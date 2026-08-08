@@ -107,7 +107,7 @@ type Abi = {
         SettingsStore: { save(name: string, key: string, raw: string): void };
         registerScript(m: { name: string; create(): unknown }): unknown;
     };
-    rs2b0t: { runner: { state: string; start(meta: unknown): void; stop(): void } };
+    rs2b0t: { runner: { state: string; start(meta: unknown): void; stop(reason: string): void } };
     __navTravel?: { walkOk: boolean; tile: Tile | null; logs: string[] };
 };
 
@@ -222,7 +222,7 @@ async function walkLeg(page: Page, dest: Tile, budgetMs: number): Promise<{ walk
                             logs: [...logs, String(e)]
                         };
                     } finally {
-                        g.rs2b0t.runner.stop();
+                        g.rs2b0t.runner.stop('harness stop');
                     }
                 }
             }

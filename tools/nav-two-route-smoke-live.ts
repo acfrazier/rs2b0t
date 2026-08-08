@@ -193,7 +193,7 @@ type Abi = {
         isNavPathPaintEnabled(): boolean;
     };
     rs2b0t: {
-        runner: { start(meta: unknown): void; stop(): void; state: string };
+        runner: { start(meta: unknown): void; stop(reason: string): void; state: string };
     };
     __twoRoute?: { walkOk: boolean; tile: Tile | null; logs: string[]; hops: string[] };
 };
@@ -299,7 +299,7 @@ async function runWalk(page: Page, dest: Tile, radius: number, budgetMs: number)
                             hops: []
                         };
                     } finally {
-                        g.rs2b0t.runner.stop();
+                        g.rs2b0t.runner.stop('harness stop');
                     }
                 }
             }

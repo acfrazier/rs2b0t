@@ -73,7 +73,7 @@ type Abi = {
         registerScript(manifest: { name: string; create(): unknown }): unknown;
     };
     rs2b0t: {
-        runner: { state: string; start(meta: unknown): void; stop(): void };
+        runner: { state: string; start(meta: unknown): void; stop(reason: string): void };
     };
     __navStress?: {
         walkOk: boolean;
@@ -297,7 +297,7 @@ async function runWalk(page: Page, opts: WalkOpts): Promise<NonNullable<Abi['__n
                         if (sampler) {
                             clearInterval(sampler);
                         }
-                        g.rs2b0t.runner.stop();
+                        g.rs2b0t.runner.stop('harness stop');
                     }
                 }
             }

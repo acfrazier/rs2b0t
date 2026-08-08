@@ -48,7 +48,7 @@ type Abi = {
         registerScript(manifest: { name: string; create(): unknown }): unknown;
     };
     rs2b0t: {
-        runner: { state: string; start(meta: unknown): void; stop(): void };
+        runner: { state: string; start(meta: unknown): void; stop(reason: string): void };
     };
     __navV2Tele?: { walkOk: boolean; tile: Tile | null; logs: string[] };
 };
@@ -180,7 +180,7 @@ try {
                             logs: [...logs, String(e)]
                         };
                     } finally {
-                        g.rs2b0t.runner.stop();
+                        g.rs2b0t.runner.stop('harness stop');
                     }
                 }
             }

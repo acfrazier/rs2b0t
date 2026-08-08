@@ -563,7 +563,7 @@ async function verifyBankCounts(
 
     try {
         await page.evaluate(() => {
-            (globalThis as never as { rs2b0t: { runner: { stop(): void } } }).rs2b0t.runner.stop();
+            (globalThis as never as { rs2b0t: { runner: { stop(reason: string): void } } }).rs2b0t.runner.stop('harness stop');
         });
     } catch {
         /* already stopped */

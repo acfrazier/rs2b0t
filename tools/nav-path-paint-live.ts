@@ -65,7 +65,7 @@ type Abi = {
         SettingsStore: { save(name: string, key: string, raw: string): void };
         registerScript(m: { name: string; create(): unknown }): unknown;
     };
-    rs2b0t: { runner: { state: string; start(meta: unknown): void; stop(): void } };
+    rs2b0t: { runner: { state: string; start(meta: unknown): void; stop(reason: string): void } };
     __navPaint?: {
         walkOk: boolean;
         tile: Tile | null;
@@ -207,7 +207,7 @@ async function runWalk(page: Page, dest: Tile): Promise<NonNullable<Abi['__navPa
                         if (sampler) {
                             clearInterval(sampler);
                         }
-                        g.rs2b0t.runner.stop();
+                        g.rs2b0t.runner.stop('harness stop');
                     }
                 }
             }
