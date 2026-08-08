@@ -221,7 +221,7 @@ async function runWalk(page: Page, opts: WalkOpts): Promise<NonNullable<Abi['__n
             break;
         }
         // Periodic energy watch (~1s): refill at low run so long pure-walk legs keep running.
-        await maybeRefillEnergy(page).catch(() => undefined);
+        await maybeRefillEnergy(page, ENERGY_REFILL_AT).catch(() => undefined);
         if (i > 0 && i % 15 === 0) {
             const mid = await page.evaluate(() => (globalThis as never as Abi).__rs2b0t.reader.worldTile());
             const e = await readRunEnergy(page).catch(() => -1);
