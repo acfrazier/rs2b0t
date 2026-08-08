@@ -17,19 +17,33 @@
  * tutorial varps so mainlandAccount relogs in ~9s instead of a long unclean hold.
  * See tools/tutorial/harness.ts mainlandAccount + relog.
  *
+ * Shared harness: tools/lib/navLiveHarness.ts (paint, energy, tele kit, walk probe).
+ *
  * LIMIT=0 → all legs in the segment (default 25 for safety).
  * OFFSET=N skips the first N legs (chunk long segments).
- * USE_TELEPORTS=0 pure-walk. ENERGY_REFILL_AT=25 mid-walk energy.
- * PATH_PAINT=1 (default) — pack path + cyan client segment + scene expand + camera yaw-follow
- *   (same stack as nav-script-routes-live). PATH_PAINT=0 / PATH_PAINT_SCENE_EXPAND=0 /
- *   PATH_PAINT_CLIENT_SEG=0 to turn pieces off.
+ * USE_TELEPORTS=0 pure-walk (still seeds runes only). ENERGY_REFILL_AT=25 mid-walk energy.
+ * PATH_PAINT=1 (default) — pack path + cyan client segment + scene expand + camera yaw-follow.
+ *   PATH_PAINT=0 / PATH_PAINT_SCENE_EXPAND=0 / PATH_PAINT_CLIENT_SEG=0 to turn pieces off.
  */
-import type { Page } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { launchBrowser, parseArgs, setSettings } from './lib/harness.js';
+import { launchBrowser, parseArgs } from './lib/harness.js';
 import { createHarnessProof } from './lib/harnessProof.js';
+import {
+    applyNavPaintSettings,
+    cheb,
+    energyRefillAtFromEnv,
+    ensureJewellery,
+    pathPaintFlagsFromEnv,
+    restoreRunEnergy,
+    runNavWalk,
+    seedTeleKit,
+    setTickRate,
+    teleArrive,
+    useTeleportsFromEnv,
+    type NavTile
+} from './lib/navLiveHarness.js';
 import { cheatQuiet, mainlandAccount, maxmeAndClearDialogs, relog } from './tutorial/harness.js';
 import {
     TRAVEL_SEGMENTS,
@@ -54,18 +68,9 @@ const LIVE_LIMIT =
     LIVE_LIMIT_RAW === undefined || LIVE_LIMIT_RAW === ''
         ? 25
         : Number(LIVE_LIMIT_RAW);
-const USE_TELEPORTS = process.env.USE_TELEPORTS !== '0' && process.env.USE_TELEPORTS !== 'false';
-/** PATH_PAINT=0 disables showNavPath / camera follow / dual paint; default on. */
-const PATH_PAINT = process.env.PATH_PAINT !== '0' && process.env.PATH_PAINT !== 'false';
-const PATH_PAINT_SCENE_EXPAND =
-    PATH_PAINT
-    && process.env.PATH_PAINT_SCENE_EXPAND !== '0'
-    && process.env.PATH_PAINT_SCENE_EXPAND !== 'false';
-const PATH_PAINT_CLIENT_SEG =
-    PATH_PAINT
-    && process.env.PATH_PAINT_CLIENT_SEG !== '0'
-    && process.env.PATH_PAINT_CLIENT_SEG !== 'false';
-const ENERGY_REFILL_AT = Number(process.env.ENERGY_REFILL_AT ?? 25);
+const USE_TELEPORTS = useTeleportsFromEnv();
+const PAINT = pathPaintFlagsFromEnv({ teleports: USE_TELEPORTS });
+const ENERGY_REFILL_AT = energyRefillAtFromEnv();
 const ARRIVAL = 8;
 const SEED_QUESTS =
     process.env.SEED_QUESTS === '1'
@@ -80,193 +85,6 @@ const { base } = parseArgs(process.argv.slice(2), {
 });
 
 const proof = createHarnessProof({ issue: 0, slug: `nav-script-travel-${SEGMENT}` });
-
-type Tile = { x: number; z: number; level: number };
-
-type Abi = {
-    __rs2b0t: {
-        reader: {
-            worldTile(): Tile | null;
-            chat(n: number): { text: string }[];
-            energy(): number;
-        };
-        Game: { energy(): number };
-        LoopingBot: new () => { loop(): unknown; log(m: string): void };
-        Traversal: {
-            walkTo(
-                dest: Tile,
-                opts: {
-                    radius?: number;
-                    timeoutMs?: number;
-                    log?: (m: string) => void;
-                    useTeleportCatalog?: boolean;
-                    policy?: { useTeleports?: boolean; distanceBeforeTeleport?: number };
-                }
-            ): Promise<boolean>;
-        };
-        SettingsStore: { save(name: string, key: string, raw: string): void };
-        registerScript(m: { name: string; create(): unknown }): unknown;
-    };
-    rs2b0t: { runner: { state: string; start(meta: unknown): void; stop(reason: string): void } };
-    __navTravel?: { walkOk: boolean; tile: Tile | null; logs: string[] };
-};
-
-function cheb(a: Tile, b: Tile): number {
-    if (a.level !== b.level) {
-        return 9999;
-    }
-    return Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z));
-}
-
-function teleCmd(t: Tile): string {
-    return `tele ${t.level},${t.x >> 6},${t.z >> 6},${t.x & 63},${t.z & 63}`;
-}
-
-async function teleArrive(page: Page, spot: Tile, maxDist = 12): Promise<void> {
-    for (let a = 0; a < 6; a++) {
-        await cheatQuiet(page, teleCmd(spot));
-        for (let p = 0; p < 16; p++) {
-            const t = await page.evaluate(() => (globalThis as never as Abi).__rs2b0t.reader.worldTile());
-            if (t && cheb(t, spot) <= maxDist) {
-                await page.waitForTimeout(300);
-                return;
-            }
-            await page.waitForTimeout(150);
-        }
-    }
-    throw new Error(`tele to ${spot.x},${spot.z} failed`);
-}
-
-async function setTickRate(page: Page, ms: number): Promise<void> {
-    if (!(await cheatQuiet(page, `speed ${ms}`))) {
-        throw new Error(`could not send speed ${ms}`);
-    }
-    const confirmed = await page.evaluate(expected => {
-        const lines = (globalThis as never as Abi).__rs2b0t.reader.chat(16);
-        return lines.some(l => l.text.includes(`World speed was changed to ${expected}ms`));
-    }, ms);
-    if (!confirmed) {
-        console.warn(`WARN: speed ${ms}ms not confirmed in chat`);
-    }
-}
-
-async function refillEnergy(page: Page): Promise<void> {
-    for (let i = 0; i < 4; i++) {
-        await cheatQuiet(page, 'energy');
-        await page.waitForTimeout(200);
-        const e = await page.evaluate(() => (globalThis as never as Abi).__rs2b0t.reader.energy());
-        if (e >= 90) {
-            return;
-        }
-    }
-}
-
-/**
- * Dual red pack path + cyan client segment paint, scene expand, and yaw-follow
- * camera — mirrors tools/nav-script-routes-live.ts applyNavPaintSettings.
- */
-async function applyNavPaintSettings(page: Page): Promise<void> {
-    await setSettings(page, 'Global', {
-        showNavPath: PATH_PAINT,
-        navCameraFollow: PATH_PAINT,
-        navPathSceneExpand: PATH_PAINT_SCENE_EXPAND,
-        navPathClientSegment: PATH_PAINT_CLIENT_SEG,
-        navPathColorClient: '#00D4FF',
-        navPathColorPath: '#FF0000',
-        navTeleports: USE_TELEPORTS
-    });
-    await page.evaluate(
-        flags => {
-            const s = (globalThis as never as Abi).__rs2b0t.SettingsStore;
-            s.save('Global', 'showNavPath', flags.paint ? 'true' : 'false');
-            s.save('Global', 'navCameraFollow', flags.paint ? 'true' : 'false');
-            s.save('Global', 'navPathSceneExpand', flags.sceneExpand ? 'true' : 'false');
-            s.save('Global', 'navPathClientSegment', flags.clientSeg ? 'true' : 'false');
-            s.save('Global', 'navPathColorClient', '#00D4FF');
-            s.save('Global', 'navPathColorPath', '#FF0000');
-            s.save('Global', 'navTeleports', flags.tele ? 'true' : 'false');
-        },
-        {
-            paint: PATH_PAINT,
-            sceneExpand: PATH_PAINT_SCENE_EXPAND,
-            clientSeg: PATH_PAINT_CLIENT_SEG,
-            tele: USE_TELEPORTS
-        }
-    );
-}
-
-async function walkLeg(page: Page, dest: Tile, budgetMs: number): Promise<{ walkOk: boolean; tile: Tile | null; logs: string[] }> {
-    await page.evaluate(
-        ({ destination, budgetMs: budget, teleOn }) => {
-            const g = globalThis as never as Abi;
-            const logs: string[] = [];
-            g.__navTravel = undefined;
-            class Probe extends g.__rs2b0t.LoopingBot {
-                override async loop(): Promise<void> {
-                    try {
-                        const walkOk = await g.__rs2b0t.Traversal.walkTo(destination, {
-                            radius: 4,
-                            timeoutMs: budget,
-                            useTeleportCatalog: teleOn,
-                            policy: { useTeleports: teleOn, distanceBeforeTeleport: 0 },
-                            log: m => {
-                                logs.push(m);
-                                this.log(m);
-                            }
-                        });
-                        g.__navTravel = { walkOk, tile: g.__rs2b0t.reader.worldTile(), logs };
-                    } catch (e) {
-                        g.__navTravel = {
-                            walkOk: false,
-                            tile: g.__rs2b0t.reader.worldTile(),
-                            logs: [...logs, String(e)]
-                        };
-                    } finally {
-                        g.rs2b0t.runner.stop('harness stop');
-                    }
-                }
-            }
-            g.rs2b0t.runner.start(
-                g.__rs2b0t.registerScript({ name: `NavTravel${Date.now()}`, create: () => new Probe() })
-            );
-        },
-        { destination: dest, budgetMs, teleOn: USE_TELEPORTS }
-    );
-
-    for (let i = 0; i < Math.ceil(budgetMs / 1000) + 40; i++) {
-        const done = await page.evaluate(() => {
-            const g = globalThis as never as Abi;
-            return (
-                g.__navTravel !== undefined
-                && (g.rs2b0t.runner.state === 'stopped' || g.rs2b0t.runner.state === 'idle')
-            );
-        });
-        if (done) {
-            break;
-        }
-        const low = await page
-            .evaluate(at => (globalThis as never as Abi).__rs2b0t.reader.energy() <= at, ENERGY_REFILL_AT)
-            .catch(() => false);
-        if (low) {
-            await refillEnergy(page);
-        }
-        if (i > 0 && i % 20 === 0) {
-            const mid = await page.evaluate(() => (globalThis as never as Abi).__rs2b0t.reader.worldTile());
-            console.log(`    …walking ${mid ? `${mid.x},${mid.z}` : '?'}`);
-        }
-        await page.waitForTimeout(1000);
-    }
-
-    const res = await page.evaluate(() => {
-        const r = (globalThis as never as Abi).__navTravel;
-        delete (globalThis as never as Abi).__navTravel;
-        return r;
-    });
-    if (!res) {
-        return { walkOk: false, tile: null, logs: ['no result (timeout)'] };
-    }
-    return res;
-}
 
 function selectRoutes(): TravelRoute[] {
     const all = buildTravelRoutes();
@@ -283,8 +101,8 @@ const stats = travelRouteStats(buildTravelRoutes());
 
 console.log(
     `nav-script-travel-live base=${base} segment=${SEGMENT} offset=${OFFSET} limit=${LIVE_LIMIT === 0 ? 'ALL' : LIVE_LIMIT} `
-    + `legs=${routes.length} tele=${USE_TELEPORTS} pathPaint=${PATH_PAINT} sceneExpand=${PATH_PAINT_SCENE_EXPAND} `
-    + `clientSeg=${PATH_PAINT_CLIENT_SEG} cameraFollow=${PATH_PAINT} tick=${TICK_MS}ms energy≤${ENERGY_REFILL_AT}% `
+    + `legs=${routes.length} tele=${USE_TELEPORTS} pathPaint=${PAINT.paint} sceneExpand=${PAINT.sceneExpand} `
+    + `clientSeg=${PAINT.clientSeg} cameraFollow=${PAINT.cameraFollow} tick=${TICK_MS}ms energy≤${ENERGY_REFILL_AT}% `
     + `budget≈${Math.round(BUDGET_MS / 1000)}s`
 );
 console.log(`  corpus: ${JSON.stringify(stats)}`);
@@ -316,7 +134,7 @@ try {
     const user = process.env.USER_NAME || `nvtr${Date.now().toString(36).slice(-6)}`;
     console.log(`${stamp()} mainlandAccount '${user}' (clean IF_BUTTON logout relog)`);
     await mainlandAccount(page, base, user);
-    await applyNavPaintSettings(page);
+    await applyNavPaintSettings(page, PAINT);
     await maxmeAndClearDialogs(page);
 
     if (SEED_QUESTS) {
@@ -328,7 +146,7 @@ try {
         await cheatQuiet(page, '~item coins 5000');
         console.log(`${stamp()} relog (quest journal colours)`);
         await relog(page, user);
-        await applyNavPaintSettings(page);
+        await applyNavPaintSettings(page, PAINT);
         await maxmeAndClearDialogs(page);
         const statuses = await page.evaluate((names: string[]) => {
             const g = globalThis as never as {
@@ -341,8 +159,14 @@ try {
         }
     }
 
+    // Runes + jewellery so product tele edges can fire when USE_TELEPORTS is on.
+    await seedTeleKit(page, stamp, { useTeleports: USE_TELEPORTS });
+    if (SEED_QUESTS || !USE_TELEPORTS) {
+        await cheatQuiet(page, 'give coins 5000');
+    }
+
     await setTickRate(page, TICK_MS);
-    await refillEnergy(page);
+    await restoreRunEnergy(page);
 
     let pass = 0;
     let fail = 0;
@@ -351,10 +175,19 @@ try {
         const id = r.id;
         console.log(`${stamp()} (${i + 1}/${routes.length}) ${id}: ${r.note}`);
         try {
-            await teleArrive(page, r.from, 14);
-            await refillEnergy(page);
-            const res = await walkLeg(page, r.to, BUDGET_MS);
-            const dist = res.tile ? cheb(res.tile, r.to) : 9999;
+            await ensureJewellery(page, { useTeleports: USE_TELEPORTS });
+            await teleArrive(page, r.from as NavTile, 14);
+            await restoreRunEnergy(page);
+            const res = await runNavWalk(page, {
+                dest: r.to as NavTile,
+                budgetMs: BUDGET_MS,
+                useTeleports: USE_TELEPORTS,
+                distanceBeforeTeleport: 0,
+                energyRefillAt: ENERGY_REFILL_AT,
+                resultKey: '__navTravel',
+                scriptNamePrefix: 'NavTravel'
+            });
+            const dist = res.tile ? cheb(res.tile, r.to as NavTile) : 9999;
             const ok = res.walkOk && dist <= ARRIVAL;
             const detail = `dist=${dist} walkOk=${res.walkOk} from=${r.from.x},${r.from.z}→${r.to.x},${r.to.z}`;
             console.log(`${ok ? 'PASS' : 'FAIL'} ${id}: ${detail}`);
@@ -375,32 +208,45 @@ try {
     await setTickRate(page, TICK_RESTORE_MS);
 
     const outPath = path.join(process.cwd(), 'out', `nav-script-travel-${SEGMENT}-proof.json`);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(
         outPath,
         JSON.stringify(
             {
                 segment: SEGMENT,
-                offset: OFFSET,
-                limit: LIVE_LIMIT,
                 pass,
                 fail,
                 total: results.length,
-                results,
-                stats
+                tele: USE_TELEPORTS,
+                results
             },
             null,
             2
         )
     );
-    console.log(`${stamp()} proof: ${outPath}`);
-    console.log(`${stamp()} ${pass} pass / ${fail} fail / ${results.length} total`);
+    console.log(`\n── summary ${pass}/${results.length} pass (wrote ${outPath}) ──`);
+    for (const r of results) {
+        console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.id}: ${r.detail}`);
+    }
+
+    await proof.writeSuccess(page, {
+        base,
+        user,
+        segment: SEGMENT,
+        tele: USE_TELEPORTS,
+        passed: pass,
+        total: results.length,
+        results
+    });
 
     if (fail > 0) {
-        process.exitCode = 1;
-        console.error(`FAIL nav-script-travel-live segment=${SEGMENT}`);
-    } else {
-        console.log(`PASS nav-script-travel-live segment=${SEGMENT}`);
+        process.exit(1);
     }
+    console.log('PASS nav-script-travel-live');
+    process.exit(0);
+} catch (e) {
+    console.error(e);
+    process.exit(1);
 } finally {
-    await browser.close();
+    await browser.close().catch(() => undefined);
 }
