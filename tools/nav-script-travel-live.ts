@@ -20,6 +20,9 @@
  * LIMIT=0 → all legs in the segment (default 25 for safety).
  * OFFSET=N skips the first N legs (chunk long segments).
  * USE_TELEPORTS=0 pure-walk. ENERGY_REFILL_AT=25 mid-walk energy.
+ * PATH_PAINT=1 (default) — pack path + cyan client segment + scene expand + camera yaw-follow
+ *   (same stack as nav-script-routes-live). PATH_PAINT=0 / PATH_PAINT_SCENE_EXPAND=0 /
+ *   PATH_PAINT_CLIENT_SEG=0 to turn pieces off.
  */
 import type { Page } from 'playwright-core';
 import fs from 'node:fs';
@@ -52,7 +55,16 @@ const LIVE_LIMIT =
         ? 25
         : Number(LIVE_LIMIT_RAW);
 const USE_TELEPORTS = process.env.USE_TELEPORTS !== '0' && process.env.USE_TELEPORTS !== 'false';
+/** PATH_PAINT=0 disables showNavPath / camera follow / dual paint; default on. */
 const PATH_PAINT = process.env.PATH_PAINT !== '0' && process.env.PATH_PAINT !== 'false';
+const PATH_PAINT_SCENE_EXPAND =
+    PATH_PAINT
+    && process.env.PATH_PAINT_SCENE_EXPAND !== '0'
+    && process.env.PATH_PAINT_SCENE_EXPAND !== 'false';
+const PATH_PAINT_CLIENT_SEG =
+    PATH_PAINT
+    && process.env.PATH_PAINT_CLIENT_SEG !== '0'
+    && process.env.PATH_PAINT_CLIENT_SEG !== 'false';
 const ENERGY_REFILL_AT = Number(process.env.ENERGY_REFILL_AT ?? 25);
 const ARRIVAL = 8;
 const SEED_QUESTS =
@@ -149,16 +161,38 @@ async function refillEnergy(page: Page): Promise<void> {
     }
 }
 
+/**
+ * Dual red pack path + cyan client segment paint, scene expand, and yaw-follow
+ * camera — mirrors tools/nav-script-routes-live.ts applyNavPaintSettings.
+ */
 async function applyNavPaintSettings(page: Page): Promise<void> {
     await setSettings(page, 'Global', {
         showNavPath: PATH_PAINT,
+        navCameraFollow: PATH_PAINT,
+        navPathSceneExpand: PATH_PAINT_SCENE_EXPAND,
+        navPathClientSegment: PATH_PAINT_CLIENT_SEG,
+        navPathColorClient: '#00D4FF',
+        navPathColorPath: '#FF0000',
         navTeleports: USE_TELEPORTS
     });
-    await page.evaluate(([paint, tele]) => {
-        const store = (globalThis as never as Abi).__rs2b0t.SettingsStore;
-        store.save('Global', 'showNavPath', paint ? 'true' : 'false');
-        store.save('Global', 'navTeleports', tele ? 'true' : 'false');
-    }, [PATH_PAINT, USE_TELEPORTS] as const);
+    await page.evaluate(
+        flags => {
+            const s = (globalThis as never as Abi).__rs2b0t.SettingsStore;
+            s.save('Global', 'showNavPath', flags.paint ? 'true' : 'false');
+            s.save('Global', 'navCameraFollow', flags.paint ? 'true' : 'false');
+            s.save('Global', 'navPathSceneExpand', flags.sceneExpand ? 'true' : 'false');
+            s.save('Global', 'navPathClientSegment', flags.clientSeg ? 'true' : 'false');
+            s.save('Global', 'navPathColorClient', '#00D4FF');
+            s.save('Global', 'navPathColorPath', '#FF0000');
+            s.save('Global', 'navTeleports', flags.tele ? 'true' : 'false');
+        },
+        {
+            paint: PATH_PAINT,
+            sceneExpand: PATH_PAINT_SCENE_EXPAND,
+            clientSeg: PATH_PAINT_CLIENT_SEG,
+            tele: USE_TELEPORTS
+        }
+    );
 }
 
 async function walkLeg(page: Page, dest: Tile, budgetMs: number): Promise<{ walkOk: boolean; tile: Tile | null; logs: string[] }> {
@@ -249,7 +283,9 @@ const stats = travelRouteStats(buildTravelRoutes());
 
 console.log(
     `nav-script-travel-live base=${base} segment=${SEGMENT} offset=${OFFSET} limit=${LIVE_LIMIT === 0 ? 'ALL' : LIVE_LIMIT} `
-    + `legs=${routes.length} tele=${USE_TELEPORTS} tick=${TICK_MS}ms energy≤${ENERGY_REFILL_AT}% budget≈${Math.round(BUDGET_MS / 1000)}s`
+    + `legs=${routes.length} tele=${USE_TELEPORTS} pathPaint=${PATH_PAINT} sceneExpand=${PATH_PAINT_SCENE_EXPAND} `
+    + `clientSeg=${PATH_PAINT_CLIENT_SEG} cameraFollow=${PATH_PAINT} tick=${TICK_MS}ms energy≤${ENERGY_REFILL_AT}% `
+    + `budget≈${Math.round(BUDGET_MS / 1000)}s`
 );
 console.log(`  corpus: ${JSON.stringify(stats)}`);
 
