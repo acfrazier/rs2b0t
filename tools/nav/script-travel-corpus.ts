@@ -130,32 +130,6 @@ export function buildTravelRoutes(): TravelRoute[] {
         });
     };
 
-    const chain = (
-        points: { id: string; tile: NavPoint; label: string }[],
-        source: string,
-        segment: Exclude<TravelSegment, 'all'>,
-        gathering = false
-    ): void => {
-        for (let i = 0; i < points.length; i++) {
-            for (let j = 0; j < points.length; j++) {
-                if (i === j) {
-                    continue;
-                }
-                const a = points[i]!;
-                const b = points[j]!;
-                add(
-                    `${segment}-${a.id}-${b.id}`,
-                    a.tile,
-                    b.tile,
-                    `${a.label} → ${b.label}`,
-                    source,
-                    segment,
-                    gathering
-                );
-            }
-        }
-    };
-
     // ── Clues ──────────────────────────────────────────────────────────────
     const cluePts: { id: string; tile: NavPoint; label: string }[] = [];
     for (const [id, row] of Object.entries(CLUE_DB)) {
