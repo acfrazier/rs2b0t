@@ -60,6 +60,7 @@ import {
     sustainEverySecFromEnv,
     teleArrive,
     useTeleportsFromEnv,
+    walkPollMsFromEnv,
     type NavTile
 } from './lib/navLiveHarness.js';
 import { cheatQuiet, mainlandAccount, maxmeAndClearDialogs, relog } from './tutorial/harness.js';
@@ -91,6 +92,7 @@ const PAINT = pathPaintFlagsFromEnv({ teleports: USE_TELEPORTS });
 const ENERGY_REFILL_AT = energyRefillAtFromEnv();
 const HP_REFILL_AT = hpRefillAtFromEnv();
 const SUSTAIN_EVERY_S = sustainEverySecFromEnv();
+const WALK_POLL_MS = walkPollMsFromEnv();
 const STUCK_ABORT_RAW = stuckAbortFromEnv();
 /** Align stuck est wall-clock with this suite's setTickRate (not generic TICK_MS env). */
 const STUCK_ABORT = STUCK_ABORT_RAW
@@ -136,7 +138,7 @@ console.log(
     + `pathPaint=${PAINT.paint} sceneExpand=${PAINT.sceneExpand} `
     + `clientSeg=${PAINT.clientSeg} cameraFollow=${PAINT.cameraFollow} tick=${TICK_MS}ms `
     + `energy≤${ENERGY_REFILL_AT}% hp≤${HP_REFILL_AT || 'off'} sustainEvery=${SUSTAIN_EVERY_S}s `
-    + `budget≈${Math.round(BUDGET_MS / 1000)}s ${stuckNote} suiteAbort=${HARNESS_SUITE_ABORT}`
+    + `walkPoll=${WALK_POLL_MS}ms budget≈${Math.round(BUDGET_MS / 1000)}s ${stuckNote} suiteAbort=${HARNESS_SUITE_ABORT}`
 );
 console.log(`  corpus: ${JSON.stringify(stats)}`);
 
@@ -223,6 +225,7 @@ try {
                 energyRefillAt: ENERGY_REFILL_AT,
                 hpRefillAt: HP_REFILL_AT > 0 ? HP_REFILL_AT : undefined,
                 sustainEverySec: SUSTAIN_EVERY_S,
+                pollMs: WALK_POLL_MS,
                 resultKey: '__navTravel',
                 scriptNamePrefix: 'NavTravel',
                 stuckAbort: STUCK_ABORT

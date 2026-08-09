@@ -2,13 +2,52 @@
  * Shared helpers for operator nav live harnesses (tools/nav-*-live.ts, nav-*-smoke.ts).
  * Test/tooling only — not product runtime.
  *
- * Covers: cheat tele placement, energy, tick rate, path paint settings,
+ * Covers: cheat tele placement, energy/HP sustain, tick rate, path paint settings,
  * inventory seed (runes/jewellery), and a generic walkTo probe loop.
+ *
+ * **Pacing (multi-suite MacBook):** prefer shared defaults below — outer walk polls
+ * are multi-second, sustain is throttled, cheats settle without sub-100ms spins.
  */
 import type { Page } from 'playwright-core';
 
 import { setSettings } from './harness.js';
 import { cheatQuiet } from '../tutorial/harness.js';
+
+// ── pacing (shared — do not invent tighter loops in callers) ────────────────
+
+/** Outer mid-walk poll period (done/tile/stuck). Default 2s. */
+export const DEFAULT_WALK_POLL_MS = 2000;
+
+/** Energy + HP sustain period. Default 5s (see maybeSustain). */
+export const DEFAULT_SUSTAIN_EVERY_S = 5;
+
+/** Post-cheat / post-drop settle. */
+export const DEFAULT_SETTLE_MS = 400;
+
+/** Tele / inv-seed arrival polls (not 20–150ms spins). */
+export const DEFAULT_ARRIVAL_POLL_MS = 400;
+
+/** Runner stop wait step. */
+export const DEFAULT_STOP_POLL_MS = 500;
+
+/**
+ * Outer walk poll ms from env: `WALK_POLL_MS` or `WALK_POLL_S` (seconds).
+ * Floor 500ms — sub-second fleet polls are unnecessary for nav research.
+ */
+export function walkPollMsFromEnv(fallback = DEFAULT_WALK_POLL_MS): number {
+    const rawS = process.env.WALK_POLL_S;
+    const rawMs = process.env.WALK_POLL_MS;
+    let ms = fallback;
+    if (rawMs !== undefined && rawMs !== '') {
+        ms = Number(rawMs);
+    } else if (rawS !== undefined && rawS !== '') {
+        ms = Number(rawS) * 1000;
+    }
+    if (!Number.isFinite(ms) || ms < 500) {
+        return 500;
+    }
+    return Math.min(15_000, ms);
+}
 
 // ── types ───────────────────────────────────────────────────────────────────
 
@@ -114,9 +153,10 @@ export function teleCmd(t: NavTile): string {
  * This is placement seed, not a product spell/jewellery teleport.
  */
 async function teleArriveExact(page: Page, spot: NavTile, maxDist: number): Promise<void> {
-    for (let a = 0; a < 6; a++) {
+    // ~5 × ~3s max wait — not 6×16×150ms evaluate storms.
+    for (let a = 0; a < 5; a++) {
         await cheatQuiet(page, teleCmd(spot));
-        for (let p = 0; p < 16; p++) {
+        for (let p = 0; p < 8; p++) {
             const t = await page.evaluate(() => {
                 const g = globalThis as never as {
                     __rs2b0t: { reader: { worldTile(): NavTile | null } };
@@ -124,10 +164,10 @@ async function teleArriveExact(page: Page, spot: NavTile, maxDist: number): Prom
                 return g.__rs2b0t.reader.worldTile();
             });
             if (t && cheb(t, spot) <= maxDist) {
-                await page.waitForTimeout(300);
+                await page.waitForTimeout(DEFAULT_SETTLE_MS);
                 return;
             }
-            await page.waitForTimeout(150);
+            await page.waitForTimeout(DEFAULT_ARRIVAL_POLL_MS);
         }
     }
     throw new Error(`tele to ${spot.x},${spot.z},L${spot.level} failed`);
@@ -247,10 +287,10 @@ export async function readHp(page: Page): Promise<{ effective: number; base: num
  * One cheat + short confirm (no tight poll storm).
  */
 export async function restoreRunEnergy(page: Page): Promise<boolean> {
-    if (!(await cheatQuiet(page, '~energy', 500))) {
+    if (!(await cheatQuiet(page, '~energy', DEFAULT_SETTLE_MS + 100))) {
         return false;
     }
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(DEFAULT_SETTLE_MS);
     return (await readRunEnergy(page)) >= 90;
 }
 
@@ -260,10 +300,10 @@ export async function restoreRunEnergy(page: Page): Promise<boolean> {
  */
 export async function restoreHp(page: Page, level = 99): Promise<boolean> {
     const lv = Math.max(1, Math.min(99, level | 0));
-    if (!(await cheatQuiet(page, `setstat hitpoints ${lv}`, 500))) {
+    if (!(await cheatQuiet(page, `setstat hitpoints ${lv}`, DEFAULT_SETTLE_MS + 100))) {
         return false;
     }
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(DEFAULT_SETTLE_MS);
     const hp = await readHp(page);
     return hp.effective >= Math.min(lv, hp.base) - 1;
 }
@@ -332,7 +372,7 @@ export function hpRefillAtFromEnv(fallback = 40): number {
 }
 
 /** SUSTAIN_EVERY_S env: default 5. Floor 2 so we never poll harder than that. */
-export function sustainEverySecFromEnv(fallback = 5): number {
+export function sustainEverySecFromEnv(fallback = DEFAULT_SUSTAIN_EVERY_S): number {
     const n = Number(process.env.SUSTAIN_EVERY_S ?? fallback);
     if (!Number.isFinite(n) || n < 2) {
         return 2;
@@ -568,7 +608,7 @@ export async function dropInvMatching(page: Page, match: RegExp): Promise<number
         return n;
     }, match.source);
     if (dropped > 0) {
-        await page.waitForTimeout(400);
+        await page.waitForTimeout(DEFAULT_SETTLE_MS);
     }
     return dropped;
 }
@@ -604,10 +644,12 @@ export async function seedItem(
     const debugName = m?.[1] ?? debugOrCmd;
     const resolvedQty = m?.[2] !== undefined ? Number(m[2]) : qty;
     const cmds = [`give ${debugName} ${resolvedQty}`, `~item ${debugName} ${resolvedQty}`];
-    for (let i = 0; i < tries; i++) {
+    // Fewer tries × coarser polls (was 8×4×200ms evaluate storm).
+    const maxTries = Math.min(tries, 6);
+    for (let i = 0; i < maxTries; i++) {
         await cheatQuiet(page, cmds[i % cmds.length]!);
-        for (let poll = 0; poll < 4; poll++) {
-            await page.waitForTimeout(200);
+        for (let poll = 0; poll < 3; poll++) {
+            await page.waitForTimeout(DEFAULT_ARRIVAL_POLL_MS);
             const ok = await page.evaluate(pattern => {
                 const g = globalThis as never as {
                     __rs2b0t: { Inventory: { items(): { name: string | null }[] } };
@@ -646,6 +688,119 @@ export async function seedRunes(page: Page): Promise<void> {
     }
 }
 
+// ── 377-style prep helpers (tools-only; condition → seed/fix) ───────────────
+
+/**
+ * Wait until client is ingame with scene fully built (`sceneState === 2`).
+ * Backport of LC-rs2-r377 `waitSceneReady` — seeds while scene≠2 thrash.
+ * Polls at {@link DEFAULT_STOP_POLL_MS}, not sub-100ms.
+ */
+export async function waitSceneReady(page: Page, timeoutMs = 45_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const ok = await page.evaluate(() => {
+            try {
+                const c = (globalThis as never as {
+                    rs2b0t?: { client?: { ingame: boolean; sceneState: number } };
+                }).rs2b0t?.client;
+                return !!(c?.ingame && c.sceneState === 2);
+            } catch {
+                return false;
+            }
+        });
+        if (ok) {
+            return true;
+        }
+        await page.waitForTimeout(DEFAULT_STOP_POLL_MS);
+    }
+    return false;
+}
+
+/**
+ * Batch `give <debug> <qty>` after scene ready (377 `giveItems`).
+ * Prefer this over raw give spam mid-zone-rebuild.
+ */
+export async function giveItems(
+    page: Page,
+    items: readonly (readonly [string, number] | { name: string; qty?: number })[],
+    opts?: { waitScene?: boolean }
+): Promise<string[]> {
+    if (opts?.waitScene !== false) {
+        const ok = await waitSceneReady(page, 45_000);
+        if (!ok) {
+            console.warn('giveItems: scene not ready after 45s — sending give anyway');
+        }
+    }
+    const failed: string[] = [];
+    for (const entry of items) {
+        const name = 'name' in entry ? entry.name : entry[0];
+        const qty = 'name' in entry ? (entry.qty ?? 1) : (entry[1] ?? 1);
+        const cmd = `give ${name} ${qty | 0}`;
+        if (!(await cheatQuiet(page, cmd, DEFAULT_SETTLE_MS))) {
+            failed.push(cmd);
+        }
+    }
+    if (failed.length) {
+        console.warn('giveItems failed:', failed.join('; '));
+    }
+    return failed;
+}
+
+/**
+ * Batch engine `setstat <skill> <level>` (377 `setStats`).
+ * Sets base + current; useful for skill gates and HP restore without ~maxme dialogs.
+ */
+export async function setStats(
+    page: Page,
+    stats: Record<string, number> | readonly (readonly [string, number])[],
+    opts?: { waitMs?: number }
+): Promise<string[]> {
+    const waitMs = opts?.waitMs ?? DEFAULT_SETTLE_MS;
+    const entries = Array.isArray(stats)
+        ? stats
+        : Object.entries(stats).map(([k, v]) => [k, v] as const);
+    const failed: string[] = [];
+    for (const [skill, level] of entries) {
+        const cmd = `setstat ${String(skill).toLowerCase()} ${Number(level) | 0}`;
+        if (!(await cheatQuiet(page, cmd, waitMs))) {
+            failed.push(cmd);
+        }
+    }
+    return failed;
+}
+
+/**
+ * Full run energy + run on (377 `fillRunEnergy` name; same as {@link restoreRunEnergy}).
+ */
+export async function fillRunEnergy(page: Page): Promise<boolean> {
+    return restoreRunEnergy(page);
+}
+
+/**
+ * Condition → act: if inv lacks `match`, seed via give (377 mid-quest top-up style).
+ * Returns true when item was already present or seed succeeded.
+ */
+export async function ensureInvItem(
+    page: Page,
+    debugName: string,
+    match: RegExp | string,
+    qty = 1
+): Promise<boolean> {
+    const re =
+        typeof match === 'string'
+            ? new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
+            : match;
+    if (await invHas(page, re)) {
+        return true;
+    }
+    try {
+        await seedItem(page, debugName, re, qty);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /**
  * Ensure one charged copy of each jewellery seed is present.
  * Drops depleted (no charge-paren) copies first so a full pack of uncharged
@@ -681,9 +836,16 @@ export async function ensureJewellery(
 export async function seedTeleKit(
     page: Page,
     stamp: () => string,
-    opts?: { useTeleports?: boolean }
+    opts?: { useTeleports?: boolean; waitScene?: boolean }
 ): Promise<void> {
     const useTele = opts?.useTeleports ?? useTeleportsFromEnv();
+    // 377 lesson: seed after scene 2 so inv lists are real.
+    if (opts?.waitScene !== false) {
+        const ok = await waitSceneReady(page, 30_000);
+        if (!ok) {
+            console.warn(`${stamp()} seedTeleKit: scene not ready — seeding anyway`);
+        }
+    }
     await seedRunes(page);
     if (useTele) {
         await ensureJewellery(page, { useTeleports: true });
@@ -790,6 +952,11 @@ export type RunNavWalkOpts = {
     /** Log mid-walk position every N seconds (default 20). 0 = off. */
     progressEverySec?: number;
     /**
+     * Outer poll period for done/tile/stuck (default {@link DEFAULT_WALK_POLL_MS}).
+     * Prefer ≥1s; sub-second is almost never useful for multi-suite fleets.
+     */
+    pollMs?: number;
+    /**
      * Per-leg early stop when wall time ≫ path-cost estimate and no tile move
      * (door thrash / pathfind loop). Does not abort the whole suite.
      */
@@ -846,7 +1013,7 @@ export async function ensureRunnerStopped(
         if (state === 'stopped' || state === 'idle' || state === 'crashed') {
             return;
         }
-        await page.waitForTimeout(250);
+        await page.waitForTimeout(DEFAULT_STOP_POLL_MS);
     }
 }
 
@@ -867,13 +1034,15 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
     const teleOn = opts.useTeleports !== false;
     const radius = opts.radius ?? 4;
     const progressEvery = opts.progressEverySec ?? 20;
+    const pollMs = opts.pollMs ?? walkPollMsFromEnv();
     const stuck = opts.stuckAbort;
     const walkStartedAt = Date.now();
     let lastTile: NavTile | null = null;
     let lastMoveAt = walkStartedAt;
     let stuckReason: string | null = null;
-    /** Throttle sustain so N concurrent fleets do not evaluate every second. */
+    /** Throttle sustain so N concurrent fleets do not evaluate every outer poll. */
     const sustainClock = { t: 0 };
+    const maxPolls = Math.ceil(opts.budgetMs / pollMs) + 20;
 
     try {
         await page.evaluate(
@@ -988,8 +1157,8 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
             }
         );
 
-        for (let i = 0; i < Math.ceil(opts.budgetMs / 1000) + 40; i++) {
-            // One page.evaluate per second: done + mid tile/cost (no separate energy/hp read).
+        for (let i = 0; i < maxPolls; i++) {
+            // One page.evaluate per outer poll: done + mid tile/cost (no separate energy/hp).
             const poll = await page.evaluate(
                 ({ resultKey, midKey }) => {
                     const g = globalThis as never as Record<string, unknown> & {
@@ -1035,7 +1204,7 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                     console.log(`    …${stuckReason}`);
                     await ensureRunnerStopped(page, 'harness stuck abort').catch(() => undefined);
                     // Give walkTo a moment to settle into the result slot after stop.
-                    for (let w = 0; w < 20; w++) {
+                    for (let w = 0; w < 12; w++) {
                         const settled = await page.evaluate(
                             ({ resultKey }) => {
                                 const g = globalThis as never as Record<string, unknown> & {
@@ -1053,26 +1222,27 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                         if (settled) {
                             break;
                         }
-                        await page.waitForTimeout(250);
+                        await page.waitForTimeout(DEFAULT_STOP_POLL_MS);
                     }
                     break;
                 }
             }
 
-            // Energy + HP on a shared slow cadence (default 5s), not every poll second.
+            // Energy + HP on a shared slow cadence (default 5s), not every outer poll.
             await maybeSustain(
                 page,
                 {
                     energyRefillAt: opts.energyRefillAt,
                     hpRefillAt: opts.hpRefillAt,
                     hpLevel: opts.hpLevel,
-                    everySec: opts.sustainEverySec ?? 5
+                    everySec: opts.sustainEverySec ?? DEFAULT_SUSTAIN_EVERY_S
                 },
                 sustainClock
             ).catch(() => undefined);
 
-            if (progressEvery > 0 && i > 0 && i % progressEvery === 0) {
-                // Tile/cost from poll (free); skip energy read here — sustain already tracks it.
+            // Progress ~every progressEvery seconds (scale by poll period).
+            const progressEveryPolls = Math.max(1, Math.round((progressEvery * 1000) / pollMs));
+            if (progressEvery > 0 && i > 0 && i % progressEveryPolls === 0) {
                 const costNote =
                     poll.pathCost !== null
                         ? ` cost=${poll.pathCost} est≈${pathCostToEstSec(poll.pathCost, stuck?.tickMs ?? 300).toFixed(0)}s`
@@ -1081,7 +1251,7 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                     `    …walking ${poll.tile ? `${poll.tile.x},${poll.tile.z}` : '?'}${costNote}`
                 );
             }
-            await page.waitForTimeout(1000);
+            await page.waitForTimeout(pollMs);
         }
     } finally {
         // Poll timeout (or evaluate throw) must not leave the runner running for the next leg.
