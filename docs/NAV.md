@@ -609,6 +609,10 @@ the JSON proof.
 `mainlandAccount` uses clean IF_BUTTON logout (com 2458) after tutorial varps so
 relogin is ~seconds, not a minute-long unclean hold.
 
+Fresh accounts leave `*.sav` on an always-on local engine. Clean with
+`bash tools/cleanup-test-accounts.sh` (dry-run default; see [TESTING.md](TESTING.md#live-harnesses)).
+Stagger concurrent suite boots so logins do not share one title-loop race.
+
 **Live HARD:** `tools/nav-script-routes-live.ts` with `HARD=1` reads
 `tools/nav/script-routes.hardest.json`. Seeds runes + charged jewellery at start so
 long OD legs may Rub naturally (no fake end-of-run jewellery allowlist). Fresh
