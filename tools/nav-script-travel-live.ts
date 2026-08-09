@@ -34,6 +34,8 @@
  *     STUCK_FACTOR=2.5 STUCK_MIN_S=20 STUCK_NOMOVE_S=12
  *   HARNESS_SUITE_ABORT=1 (default) — stop the whole suite on harness death only
  *     (`is still running`, seed failure, tele placement failure). Product OD fails continue.
+ *   HP_REFILL_AT=40 (default) — mid-walk setstat hitpoints when effective ≤ threshold (0=off).
+ *   SUSTAIN_EVERY_S=5 — energy+HP check period (not every poll second; multi-suite friendly).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,13 +48,16 @@ import {
     energyRefillAtFromEnv,
     ensureJewellery,
     harnessSuiteAbortFromEnv,
+    hpRefillAtFromEnv,
     isHarnessDeathDetail,
     pathPaintFlagsFromEnv,
+    restoreHp,
     restoreRunEnergy,
     runNavWalk,
     seedTeleKit,
     setTickRate,
     stuckAbortFromEnv,
+    sustainEverySecFromEnv,
     teleArrive,
     useTeleportsFromEnv,
     type NavTile
@@ -84,6 +89,8 @@ const LIVE_LIMIT =
 const USE_TELEPORTS = useTeleportsFromEnv();
 const PAINT = pathPaintFlagsFromEnv({ teleports: USE_TELEPORTS });
 const ENERGY_REFILL_AT = energyRefillAtFromEnv();
+const HP_REFILL_AT = hpRefillAtFromEnv();
+const SUSTAIN_EVERY_S = sustainEverySecFromEnv();
 const STUCK_ABORT_RAW = stuckAbortFromEnv();
 /** Align stuck est wall-clock with this suite's setTickRate (not generic TICK_MS env). */
 const STUCK_ABORT = STUCK_ABORT_RAW
@@ -127,7 +134,8 @@ console.log(
     `nav-script-travel-live base=${base} segment=${SEGMENT} offset=${OFFSET} limit=${LIVE_LIMIT === 0 ? 'ALL' : LIVE_LIMIT} `
     + `legs=${routes.length} tele=${USE_TELEPORTS} kitSeeded=${KIT_SEEDED} pureWalk=${PURE_WALK} `
     + `pathPaint=${PAINT.paint} sceneExpand=${PAINT.sceneExpand} `
-    + `clientSeg=${PAINT.clientSeg} cameraFollow=${PAINT.cameraFollow} tick=${TICK_MS}ms energy≤${ENERGY_REFILL_AT}% `
+    + `clientSeg=${PAINT.clientSeg} cameraFollow=${PAINT.cameraFollow} tick=${TICK_MS}ms `
+    + `energy≤${ENERGY_REFILL_AT}% hp≤${HP_REFILL_AT || 'off'} sustainEvery=${SUSTAIN_EVERY_S}s `
     + `budget≈${Math.round(BUDGET_MS / 1000)}s ${stuckNote} suiteAbort=${HARNESS_SUITE_ABORT}`
 );
 console.log(`  corpus: ${JSON.stringify(stats)}`);
@@ -203,12 +211,18 @@ try {
             await ensureJewellery(page, { useTeleports: USE_TELEPORTS });
             await teleArrive(page, r.from as NavTile, 14);
             await restoreRunEnergy(page);
+            // One HP top-up at leg start if enabled (not every tick — mid-walk is throttled).
+            if (HP_REFILL_AT > 0) {
+                await restoreHp(page, 99).catch(() => undefined);
+            }
             const res = await runNavWalk(page, {
                 dest: r.to as NavTile,
                 budgetMs: BUDGET_MS,
                 useTeleports: USE_TELEPORTS,
                 distanceBeforeTeleport: 0,
                 energyRefillAt: ENERGY_REFILL_AT,
+                hpRefillAt: HP_REFILL_AT > 0 ? HP_REFILL_AT : undefined,
+                sustainEverySec: SUSTAIN_EVERY_S,
                 resultKey: '__navTravel',
                 scriptNamePrefix: 'NavTravel',
                 stuckAbort: STUCK_ABORT

@@ -200,7 +200,7 @@ export async function teleArrive(page: Page, spot: NavTile, maxDist = 12): Promi
     await teleArriveExact(page, stand, maxDist);
 }
 
-// ── energy / tick ───────────────────────────────────────────────────────────
+// ── energy / HP sustain (cheap polls — multi-suite MacBook friendly) ────────
 
 /** Client energy 0–100. Prefer Game.energy(). */
 export async function readRunEnergy(page: Page): Promise<number> {
@@ -219,23 +219,53 @@ export async function readRunEnergy(page: Page): Promise<number> {
     });
 }
 
+/** Effective / base hitpoints (1 if unread). */
+export async function readHp(page: Page): Promise<{ effective: number; base: number }> {
+    return page.evaluate(() => {
+        const g = globalThis as never as {
+            __rs2b0t: {
+                Skills: {
+                    effective(n: string): number;
+                    level(n: string): number;
+                };
+            };
+        };
+        try {
+            return {
+                effective: g.__rs2b0t.Skills.effective('hitpoints'),
+                base: g.__rs2b0t.Skills.level('hitpoints')
+            };
+        } catch {
+            return { effective: 1, base: 1 };
+        }
+    });
+}
+
 /**
  * Full energy + run on via content debugproc `[debugproc,energy]` → `~energy`.
  * Plain `energy` is not an engine cheat and is silently ignored.
+ * One cheat + short confirm (no tight poll storm).
  */
 export async function restoreRunEnergy(page: Page): Promise<boolean> {
-    if (!(await cheatQuiet(page, '~energy', 400))) {
+    if (!(await cheatQuiet(page, '~energy', 500))) {
         return false;
     }
-    for (let attempt = 0; attempt < 4; attempt++) {
-        await page.waitForTimeout(250);
-        const e = await readRunEnergy(page);
-        if (e >= 90) {
-            return true;
-        }
-        await cheatQuiet(page, '~energy', 300);
-    }
+    await page.waitForTimeout(300);
     return (await readRunEnergy(page)) >= 90;
+}
+
+/**
+ * Full HP via engine `setstat hitpoints <level>` (sets base + current).
+ * No dedicated ~heal debugproc; this is the stock full-restore path.
+ */
+export async function restoreHp(page: Page, level = 99): Promise<boolean> {
+    const lv = Math.max(1, Math.min(99, level | 0));
+    if (!(await cheatQuiet(page, `setstat hitpoints ${lv}`, 500))) {
+        return false;
+    }
+    await page.waitForTimeout(200);
+    const hp = await readHp(page);
+    return hp.effective >= Math.min(lv, hp.base) - 1;
 }
 
 /** Mid-walk: refill when energy ≤ lowAt. Logs when it fires. */
@@ -250,6 +280,131 @@ export async function maybeRefillEnergy(page: Page, lowAt = 25): Promise<boolean
         `    energy refill: ${e}% → ${after}% (threshold ≤${lowAt}${ok ? '' : ', ~energy may have been busy/p_finduid'})`
     );
     return ok;
+}
+
+/**
+ * Mid-walk HP top-up when effective ≤ lowAt.
+ * Uses setstat (engine cheat) — not invuln; combat can still land between ticks.
+ */
+export async function maybeRestoreHp(page: Page, lowAt = 40, level = 99): Promise<boolean> {
+    if (lowAt <= 0) {
+        return false;
+    }
+    const before = await readHp(page);
+    if (before.effective > lowAt) {
+        return false;
+    }
+    const target = Math.max(before.base, Math.min(99, level | 0));
+    const ok = await restoreHp(page, target);
+    const after = await readHp(page);
+    console.log(
+        `    hp restore: ${before.effective}/${before.base} → ${after.effective}/${after.base}`
+        + ` (threshold ≤${lowAt}${ok ? '' : ', setstat may have failed'})`
+    );
+    return ok;
+}
+
+export type SustainOpts = {
+    /** Energy % threshold; omit/undefined = off. */
+    energyRefillAt?: number;
+    /** Effective HP threshold; 0/omit = off. */
+    hpRefillAt?: number;
+    /** setstat hitpoints target (default 99). */
+    hpLevel?: number;
+    /**
+     * Min seconds between sustain checks (default 5).
+     * Avoids per-second evaluate spam when many suites share a machine.
+     */
+    everySec?: number;
+};
+
+/** HP_REFILL_AT env: default 40; 0/false disables. */
+export function hpRefillAtFromEnv(fallback = 40): number {
+    const v = process.env.HP_REFILL_AT;
+    if (v === '0' || v === 'false') {
+        return 0;
+    }
+    if (v === undefined || v === '') {
+        return fallback;
+    }
+    const n = Number(v);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+/** SUSTAIN_EVERY_S env: default 5. Floor 2 so we never poll harder than that. */
+export function sustainEverySecFromEnv(fallback = 5): number {
+    const n = Number(process.env.SUSTAIN_EVERY_S ?? fallback);
+    if (!Number.isFinite(n) || n < 2) {
+        return 2;
+    }
+    return Math.min(60, n);
+}
+
+/**
+ * Throttled energy + HP sustain. Call from the walk poll; returns quickly when
+ * not due. Single decision path so 6 concurrent fleets stay light.
+ */
+export async function maybeSustain(
+    page: Page,
+    opts: SustainOpts,
+    lastAtMs: { t: number }
+): Promise<void> {
+    const everyMs = (opts.everySec ?? 5) * 1000;
+    const now = Date.now();
+    if (now - lastAtMs.t < everyMs) {
+        return;
+    }
+    lastAtMs.t = now;
+
+    const wantEnergy = opts.energyRefillAt !== undefined;
+    const wantHp = opts.hpRefillAt !== undefined && opts.hpRefillAt > 0;
+    if (!wantEnergy && !wantHp) {
+        return;
+    }
+
+    // One evaluate for both gauges when either is watched.
+    const snap = await page.evaluate(() => {
+        const g = globalThis as never as {
+            __rs2b0t: {
+                Game?: { energy(): number };
+                reader: { energy(): number };
+                Skills: { effective(n: string): number; level(n: string): number };
+            };
+        };
+        let energy = -1;
+        let hp = 1;
+        let hpBase = 1;
+        try {
+            energy = g.__rs2b0t.Game?.energy() ?? g.__rs2b0t.reader.energy();
+        } catch {
+            /* ignore */
+        }
+        try {
+            hp = g.__rs2b0t.Skills.effective('hitpoints');
+            hpBase = g.__rs2b0t.Skills.level('hitpoints');
+        } catch {
+            /* ignore */
+        }
+        return { energy, hp, hpBase };
+    });
+
+    if (wantEnergy && snap.energy >= 0 && snap.energy <= (opts.energyRefillAt as number)) {
+        const ok = await restoreRunEnergy(page);
+        const after = await readRunEnergy(page).catch(() => -1);
+        console.log(
+            `    energy refill: ${snap.energy}% → ${after}% (threshold ≤${opts.energyRefillAt}`
+            + `${ok ? '' : ', ~energy may have been busy/p_finduid'})`
+        );
+    }
+    if (wantHp && snap.hp <= (opts.hpRefillAt as number)) {
+        const target = Math.max(snap.hpBase, Math.min(99, opts.hpLevel ?? 99));
+        const ok = await restoreHp(page, target);
+        const after = await readHp(page).catch(() => ({ effective: -1, base: -1 }));
+        console.log(
+            `    hp restore: ${snap.hp}/${snap.hpBase} → ${after.effective}/${after.base}`
+            + ` (threshold ≤${opts.hpRefillAt}${ok ? '' : ', setstat may have failed'})`
+        );
+    }
 }
 
 export async function setTickRate(
@@ -623,6 +778,15 @@ export type RunNavWalkOpts = {
     scriptNamePrefix?: string;
     /** When set, mid-walk energy watch refills at this threshold. */
     energyRefillAt?: number;
+    /**
+     * When set (>0), mid-walk HP restore via setstat when effective ≤ threshold.
+     * Checked on the same throttled sustain cadence as energy (not every second).
+     */
+    hpRefillAt?: number;
+    /** setstat hitpoints target when restoring (default 99). */
+    hpLevel?: number;
+    /** Sustain poll period seconds (default 5). */
+    sustainEverySec?: number;
     /** Log mid-walk position every N seconds (default 20). 0 = off. */
     progressEverySec?: number;
     /**
@@ -708,6 +872,8 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
     let lastTile: NavTile | null = null;
     let lastMoveAt = walkStartedAt;
     let stuckReason: string | null = null;
+    /** Throttle sustain so N concurrent fleets do not evaluate every second. */
+    const sustainClock = { t: 0 };
 
     try {
         await page.evaluate(
@@ -823,53 +989,47 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
         );
 
         for (let i = 0; i < Math.ceil(opts.budgetMs / 1000) + 40; i++) {
-            const done = await page.evaluate(
-                ({ resultKey }) => {
-                    const g = globalThis as never as Record<string, unknown> & {
-                        rs2b0t: { runner: { state: string } };
-                    };
-                    return (
-                        g[resultKey] !== undefined
-                        && (g.rs2b0t.runner.state === 'stopped' || g.rs2b0t.runner.state === 'idle')
-                    );
-                },
-                { resultKey }
-            );
-            if (done) {
-                break;
-            }
-
-            const mid = await page.evaluate(
-                ({ midKey }) => {
+            // One page.evaluate per second: done + mid tile/cost (no separate energy/hp read).
+            const poll = await page.evaluate(
+                ({ resultKey, midKey }) => {
                     const g = globalThis as never as Record<string, unknown> & {
                         __rs2b0t: { reader: { worldTile(): NavTile | null } };
+                        rs2b0t: { runner: { state: string } };
                     };
+                    const state = g.rs2b0t.runner.state;
+                    const done =
+                        g[resultKey] !== undefined
+                        && (state === 'stopped' || state === 'idle');
                     const slot = g[midKey] as WalkMidSlot | undefined;
                     return {
+                        done,
                         tile: slot?.tile ?? g.__rs2b0t.reader.worldTile(),
                         pathCost: slot?.pathCost ?? null
                     };
                 },
-                { midKey }
+                { resultKey, midKey }
             );
-
-            if (mid.tile) {
-                if (!lastTile || cheb(mid.tile, lastTile) > 0) {
-                    lastMoveAt = Date.now();
-                }
-                lastTile = mid.tile;
+            if (poll.done) {
+                break;
             }
 
-            if (stuck && mid.pathCost !== null && mid.pathCost > 0 && !stuckReason) {
+            if (poll.tile) {
+                if (!lastTile || cheb(poll.tile, lastTile) > 0) {
+                    lastMoveAt = Date.now();
+                }
+                lastTile = poll.tile;
+            }
+
+            if (stuck && poll.pathCost !== null && poll.pathCost > 0 && !stuckReason) {
                 const elapsedMs = Date.now() - walkStartedAt;
                 const noMoveMs = Date.now() - lastMoveAt;
-                const estSec = pathCostToEstSec(mid.pathCost, stuck.tickMs);
+                const estSec = pathCostToEstSec(poll.pathCost, stuck.tickMs);
                 const estMs = estSec * 1000;
                 const thresholdMs = Math.max(stuck.minElapsedMs, stuck.factor * estMs);
                 if (elapsedMs >= thresholdMs && noMoveMs >= stuck.noMoveMs) {
                     stuckReason =
                         `harness stuck abort: elapsed=${Math.round(elapsedMs / 1000)}s `
-                        + `est=${estSec.toFixed(1)}s cost=${mid.pathCost} `
+                        + `est=${estSec.toFixed(1)}s cost=${poll.pathCost} `
                         + `noMove=${Math.round(noMoveMs / 1000)}s `
                         + `factor=${stuck.factor} (thrash vs path-cost estimate)`;
                     console.log(`    …${stuckReason}`);
@@ -899,18 +1059,26 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                 }
             }
 
-            if (opts.energyRefillAt !== undefined) {
-                await maybeRefillEnergy(page, opts.energyRefillAt).catch(() => undefined);
-            }
+            // Energy + HP on a shared slow cadence (default 5s), not every poll second.
+            await maybeSustain(
+                page,
+                {
+                    energyRefillAt: opts.energyRefillAt,
+                    hpRefillAt: opts.hpRefillAt,
+                    hpLevel: opts.hpLevel,
+                    everySec: opts.sustainEverySec ?? 5
+                },
+                sustainClock
+            ).catch(() => undefined);
+
             if (progressEvery > 0 && i > 0 && i % progressEvery === 0) {
-                const e = await readRunEnergy(page).catch(() => -1);
+                // Tile/cost from poll (free); skip energy read here — sustain already tracks it.
                 const costNote =
-                    mid.pathCost !== null
-                        ? ` cost=${mid.pathCost} est≈${pathCostToEstSec(mid.pathCost, stuck?.tickMs ?? 300).toFixed(0)}s`
+                    poll.pathCost !== null
+                        ? ` cost=${poll.pathCost} est≈${pathCostToEstSec(poll.pathCost, stuck?.tickMs ?? 300).toFixed(0)}s`
                         : '';
                 console.log(
-                    `    …walking ${mid.tile ? `${mid.tile.x},${mid.tile.z}` : '?'}`
-                    + ` energy=${e}%${costNote}`
+                    `    …walking ${poll.tile ? `${poll.tile.x},${poll.tile.z}` : '?'}${costNote}`
                 );
             }
             await page.waitForTimeout(1000);
