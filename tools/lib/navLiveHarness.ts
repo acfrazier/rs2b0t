@@ -492,10 +492,6 @@ export async function seedRunes(page: Page): Promise<void> {
 }
 
 /**
- * Seed runes + charged jewellery so product walkTo may cast/Rub.
- * When useTeleports is false, still seeds runes (spell tests can re-enable).
- */
-/**
  * Ensure one charged copy of each jewellery seed is present.
  * Drops depleted (no charge-paren) copies first so a full pack of uncharged
  * glories cannot block `give amulet_of_glory_4` (#555 / P10).
@@ -523,6 +519,10 @@ export async function ensureJewellery(
     }
 }
 
+/**
+ * Seed runes + charged jewellery so product walkTo may cast/Rub.
+ * When useTeleports is false, still seeds runes (spell tests can re-enable).
+ */
 export async function seedTeleKit(
     page: Page,
     stamp: () => string,
@@ -540,7 +540,76 @@ export async function seedTeleKit(
     }
 }
 
+// ── stuck / harness-abort helpers ───────────────────────────────────────────
+
+/**
+ * Convert planner path cost (run-tile units, see edgeCosts.ts) to optimistic
+ * wall-clock seconds at the live tick rate.
+ * ticks ≈ cost / 2; wall ≈ ticks * tickMs.
+ */
+export function pathCostToEstSec(cost: number, tickMs: number): number {
+    if (!(cost > 0) || !(tickMs > 0)) {
+        return 0;
+    }
+    return (cost / 2) * (tickMs / 1000);
+}
+
+/** Last `path: cost N` line from walk logs (null if none yet). */
+export function parsePathCostFromLogs(logs: readonly string[]): number | null {
+    let last: number | null = null;
+    for (const line of logs) {
+        const m = /path:\s*cost\s+(\d+)/i.exec(line);
+        if (m) {
+            last = Number(m[1]);
+        }
+    }
+    return last !== null && Number.isFinite(last) ? last : null;
+}
+
+/**
+ * True when a leg failure means the multi-leg suite is no longer valid research
+ * (wedged runner, kit seed death, tele placement failure) — not a product OD fail.
+ */
+export function isHarnessDeathDetail(detail: string): boolean {
+    return (
+        /is still running/i.test(detail)
+        || /could not seed/i.test(detail)
+        || /tele to .+\bfailed\b/i.test(detail)
+        || /HARNESS_DEATH/i.test(detail)
+    );
+}
+
+/** STUCK_ABORT default on; set 0/false to disable per-leg stuck kill. */
+export function stuckAbortFromEnv(): StuckAbortOpts | undefined {
+    if (!envDefaultOn('STUCK_ABORT')) {
+        return undefined;
+    }
+    return {
+        factor: Number(process.env.STUCK_FACTOR ?? 2.5) || 2.5,
+        minElapsedMs: (Number(process.env.STUCK_MIN_S ?? 20) || 20) * 1000,
+        noMoveMs: (Number(process.env.STUCK_NOMOVE_S ?? 12) || 12) * 1000,
+        tickMs: Number(process.env.TICK_MS ?? 300) || 300
+    };
+}
+
+/** HARNESS_SUITE_ABORT default on — kill whole travel suite on harness death. */
+export function harnessSuiteAbortFromEnv(): boolean {
+    return envDefaultOn('HARNESS_SUITE_ABORT');
+}
+
 // ── generic walkTo probe ────────────────────────────────────────────────────
+
+export type StuckAbortOpts = {
+    /**
+     * Abort leg when elapsed ≥ max(minElapsedMs, factor × estMs) and the
+     * character has not moved for noMoveMs. Est from planner path cost.
+     */
+    factor: number;
+    minElapsedMs: number;
+    noMoveMs: number;
+    /** Game tick length used by the live harness (for cost → wall seconds). */
+    tickMs: number;
+};
 
 export type RunNavWalkOpts = {
     dest: NavTile;
@@ -556,11 +625,22 @@ export type RunNavWalkOpts = {
     energyRefillAt?: number;
     /** Log mid-walk position every N seconds (default 20). 0 = off. */
     progressEverySec?: number;
+    /**
+     * Per-leg early stop when wall time ≫ path-cost estimate and no tile move
+     * (door thrash / pathfind loop). Does not abort the whole suite.
+     */
+    stuckAbort?: StuckAbortOpts;
 };
 
 type WalkSlot = {
     walkOk: boolean;
     tile: NavTile | null;
+    logs: string[];
+};
+
+type WalkMidSlot = {
+    tile: NavTile | null;
+    pathCost: number | null;
     logs: string[];
 };
 
@@ -612,16 +692,36 @@ export async function ensureRunnerStopped(
  *
  * Always stops the runner before return (including poll timeout) so multi-leg
  * suites never cascade with `'Nav…' is still running`.
+ *
+ * Optional {@link RunNavWalkOpts.stuckAbort}: stop this leg early when wall time
+ * far exceeds the planner path-cost estimate and the character has not moved
+ * (door thrash / pathfind loop). Product FAIL for that leg only — not suite abort.
  */
 export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavWalkResult> {
     const resultKey = opts.resultKey ?? '__navLiveWalk';
+    const midKey = `${resultKey}__mid`;
     const teleOn = opts.useTeleports !== false;
     const radius = opts.radius ?? 4;
     const progressEvery = opts.progressEverySec ?? 20;
+    const stuck = opts.stuckAbort;
+    const walkStartedAt = Date.now();
+    let lastTile: NavTile | null = null;
+    let lastMoveAt = walkStartedAt;
+    let stuckReason: string | null = null;
 
     try {
         await page.evaluate(
-            ({ destination, budgetMs, allowTeleportIds, distanceBeforeTeleport, teleOn, radius, resultKey, prefix }) => {
+            ({
+                destination,
+                budgetMs,
+                allowTeleportIds,
+                distanceBeforeTeleport,
+                teleOn,
+                radius,
+                resultKey,
+                midKey,
+                prefix
+            }) => {
                 const g = globalThis as never as Record<string, unknown> & {
                     __rs2b0t: {
                         reader: { worldTile(): NavTile | null };
@@ -647,9 +747,24 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                     rs2b0t: { runner: { start(meta: unknown): void; stop(reason: string): void } };
                 };
                 (g as Record<string, unknown>)[resultKey] = undefined;
+                (g as Record<string, unknown>)[midKey] = {
+                    tile: null,
+                    pathCost: null,
+                    logs: []
+                } satisfies WalkMidSlot;
+
+                const publishMid = (logs: string[], pathCost: number | null): void => {
+                    (g as Record<string, unknown>)[midKey] = {
+                        tile: g.__rs2b0t.reader.worldTile(),
+                        pathCost,
+                        logs: logs.slice(-24)
+                    } satisfies WalkMidSlot;
+                };
+
                 class Probe extends g.__rs2b0t.LoopingBot {
                     override async loop(): Promise<void> {
                         const logs: string[] = [];
+                        let pathCost: number | null = null;
                         try {
                             const walkOk = await g.__rs2b0t.Traversal.walkTo(destination, {
                                 radius,
@@ -663,6 +778,11 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                                 log: m => {
                                     logs.push(m);
                                     this.log(m);
+                                    const cm = /path:\s*cost\s+(\d+)/i.exec(m);
+                                    if (cm) {
+                                        pathCost = Number(cm[1]);
+                                    }
+                                    publishMid(logs, pathCost);
                                 }
                             });
                             (g as Record<string, unknown>)[resultKey] = {
@@ -677,6 +797,7 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                                 logs: [...logs, String(e)]
                             } satisfies WalkSlot;
                         } finally {
+                            publishMid(logs, pathCost);
                             g.rs2b0t.runner.stop('harness stop');
                         }
                     }
@@ -696,6 +817,7 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                 teleOn,
                 radius,
                 resultKey,
+                midKey,
                 prefix: opts.scriptNamePrefix ?? 'NavLive'
             }
         );
@@ -716,24 +838,94 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
             if (done) {
                 break;
             }
+
+            const mid = await page.evaluate(
+                ({ midKey }) => {
+                    const g = globalThis as never as Record<string, unknown> & {
+                        __rs2b0t: { reader: { worldTile(): NavTile | null } };
+                    };
+                    const slot = g[midKey] as WalkMidSlot | undefined;
+                    return {
+                        tile: slot?.tile ?? g.__rs2b0t.reader.worldTile(),
+                        pathCost: slot?.pathCost ?? null
+                    };
+                },
+                { midKey }
+            );
+
+            if (mid.tile) {
+                if (!lastTile || cheb(mid.tile, lastTile) > 0) {
+                    lastMoveAt = Date.now();
+                }
+                lastTile = mid.tile;
+            }
+
+            if (stuck && mid.pathCost !== null && mid.pathCost > 0 && !stuckReason) {
+                const elapsedMs = Date.now() - walkStartedAt;
+                const noMoveMs = Date.now() - lastMoveAt;
+                const estSec = pathCostToEstSec(mid.pathCost, stuck.tickMs);
+                const estMs = estSec * 1000;
+                const thresholdMs = Math.max(stuck.minElapsedMs, stuck.factor * estMs);
+                if (elapsedMs >= thresholdMs && noMoveMs >= stuck.noMoveMs) {
+                    stuckReason =
+                        `harness stuck abort: elapsed=${Math.round(elapsedMs / 1000)}s `
+                        + `est=${estSec.toFixed(1)}s cost=${mid.pathCost} `
+                        + `noMove=${Math.round(noMoveMs / 1000)}s `
+                        + `factor=${stuck.factor} (thrash vs path-cost estimate)`;
+                    console.log(`    …${stuckReason}`);
+                    await ensureRunnerStopped(page, 'harness stuck abort').catch(() => undefined);
+                    // Give walkTo a moment to settle into the result slot after stop.
+                    for (let w = 0; w < 20; w++) {
+                        const settled = await page.evaluate(
+                            ({ resultKey }) => {
+                                const g = globalThis as never as Record<string, unknown> & {
+                                    rs2b0t: { runner: { state: string } };
+                                };
+                                return (
+                                    g[resultKey] !== undefined
+                                    && (g.rs2b0t.runner.state === 'stopped'
+                                        || g.rs2b0t.runner.state === 'idle'
+                                        || g.rs2b0t.runner.state === 'crashed')
+                                );
+                            },
+                            { resultKey }
+                        );
+                        if (settled) {
+                            break;
+                        }
+                        await page.waitForTimeout(250);
+                    }
+                    break;
+                }
+            }
+
             if (opts.energyRefillAt !== undefined) {
                 await maybeRefillEnergy(page, opts.energyRefillAt).catch(() => undefined);
             }
             if (progressEvery > 0 && i > 0 && i % progressEvery === 0) {
-                const mid = await page.evaluate(() => {
-                    const g = globalThis as never as {
-                        __rs2b0t: { reader: { worldTile(): NavTile | null } };
-                    };
-                    return g.__rs2b0t.reader.worldTile();
-                });
                 const e = await readRunEnergy(page).catch(() => -1);
-                console.log(`    …walking ${mid ? `${mid.x},${mid.z}` : '?'} energy=${e}%`);
+                const costNote =
+                    mid.pathCost !== null
+                        ? ` cost=${mid.pathCost} est≈${pathCostToEstSec(mid.pathCost, stuck?.tickMs ?? 300).toFixed(0)}s`
+                        : '';
+                console.log(
+                    `    …walking ${mid.tile ? `${mid.tile.x},${mid.tile.z}` : '?'}`
+                    + ` energy=${e}%${costNote}`
+                );
             }
             await page.waitForTimeout(1000);
         }
     } finally {
         // Poll timeout (or evaluate throw) must not leave the runner running for the next leg.
-        await ensureRunnerStopped(page, 'harness timeout').catch(() => undefined);
+        await ensureRunnerStopped(page, stuckReason ? 'harness stuck abort' : 'harness timeout').catch(
+            () => undefined
+        );
+        await page
+            .evaluate(({ midKey }) => {
+                const g = globalThis as never as Record<string, unknown>;
+                delete g[midKey];
+            }, { midKey })
+            .catch(() => undefined);
     }
 
     const result = await page.evaluate(
@@ -746,7 +938,18 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
         { resultKey }
     );
     if (!result) {
-        return { walkOk: false, tile: null, logs: ['no result (timeout)'] };
+        const logs = ['no result (timeout)'];
+        if (stuckReason) {
+            logs.unshift(stuckReason);
+        }
+        return { walkOk: false, tile: lastTile, logs };
+    }
+    if (stuckReason && !result.logs.some(l => l.includes('harness stuck abort'))) {
+        return {
+            walkOk: false,
+            tile: result.tile ?? lastTile,
+            logs: [...result.logs, stuckReason]
+        };
     }
     return result;
 }

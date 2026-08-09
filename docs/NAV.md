@@ -575,9 +575,20 @@ HEADED=1 SEGMENT=quests LIMIT=50 OFFSET=0 bun tools/nav-script-travel-live.ts
 | `BUDGET_S` | Per-leg walk timeout seconds (default 240) |
 | `SEED_QUESTS` | Force transport-quest varp seed (also on when `SEGMENT=quests`) |
 | `PATH_PAINT` | Path paint defaults on; set `0` to disable |
+| `STUCK_ABORT` | Default **on** — per-leg early stop when wall time ≫ path-cost estimate **and** no tile move (door thrash / pathfind loop). Not a suite kill. `STUCK_ABORT=0` to disable. |
+| `STUCK_FACTOR` | Multiplier on est wall time (default **2.5**) |
+| `STUCK_MIN_S` | Min elapsed before stuck kill (default **20**) |
+| `STUCK_NOMOVE_S` | Min seconds without tile change (default **12**) |
+| `HARNESS_SUITE_ABORT` | Default **on** — stop the **whole** suite only on harness death (`is still running`, seed fail, tele fail). Product OD fails continue. |
 
-Startup line logs `tele=… kitSeeded=… pureWalk=…`. Success proof only when every
-leg passes; any FAIL → failure screenshot + exit 1.
+Path-cost estimate (optimistic): `estSec ≈ (cost / 2) × (tickMs / 1000)` with live
+`tickMs=300`. Stuck abort requires **no movement** so long multi-ship ODs that
+still advance are not cut short.
+
+Startup line logs `tele=… kitSeeded=… pureWalk=… stuckAbort=… suiteAbort=…`.
+Success proof only when every planned leg passes; any FAIL or suite abort →
+failure screenshot + exit 1. Partial runs set `suiteAbortReason` + `planned` in
+the JSON proof.
 
 `mainlandAccount` uses clean IF_BUTTON logout (com 2458) after tutorial varps so
 relogin is ~seconds, not a minute-long unclean hold.

@@ -27,6 +27,13 @@
  *   PATH_PAINT=0 / PATH_PAINT_SCENE_EXPAND=0 / PATH_PAINT_CLIENT_SEG=0 to turn pieces off.
  *
  * Proof honesty: success.png/proof only when every leg passes; any FAIL → failure screenshot + exit 1.
+ *
+ * Stuck / harness abort (research fleet — not product fail-rate):
+ *   STUCK_ABORT=1 (default) — kill a leg early when wall time ≫ path-cost estimate
+ *     and the character has not moved (door thrash / pathfind loop).
+ *     STUCK_FACTOR=2.5 STUCK_MIN_S=20 STUCK_NOMOVE_S=12
+ *   HARNESS_SUITE_ABORT=1 (default) — stop the whole suite on harness death only
+ *     (`is still running`, seed failure, tele placement failure). Product OD fails continue.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,11 +45,14 @@ import {
     cheb,
     energyRefillAtFromEnv,
     ensureJewellery,
+    harnessSuiteAbortFromEnv,
+    isHarnessDeathDetail,
     pathPaintFlagsFromEnv,
     restoreRunEnergy,
     runNavWalk,
     seedTeleKit,
     setTickRate,
+    stuckAbortFromEnv,
     teleArrive,
     useTeleportsFromEnv,
     type NavTile
@@ -74,6 +84,12 @@ const LIVE_LIMIT =
 const USE_TELEPORTS = useTeleportsFromEnv();
 const PAINT = pathPaintFlagsFromEnv({ teleports: USE_TELEPORTS });
 const ENERGY_REFILL_AT = energyRefillAtFromEnv();
+const STUCK_ABORT_RAW = stuckAbortFromEnv();
+/** Align stuck est wall-clock with this suite's setTickRate (not generic TICK_MS env). */
+const STUCK_ABORT = STUCK_ABORT_RAW
+    ? { ...STUCK_ABORT_RAW, tickMs: TICK_MS }
+    : undefined;
+const HARNESS_SUITE_ABORT = harnessSuiteAbortFromEnv();
 const ARRIVAL = 8;
 const SEED_QUESTS =
     process.env.SEED_QUESTS === '1'
@@ -104,12 +120,15 @@ const stats = travelRouteStats(buildTravelRoutes());
 
 const KIT_SEEDED = USE_TELEPORTS;
 const PURE_WALK = !USE_TELEPORTS;
+const stuckNote = STUCK_ABORT
+    ? `stuckAbort=×${STUCK_ABORT.factor}/min${STUCK_ABORT.minElapsedMs / 1000}s/noMove${STUCK_ABORT.noMoveMs / 1000}s`
+    : 'stuckAbort=off';
 console.log(
     `nav-script-travel-live base=${base} segment=${SEGMENT} offset=${OFFSET} limit=${LIVE_LIMIT === 0 ? 'ALL' : LIVE_LIMIT} `
     + `legs=${routes.length} tele=${USE_TELEPORTS} kitSeeded=${KIT_SEEDED} pureWalk=${PURE_WALK} `
     + `pathPaint=${PAINT.paint} sceneExpand=${PAINT.sceneExpand} `
     + `clientSeg=${PAINT.clientSeg} cameraFollow=${PAINT.cameraFollow} tick=${TICK_MS}ms energy≤${ENERGY_REFILL_AT}% `
-    + `budget≈${Math.round(BUDGET_MS / 1000)}s`
+    + `budget≈${Math.round(BUDGET_MS / 1000)}s ${stuckNote} suiteAbort=${HARNESS_SUITE_ABORT}`
 );
 console.log(`  corpus: ${JSON.stringify(stats)}`);
 
@@ -118,7 +137,7 @@ const browser = await launchBrowser({ swiftshader: true });
 const t0 = Date.now();
 const stamp = () => `[${Math.round((Date.now() - t0) / 1000)}s]`;
 const results: { id: string; ok: boolean; detail: string; segment: string }[] = [];
-
+let suiteAbortReason: string | null = null;
 try {
     const context = await browser.newContext();
     await context.route('**/*.{js,mjs}', async route => {
@@ -191,11 +210,15 @@ try {
                 distanceBeforeTeleport: 0,
                 energyRefillAt: ENERGY_REFILL_AT,
                 resultKey: '__navTravel',
-                scriptNamePrefix: 'NavTravel'
+                scriptNamePrefix: 'NavTravel',
+                stuckAbort: STUCK_ABORT
             });
             const dist = res.tile ? cheb(res.tile, r.to as NavTile) : 9999;
             const ok = res.walkOk && dist <= ARRIVAL;
-            const detail = `dist=${dist} walkOk=${res.walkOk} from=${r.from.x},${r.from.z}→${r.to.x},${r.to.z}`;
+            const stuckHit = res.logs.some(l => l.includes('harness stuck abort'));
+            const detail =
+                `dist=${dist} walkOk=${res.walkOk} from=${r.from.x},${r.from.z}→${r.to.x},${r.to.z}`
+                + (stuckHit ? ' stuckAbort=1' : '');
             console.log(`${ok ? 'PASS' : 'FAIL'} ${id}: ${detail}`);
             if (!ok) {
                 console.log(res.logs.slice(-12).join('\n'));
@@ -205,9 +228,18 @@ try {
             }
             results.push({ id, ok, detail, segment: r.segment });
         } catch (e) {
+            const detail = String(e);
             console.error(`FAIL ${id}:`, e);
-            results.push({ id, ok: false, detail: String(e), segment: r.segment });
+            results.push({ id, ok: false, detail, segment: r.segment });
             fail++;
+            // Harness death only — product OD fails continue the suite.
+            if (HARNESS_SUITE_ABORT && isHarnessDeathDetail(detail)) {
+                suiteAbortReason = detail;
+                console.error(
+                    `${stamp()} SUITE ABORT (harness death) after ${id}: ${detail.slice(0, 200)}`
+                );
+                break;
+            }
         }
     }
 
@@ -215,18 +247,34 @@ try {
 
     const outPath = path.join(process.cwd(), 'out', `nav-script-travel-${SEGMENT}-proof.json`);
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    const planned = routes.length;
     const summary = {
         segment: SEGMENT,
         pass,
         fail,
         total: results.length,
+        planned,
         tele: USE_TELEPORTS,
         kitSeeded: KIT_SEEDED,
         pureWalk: PURE_WALK,
+        stuckAbort: STUCK_ABORT
+            ? {
+                factor: STUCK_ABORT.factor,
+                minElapsedS: STUCK_ABORT.minElapsedMs / 1000,
+                noMoveS: STUCK_ABORT.noMoveMs / 1000
+            }
+            : null,
+        harnessSuiteAbort: HARNESS_SUITE_ABORT,
+        suiteAbortReason,
         results
     };
     fs.writeFileSync(outPath, JSON.stringify(summary, null, 2));
-    console.log(`\n── summary ${pass}/${results.length} pass (wrote ${outPath}) ──`);
+    const abortNote = suiteAbortReason ? ` ABORTED=${suiteAbortReason.slice(0, 80)}` : '';
+    console.log(
+        `\n── summary ${pass}/${results.length} pass`
+        + (results.length < planned ? ` (${planned - results.length} not run)` : '')
+        + ` (wrote ${outPath})${abortNote} ──`
+    );
     for (const r of results) {
         console.log(`  ${r.ok ? 'PASS' : 'FAIL'}  ${r.id}: ${r.detail}`);
     }
@@ -241,9 +289,11 @@ try {
         passed: pass,
         fail,
         total: results.length,
+        planned,
+        suiteAbortReason,
         results
     };
-    if (fail === 0) {
+    if (fail === 0 && !suiteAbortReason) {
         await proof.writeSuccess(page, proofBody);
         console.log('PASS nav-script-travel-live');
         process.exit(0);
