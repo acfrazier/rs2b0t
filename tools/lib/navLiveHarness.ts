@@ -113,7 +113,7 @@ export function teleCmd(t: NavTile): string {
  * Cheat-tele the character to `spot` (engine `tele` command).
  * This is placement seed, not a product spell/jewellery teleport.
  */
-export async function teleArrive(page: Page, spot: NavTile, maxDist = 12): Promise<void> {
+async function teleArriveExact(page: Page, spot: NavTile, maxDist: number): Promise<void> {
     for (let a = 0; a < 6; a++) {
         await cheatQuiet(page, teleCmd(spot));
         for (let p = 0; p < 16; p++) {
@@ -130,7 +130,74 @@ export async function teleArrive(page: Page, spot: NavTile, maxDist = 12): Promi
             await page.waitForTimeout(150);
         }
     }
-    throw new Error(`tele to ${spot.x},${spot.z} failed`);
+    throw new Error(`tele to ${spot.x},${spot.z},L${spot.level} failed`);
+}
+
+/**
+ * After placement, pick a walkable stand near `origin` (scene collision).
+ * Script anchors often sit on solid locs (search furniture, digs, rocks).
+ */
+async function nearestWalkableStandLive(
+    page: Page,
+    origin: NavTile,
+    radius = 3
+): Promise<NavTile | null> {
+    return page.evaluate(
+        ({ origin: o, radius: r }) => {
+            const g = globalThis as never as {
+                __rs2b0t: {
+                    reader: { worldTile(): NavTile | null };
+                    Reachability?: { walkable(t: NavTile): boolean };
+                };
+            };
+            const walkable = (t: NavTile): boolean => {
+                try {
+                    return g.__rs2b0t.Reachability?.walkable(t) ?? false;
+                } catch {
+                    return false;
+                }
+            };
+            if (walkable(o)) {
+                return o;
+            }
+            const me = g.__rs2b0t.reader.worldTile();
+            if (me && me.level === o.level && walkable(me) && Math.max(Math.abs(me.x - o.x), Math.abs(me.z - o.z)) <= r) {
+                return me;
+            }
+            for (let rad = 1; rad <= r; rad++) {
+                for (let dx = -rad; dx <= rad; dx++) {
+                    for (let dz = -rad; dz <= rad; dz++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) !== rad) {
+                            continue;
+                        }
+                        const t = { x: o.x + dx, z: o.z + dz, level: o.level };
+                        if (walkable(t)) {
+                            return t;
+                        }
+                    }
+                }
+            }
+            return null;
+        },
+        { origin, radius }
+    );
+}
+
+/**
+ * Cheat-tele to a **walkable** stand at/near `spot`.
+ * Never leaves the character on top of an unwalkable loc (search furniture, etc.).
+ */
+export async function teleArrive(page: Page, spot: NavTile, maxDist = 12): Promise<void> {
+    await teleArriveExact(page, spot, maxDist);
+    const stand = await nearestWalkableStandLive(page, spot, 3);
+    if (!stand) {
+        // Scene may not have flags yet; accept placement and let pathfinder snap.
+        return;
+    }
+    if (stand.x === spot.x && stand.z === spot.z && stand.level === spot.level) {
+        return;
+    }
+    await teleArriveExact(page, stand, maxDist);
 }
 
 // ── energy / tick ───────────────────────────────────────────────────────────
