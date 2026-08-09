@@ -13,9 +13,14 @@
  *   all | clues | quests | gathering-all | fishing | mining | woodcutting
  *   | firemaking | cooking
  *
+ * How each segment picks OD ends + regenerate commands:
+ *   docs/NAV.md § Script travel OD
+ *
  *   bun --preload ./test/setup-dom.ts tools/nav/script-travel-corpus.ts --list
  *   bun --preload ./test/setup-dom.ts tools/nav/script-travel-corpus.ts --segment=fishing --write
  *   bun --preload ./test/setup-dom.ts tools/nav/script-travel-corpus.ts --segment=clues --stats
+ *
+ * Endpoints are snapped off solid locs via out/collision.lcnav.gz when present.
  */
 import fs from 'node:fs';
 import path from 'node:path';
