@@ -5,7 +5,7 @@
 
 # Bundled scripts
 
-- Scripts: 52. Categories: 19.
+- Scripts: 53. Categories: 19.
 - Source: [`src/bot/scripts/`](../src/bot/scripts/). API: [scripting API](API.md).
 - Settings are the parameters the panel exposes before a script starts.
 
@@ -22,7 +22,7 @@
 - [Magic](#magic) — 1
 - [Mining](#mining) — 3
 - [Money making](#money-making) — 2
-- [Navigation](#navigation) — 1
+- [Navigation](#navigation) — 2
 - [Prayer](#prayer) — 1
 - [Quest](#quest) — 3
 - [Runecrafting](#runecrafting) — 3
@@ -679,6 +679,18 @@ World shop-run supply loop — cycles shop clusters buying Herblore supplies, fe
 | `mageArena` | boolean | `true` | Mage Arena leg |
 
 ## Navigation
+
+### DoorOpener
+
+Walks to a chosen tile and opens the nearest shut door every tick
+
+- Tags: `door`, `gate`, `utility`, `afk`
+
+| Setting | Type | Default | Notes |
+|---|---|---|---|
+| `stand` | tile | `{"x":3215,"z":3212,"level":0}` | Stand tile (x,z) |
+| `leashRadius` | number (1–20) | `8` | Door search radius (tiles) |
+| `obstacle` | string | `"door, gate"` | Openable names (contains) |
 
 ### WalkTo
 

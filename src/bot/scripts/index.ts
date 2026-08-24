@@ -38,6 +38,7 @@ import FireGiant, { SETTINGS as FIREGIANT_SETTINGS } from './FireGiant/FireGiant
 import RockCrab, { SETTINGS as ROCKCRAB_SETTINGS } from './RockCrab/RockCrab.js';
 import ThievingBot, { SETTINGS as THIEVING_SETTINGS } from './ThievingBot/ThievingBot.js';
 import WalkToBot, { WALKTO_SETTINGS } from './WalkToBot/WalkToBot.js';
+import DoorOpener, { SETTINGS as DOOROPENER_SETTINGS } from './DoorOpener/DoorOpener.js';
 import WildyAgility, { WILDY_AGILITY_SETTINGS } from './WildyAgility/WildyAgility.js';
 import BrimhavenAgility, { BRIMHAVEN_AGILITY_SETTINGS } from './BrimhavenAgility/BrimhavenAgility.js';
 import SmelterBot, { SETTINGS as SMELTER_SETTINGS } from './SmelterBot/SmelterBot.js';
@@ -639,6 +640,15 @@ ScriptRegistry.register({
     tags: ['navigation', 'utility', 'web-walk'],
     settingsSchema: WALKTO_SETTINGS,
     create: () => new WalkToBot()
+});
+
+ScriptRegistry.register({
+    name: 'DoorOpener',
+    description: 'Walks to a chosen tile and opens the nearest shut door every tick',
+    category: 'Navigation',
+    tags: ['door', 'gate', 'utility', 'afk'],
+    settingsSchema: DOOROPENER_SETTINGS,
+    create: () => new DoorOpener()
 });
 
 ScriptRegistry.register({
