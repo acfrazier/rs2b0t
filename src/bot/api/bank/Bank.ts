@@ -8,9 +8,10 @@ import { Traversal } from '../walking/Traversal.js';
 import { Locs } from '../locs/Locs.js';
 import { Npcs } from '../npcs/Npcs.js';
 import { ChatDialog } from '../ui/dialogue/ChatDialog.js';
-import { backpackCapacity, backpackSnapshots } from '../inventory/Inventory.js';
+import { backpackCapacity, backpackSnapshots, Inventory } from '../inventory/Inventory.js';
+import { withdrawOp } from './bankOps.js';
 
-export { withdrawOp } from './bankOps.js';
+export { withdrawOp };
 
 function backpackFull(): boolean {
     const size = backpackCapacity();
@@ -251,6 +252,38 @@ export const Bank = {
             () => invCount() >= target || (invCount() > before && backpackFull()),
             4000
         );
+    },
+
+    /**
+     * Fill the pack from one bank item: Withdraw-All when the op exists, otherwise Withdraw-X for the free slots.
+     * Why: the 10-at-a-time fallback is several clicks slower than one X (#710).
+     */
+    async withdrawLoad(name: string): Promise<boolean> {
+        if (!(await bankBackpackReady())) {
+            return false;
+        }
+        const wanted = name.toLowerCase();
+        const item = reader.bankItems().find(i => i.name?.toLowerCase() === wanted);
+        if (!item?.name) {
+            return false;
+        }
+        const itemName = item.name;
+        const allOp = withdrawOp(item.ops, 'all');
+        if (allOp) {
+            const before = Inventory.used();
+            if (!(await Bank.withdraw(itemName, allOp))) {
+                return false;
+            }
+            return Execution.delayUntil(
+                () => Inventory.used() > before || Inventory.isFull() || Bank.count(itemName) === 0,
+                4000
+            );
+        }
+        const want = Inventory.free();
+        if (want <= 0) {
+            return true;
+        }
+        return Bank.withdrawX(itemName, want);
     },
 
     deposit(name: string, op: string = 'Deposit-1'): boolean | Promise<boolean> {
