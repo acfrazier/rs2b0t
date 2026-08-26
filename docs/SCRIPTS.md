@@ -837,6 +837,7 @@ Master Nature Crafter — a master stands at the nature altar (Karamja), takes e
 | `bankEvery` | number (0–) | `60` | Bank everything every N minutes (0 = never) |
 | `withdrawEss` | number (0–) | `0` | Essence per restock (0 = default) |
 | `withdrawCoins` | number (0–) | `10000` | Coins target at restock |
+| `stayInAltar` | boolean | `false` | Stay in the altar |
 
 ### RuneCrafter
 

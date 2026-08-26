@@ -1,6 +1,6 @@
 import { expect, test, describe } from 'bun:test';
 
-import { planStoreStep, offerCount, coinTargetFor, shortRouteWithdraw, RUNES, RUNE_OPTIONS, DEFAULT_RUNE, TRADE_CAP, BUY_ONLY_STOCK, LOW_COINS, MIN_COIN_TARGET } from '#/bot/scripts/NatureCrafter/NatureRunnerLogic.js';
+import { planStoreStep, offerCount, coinTargetFor, shortRouteWithdraw, RUNES, RUNE_OPTIONS, DEFAULT_RUNE, TRADE_CAP, BUY_ONLY_STOCK, LOW_COINS, MIN_COIN_TARGET, SPIDER_SAFE, spiderSafeVia, tradeDelivered, masterShouldExitTemple, masterShouldEnterAltar } from '#/bot/scripts/NatureCrafter/NatureRunnerLogic.js';
 
 describe('planStoreStep (one store action per pass, re-planned against live stock)', () => {
     test('holding the full trade cap = done, regardless of stock', () => {
@@ -124,5 +124,51 @@ describe('offerCount (trade-window law: never more than 25)', () => {
         expect(offerCount(17)).toBe(17);
         expect(offerCount(25)).toBe(25);
         expect(offerCount(0)).toBe(0);
+    });
+});
+
+describe('tradeDelivered', () => {
+    test('true only when unnoted essence has left the pack', () => {
+        expect(tradeDelivered(25, 0)).toBe(true);
+        expect(tradeDelivered(25, 10)).toBe(true);
+        expect(tradeDelivered(25, 25)).toBe(false);
+        expect(tradeDelivered(0, 0)).toBe(false);
+    });
+});
+
+describe('spiderSafeVia', () => {
+    const store = { x: 2767, z: 3122 };
+    const ruins = { x: 2865, z: 3022 };
+
+    test('store and altar walks hop via 2790,3094 when not already there', () => {
+        expect([SPIDER_SAFE.x, SPIDER_SAFE.z, SPIDER_SAFE.level]).toEqual([2790, 3094, 0]);
+        expect(spiderSafeVia({ x: 2767, z: 3122 }, ruins, store, ruins)).toBe(true);
+        expect(spiderSafeVia({ x: 2865, z: 3022 }, store, store, ruins)).toBe(true);
+    });
+
+    test('skips the hop when already at the destination or the waypoint', () => {
+        expect(spiderSafeVia({ x: 2865, z: 3022 }, ruins, store, ruins)).toBe(false);
+        expect(spiderSafeVia({ x: 2790, z: 3094 }, ruins, store, ruins)).toBe(false);
+    });
+
+    test('bank walks do not detour through the spider-safe tile', () => {
+        expect(spiderSafeVia({ x: 2865, z: 3022 }, { x: 2655, z: 3283 }, store, ruins)).toBe(false);
+    });
+});
+
+describe('stay-in-altar master gates', () => {
+    test('exits the temple after crafting unless staying (or a bank trip is due)', () => {
+        expect(masterShouldExitTemple(true, 0, false, false)).toBe(true);
+        expect(masterShouldExitTemple(true, 0, true, false)).toBe(false);
+        expect(masterShouldExitTemple(true, 0, true, true)).toBe(true);
+        expect(masterShouldExitTemple(true, 5, true, true)).toBe(false);
+        expect(masterShouldExitTemple(false, 0, false, false)).toBe(false);
+    });
+
+    test('enters empty-handed when staying so it can wait inside', () => {
+        expect(masterShouldEnterAltar(false, 0, true)).toBe(true);
+        expect(masterShouldEnterAltar(false, 0, false)).toBe(false);
+        expect(masterShouldEnterAltar(false, 10, false)).toBe(true);
+        expect(masterShouldEnterAltar(true, 10, true)).toBe(false);
     });
 });

@@ -69,6 +69,48 @@ export function offerCount(unnoted: number): number {
     return Math.max(0, Math.min(TRADE_CAP, unnoted));
 }
 
+/** Jungle-spider-safe hop between Jiminua and the nature ruins (#730). */
+export const SPIDER_SAFE = new Tile(2790, 3094, 0);
+
+export function isNear(a: { x: number; z: number }, b: { x: number; z: number }, radius: number): boolean {
+    return Math.max(Math.abs(a.x - b.x), Math.abs(a.z - b.z)) <= radius;
+}
+
+/**
+ * Whether a nature-route walk to the store or ruins should stop at SPIDER_SAFE first.
+ * Why: the direct Karamja line walks through Jungle Spiders (#730).
+ */
+export function spiderSafeVia(
+    here: { x: number; z: number } | null,
+    dest: { x: number; z: number },
+    store: { x: number; z: number },
+    ruins: { x: number; z: number }
+): boolean {
+    if (isNear(dest, store, 3) === false && isNear(dest, ruins, 3) === false) {
+        return false;
+    }
+    if (here !== null && isNear(here, dest, 3)) {
+        return false;
+    }
+    return here === null || !isNear(here, SPIDER_SAFE, 3);
+}
+
+/** True once unnoted essence has left the pack after a trade confirm (#730). */
+export function tradeDelivered(beforeUnnoted: number, nowUnnoted: number): boolean {
+    return nowUnnoted < beforeUnnoted;
+}
+
+export function masterShouldExitTemple(inTemple: boolean, ess: number, stayInAltar: boolean, bankDue: boolean): boolean {
+    if (!inTemple || ess > 0) {
+        return false;
+    }
+    return !stayInAltar || bankDue;
+}
+
+export function masterShouldEnterAltar(inTemple: boolean, ess: number, stayInAltar: boolean): boolean {
+    return !inTemple && (ess > 0 || stayInAltar);
+}
+
 // Short route only. A trade window moves at most TRADE_CAP, so anything carried beyond it
 // buys the master a second altar round trip for the remainder, cap it however big withdrawEss is.
 export function shortRouteWithdraw(perSetting: number, banked: number, room: number): number {
