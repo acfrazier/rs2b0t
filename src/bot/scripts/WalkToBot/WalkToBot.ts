@@ -6,52 +6,110 @@ import Tile from '../../geometry/Tile.js';
 import { Traversal } from '../../api/walking/Traversal.js';
 import { Paint } from '../../paint/Paint.js';
 import { ScriptRunner } from '../../runtime/ScriptRunner.js';
-import { SettingsStore } from '../../runtime/Settings.js';
+import { SettingsBag, SettingsStore } from '../../runtime/Settings.js';
 import type { SettingsSchema } from '../../runtime/Settings.js';
 import { WALK_OPTIONS, resolveDestination } from '../../api/map/WalkDestinations.js';
+import { hasArrived, isSetCustomTile, MAP_PICK, resolveWalkTarget, UNSET_TILE } from './WalkToLogic.js';
+
+export const DEST_OPTIONS = [MAP_PICK, ...WALK_OPTIONS];
 
 export const WALKTO_SETTINGS: SettingsSchema = {
-    destination: { type: 'string', default: WALK_OPTIONS[0], options: WALK_OPTIONS, label: 'Destination' },
-    customTile: { type: 'tile', default: new Tile(0, 0, 0), label: 'Custom tile (x,z)', help: 'if set (non-zero), walk here instead of the destination above' },
-    arriveRadius: { type: 'number', default: 3, min: 0, max: 12, label: 'Arrive within (tiles)' }
+    destination: {
+        type: 'string',
+        default: WALK_OPTIONS[0],
+        options: DEST_OPTIONS,
+        label: 'Destination',
+        help: 'Pick on Map sets Map pick. Choosing a named destination clears the map pick.'
+    },
+    customTile: {
+        type: 'tile',
+        default: UNSET_TILE,
+        label: 'Map pick tile (x,z)',
+        help: 'set by Pick on Map. A named Destination above clears this.'
+    },
+    arriveRadius: {
+        type: 'number',
+        default: 0,
+        min: 0,
+        max: 12,
+        label: 'Arrive within (tiles)',
+        help: '0 = stand on the destination tile, then the script stops'
+    }
 };
+
+let syncingWalkTo = false;
+SettingsStore.onChange((name, key, raw) => {
+    if (syncingWalkTo || name !== 'WalkTo') {
+        return;
+    }
+    syncingWalkTo = true;
+    try {
+        if (key === 'destination' && raw !== MAP_PICK) {
+            SettingsStore.save('WalkTo', 'customTile', '0,0,0');
+        }
+        if (key === 'customTile') {
+            const parts = raw.split(',').map(s => Number(s.trim()));
+            if (parts.length >= 2 && isSetCustomTile({ x: parts[0], z: parts[1] })) {
+                SettingsStore.save('WalkTo', 'destination', MAP_PICK);
+            }
+        }
+    } finally {
+        syncingWalkTo = false;
+    }
+});
 
 export default class WalkToBot extends TaskBot {
     override loopDelay = 600;
 
     private target: Tile | null = null;
     private label = '';
-    private radius = 3;
+    private radius = 0;
     private arrived = false;
     private status = 'starting';
     private tripStartDist = 0;
+    private unsub: (() => void) | null = null;
 
     override async onStart(): Promise<void> {
         await Execution.delayUntil(() => Game.ingame() && Game.tile() !== null, 0);
 
-        this.radius = this.settings.num('arriveRadius', 3);
-
-        const custom = this.settings.tile('customTile', new Tile(0, 0, 0));
-        if (custom.x !== 0 || custom.z !== 0) {
-            this.target = custom;
-            this.label = `custom ${custom.x},${custom.z},${custom.level}`;
-        } else {
-            const dest = resolveDestination(this.settings.str('destination', WALK_OPTIONS[0]));
-            if (dest) {
-                this.target = dest.tile;
-                this.label = dest.name;
-            }
-        }
-
+        this.applyDestination();
         if (!this.target) {
             this.log('WalkTo: no destination set — stopping');
             throw new Error('WalkTo: no destination');
         }
 
         this.log(`walking to ${this.label} at ${this.target} (arrive within ${this.radius})`);
-        const here = Game.tile();
-        this.tripStartDist = here ? this.target.distanceTo(here) : 0;
         this.add(new WalkTo(this));
+        this.unsub = SettingsStore.onChange((name, key) => {
+            if (name === 'WalkTo' && (key === 'destination' || key === 'customTile')) {
+                this.applyDestination();
+            }
+        });
+    }
+
+    override onStop(): void {
+        this.unsub?.();
+        this.unsub = null;
+    }
+
+    private applyDestination(): void {
+        this.settings = new SettingsBag(SettingsStore.resolve('WalkTo', WALKTO_SETTINGS));
+        this.radius = this.settings.num('arriveRadius', 0);
+        const resolved = resolveWalkTarget(
+            this.settings.str('destination', WALK_OPTIONS[0]),
+            this.settings.tile('customTile', UNSET_TILE)
+        );
+        if (!resolved) {
+            return;
+        }
+        const same = this.target !== null && resolved.tile.equals(this.target) && resolved.label === this.label;
+        this.target = resolved.tile;
+        this.label = resolved.label;
+        const here = Game.tile();
+        this.tripStartDist = here ? resolved.tile.distanceTo(here) : 0;
+        if (!same) {
+            this.arrived = false;
+        }
     }
 
     override onPaint(ctx: CanvasRenderingContext2D): void {
@@ -64,9 +122,8 @@ export default class WalkToBot extends TaskBot {
         p.bar('Trip', progress, '#6cb6ff');
         p.row(`Walker queue: ${Traversal.remaining()}`, `Arrive within: ${this.radius}`);
         p.gap();
-        // Prev/Next stepper (issue #327), single-click select overshot when spam-cycling.
-        const destNow = WALK_OPTIONS.includes(this.label) ? this.label : WALK_OPTIONS[0]!;
-        const picked = p.stepper('dest', 'Destination', WALK_OPTIONS, destNow);
+        const destNow = WALK_OPTIONS.includes(this.label) ? this.label : MAP_PICK;
+        const picked = p.stepper('dest', 'Destination', DEST_OPTIONS, destNow);
         if (picked) {
             this.switchDestination(picked);
         }
@@ -75,15 +132,13 @@ export default class WalkToBot extends TaskBot {
     }
 
     private switchDestination(name: string): void {
+        if (name === MAP_PICK) {
+            return;
+        }
         const dest = resolveDestination(name);
         if (!dest || dest.name === this.label) {
             return;
         }
-        this.target = dest.tile;
-        this.label = dest.name;
-        this.arrived = false;
-        const here = Game.tile();
-        this.tripStartDist = here ? dest.tile.distanceTo(here) : 0;
         SettingsStore.save('WalkTo', 'destination', name);
         this.log(`destination switched to ${name} (from the paint)`);
     }
@@ -123,7 +178,7 @@ class WalkTo implements Task {
         const radius = this.bot.arriveRadius();
 
         const start = Game.tile();
-        if (start && target.distanceTo(start) <= radius) {
+        if (start && hasArrived(start, target, radius)) {
             this.arrive(start);
             return;
         }
@@ -137,7 +192,7 @@ class WalkTo implements Task {
             this.stalls = 0;
             return;
         }
-        if (here && target.distanceTo(here) <= radius + 1) {
+        if (here && hasArrived(here, target, radius)) {
             this.arrive(here);
             return;
         }
@@ -157,5 +212,6 @@ class WalkTo implements Task {
         this.bot.markArrived();
         this.bot.setStatus(`arrived at ${this.bot.destLabel()}`);
         this.bot.log(`arrived at ${this.bot.destLabel()} (${here.x}, ${here.z}, ${here.level})`);
+        ScriptRunner.stop(`WalkTo: arrived at ${this.bot.destLabel()}`);
     }
 }

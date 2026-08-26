@@ -40,6 +40,7 @@ try {
     await cheatQuiet(page, START);
 
     await page.evaluate(d => {
+        sessionStorage.setItem('rs2b0t:set:WalkTo:destination', 'Map pick');
         sessionStorage.setItem('rs2b0t:set:WalkTo:customTile', `${d.x},${d.z},${d.level}`);
         sessionStorage.setItem('rs2b0t:set:WalkTo:arriveRadius', '3');
     }, DEST);

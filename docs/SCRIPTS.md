@@ -755,9 +755,9 @@ Walks to a chosen destination and stops — Lumbridge, Varrock, Falador, Ardougn
 
 | Setting | Type | Default | Notes |
 |---|---|---|---|
-| `destination` | string | `"Lumbridge"` | Destination — one of: Lumbridge, Varrock, Falador, Ardougne, Rellekka, Taverley, Draynor, Al Kharid, Edgeville, Seers' Village, Catherby, Yanille |
-| `customTile` | tile | `{"x":0,"z":0,"level":0}` | Custom tile (x,z) |
-| `arriveRadius` | number (0–12) | `3` | Arrive within (tiles) |
+| `destination` | string | `"Lumbridge"` | Destination — one of: Map pick, Lumbridge, Varrock, Falador, Ardougne, Rellekka, Taverley, Draynor, Al Kharid, Edgeville, Seers' Village, Catherby, Yanille |
+| `customTile` | tile | `{"x":0,"z":0,"level":0}` | Map pick tile (x,z) |
+| `arriveRadius` | number (0–12) | `0` | Arrive within (tiles) |
 
 ## Prayer
 

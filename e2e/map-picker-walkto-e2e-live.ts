@@ -156,6 +156,7 @@ try {
     }
 
     await setSettings(page, 'WalkTo', {
+        destination: 'Map pick',
         customTile: `${picked.x},${picked.z},${picked.level}`,
         arriveRadius: ARRIVE_RADIUS
     });
