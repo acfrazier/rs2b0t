@@ -1,8 +1,5 @@
 #!/usr/bin/env bun
-// Drift gate for @rs2b0t/api: the members the client installs on globalThis.__rs2b0t versus
-// the members packages/rs2b0t-api/index.d.ts declares, over the names index.js re-exports.
-//   bun tools/api-contract.ts            report
-//   bun tools/api-contract.ts --check    exit 1 on drift
+// Drift gate: globalThis.__rs2b0t versus packages/rs2b0t-api/index.d.ts over the names index.js re-exports; --check exits 1 on drift.
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 
