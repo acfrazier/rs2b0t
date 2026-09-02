@@ -22,7 +22,7 @@ abstract class AbstractBot {
     onPaint?(ctx: CanvasRenderingContext2D): void; // overlay HUD, every redraw
 
     log(msg: string): void;
-    protected on<K>(event, cb): void;  // event subscription, auto-removed on stop
+    on<K>(event, cb): void;            // event subscription, auto-removed on stop; public so a task can subscribe for its bot
 }
 ```
 
