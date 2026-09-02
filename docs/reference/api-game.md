@@ -119,6 +119,12 @@ abstract class Area {
 }
 ```
 
+### reader
+
+`reader` is the raw client reader every object above is built on. It is exported
+untyped (`Record<string, (...args) => unknown>`), so reach for it only when no API
+object covers the read. `reader.varp(id)` is the common case ([Quests](api-quests.md)).
+
 ---
 
 ## See also
