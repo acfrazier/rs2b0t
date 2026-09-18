@@ -156,3 +156,13 @@ describe('gotoNpc wizard-tower hop walk dest', () => {
         expect(interactOps[0]).toBe('Climb-down');
     });
 });
+
+for (const failedX of [3108, 3105]) {
+    test(`does not climb when the Wizard Tower walk to x=${failedX} fails`, async () => {
+        current = new Tile(3251, 3420, 0);
+        walkScript = dest => dest.x === failedX ? false : new Tile(dest.x, dest.z, dest.level);
+
+        expect(await gotoNpc(SEDRIDOR, WIZARD_HOPS, () => {})).toBe(false);
+        expect(interactOps).toEqual([]);
+    });
+}

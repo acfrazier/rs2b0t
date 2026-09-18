@@ -72,9 +72,7 @@ export interface AlchItem {
     alchValue: number;
 }
 
-// Why: green, blue, red and black dragonhide all read as "Dragonhide body" in the client, so a
-// Why: by-name withdraw takes whichever sits earliest in the bank. Every item is chosen by id, and
-// Why: the label is what the chip and the paint show.
+// Why: dragonhide colors share a display name, so select by id and show the unique label.
 const FODDER: { obj: string; label?: string }[] = [
     { obj: 'maple_longbow' },
     { obj: 'yew_longbow' },
@@ -131,7 +129,11 @@ export const ALCH_ITEMS: readonly AlchItem[] = FODDER
     })
     .sort(richestFirst);
 
-export const ALCH_OPTIONS: string[] = [CUSTOM_ALCH_KEY, ...ALCH_ITEMS.map(i => i.key)];
+// Why: the chips are for finding an item by name, so they read alphabetically by the label shown; ALCH_ITEMS keeps its richest-first order, which is what the drain runs on.
+export const ALCH_OPTIONS: string[] = [
+    CUSTOM_ALCH_KEY,
+    ...[...ALCH_ITEMS].sort((a, b) => a.label.localeCompare(b.label)).map(i => i.key)
+];
 
 export const ALCH_OPTION_LABELS: Record<string, string> = {
     [CUSTOM_ALCH_KEY]: 'Custom item (named below)',

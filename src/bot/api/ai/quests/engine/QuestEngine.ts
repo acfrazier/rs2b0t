@@ -35,13 +35,14 @@ export interface QuestHost {
     consumeSkip(): boolean;
     consumeDeath(): boolean;
     noteState(rows: QueueRow[], runningId: string | null, stepDesc: string, noProgress: number, parked: number): void;
-    /** Why: the engine reports that it is out of work; stopping the run is the script's call, not the engine's. */
+    /** Why: the engine only reports it's out of work; stopping the run is the script's call. */
     finish(reason: string): void;
 }
 
 const PARK_GIVE_UP = 3;
 
 const WAIT_PARK = 15;
+const COMBAT_STALL_MS = 60_000;
 
 /** Walks back to a bank to try before leaving the character where it finished. */
 const RETREAT_GIVE_UP = 4;
@@ -58,10 +59,7 @@ function bankFor(module: QuestModule): Tile | undefined {
     return module.bank === 'nearest' ? undefined : (module.bank ?? PROVISION_BANK);
 }
 
-/**
- * Main-modal roots the engine must not auto-close. Pack ids from
- * content/pack/interface.pack (rev 274).
- */
+/** Main-modal roots the engine must not auto-close. Pack ids from content/pack/interface.pack (rev 274). */
 const INTERACTIVE_QUEST_MAIN: ReadonlySet<number> = new Set([
     6675, // death_dice, Harold gambling (Death Plateau)
     8119 // messagescroll_handwriting, combination after reading the IOU
@@ -85,8 +83,7 @@ function describeStep(step: QuestStep): string {
         case 'equip': return `equip ${step.item}`;
         case 'scanBank': return 'check the bank';
         case 'withdraw': return `withdraw ${step.items.map(i => `${i.name}×${i.qty}`).join(', ')}`;
-        // Not always spillover from the previous quest any more, Family Crest
-        // banks its coin float mid-quest before walking into the wilderness.
+        // Family Crest banks its coin float mid-quest, so this isn't always previous-quest spillover.
         case 'deposit': return `bank all but ${step.keep.length} kept item type(s)`;
         case 'mineRock': return `mine ${step.item}`;
         case 'buy': return `buy ${step.qty}× ${step.item} from ${step.shop.npc}`;
@@ -101,7 +98,11 @@ export class QuestEngine implements Task {
     private readonly records: QuestRecord[] = QUEST_DEFS.map(d => d.record);
 
     private readonly watchdog = new ProgressWatchdog();
+    private readonly failedWatchdog = new ProgressWatchdog();
+    private pendingFailedSignature: string | null = null;
     private noProgressCount = 0;
+    private combatIdleSince: number | null = null;
+    private combatXp = 0;
 
     private readonly parked = new Set<string>();
     private readonly parkCounts = new Map<string, number>();
@@ -147,16 +148,14 @@ export class QuestEngine implements Task {
         if (await this.recoverDeathIfPending()) {
             return;
         }
-        // Apply Skip before random-event yield so a mid-walk interrupt lands on
-        // the next quest instead of spinning on EventSignal.pending().
+        // Apply Skip before the random-event yield so a mid-walk interrupt lands on the next quest instead of spinning on EventSignal.pending().
         const skipEarly = this.host.skipPending();
         if (!skipEarly && EventSignal.pending()) {
             await Execution.delayTicks(1);
             return;
         }
 
-        // Bank-aware quest steps deliberately leave the bank open so this task can take an
-        // authoritative snapshot before the interface disappears.
+        // Bank-aware steps leave the bank open so this task can snapshot it before the interface closes.
         if (!skipEarly && Bank.isOpen()) {
             await Execution.delayUntil(() => Bank.loaded(), 3000);
             this.refreshBankCounts(true);
@@ -165,7 +164,7 @@ export class QuestEngine implements Task {
         }
 
         // Why: quest-complete scrolls and similar leftovers sit on main and block the next decide() tick.
-        // Why: interactive quest UIs also use main and are never auto-closed, as the Death Plateau dice and combination handwriting were being killed mid-step.
+        // Why: interactive quest UIs also use main and must stay open (the Death Plateau dice and combination handwriting were being killed mid-step).
         const mainModal = reader.modals().main;
         if (
             !skipEarly
@@ -229,9 +228,24 @@ export class QuestEngine implements Task {
         const progress = await module.readProgress?.();
         const stage = progress ? progress.stage : await module.readStage?.();
         const snap = this.buildSnapshot(module, stage, progress);
+        const combatActive = this.combatAdvancing(snap);
+
+        if (this.pendingFailedSignature !== null) {
+            if (!combatActive && progressSignature(snap) === this.pendingFailedSignature) {
+                this.host.log(`no progress after ${this.noProgressCount} steps on ${module.record.name}`);
+                this.parkOrGiveUp(id, module.record.name);
+                this.resetWatchdog();
+                this.runningId = null;
+                return;
+            }
+            this.pendingFailedSignature = null;
+            this.failedWatchdog.reset();
+            this.noProgressCount = 0;
+            snap.noProgress = 0;
+        }
 
         // Why: a fight shaped as a step returns here every pass, so this is the only place its prayer can be held.
-        // Why: the tick is yielded when the upkeep spends it, as the server runs one op per tick and a pass that prays and swings drops one of them.
+        // Why: the server runs one op per tick, so a pass that prays yields instead of also swinging.
         if (await prayerUpkeep()) {
             return;
         }
@@ -241,14 +255,13 @@ export class QuestEngine implements Task {
         }
 
         if (module.ownsInventory) {
-            // Some quests have one-way, bankless areas. Their stage oracle must run before any
-            // generic attempt to bank spillover or provision items on the mainland.
+            // Some quests have one-way, bankless areas, so their stage oracle runs before any generic spillover banking or provisioning on the mainland.
             this.deposited.add(id);
             this.provisioned.add(id);
         }
 
         if (snap.journal === 'complete') {
-            // Why: these quests end in a dragon's lair, a wilderness, a dungeon, and a bot dropped where it stood logs out there, or does not, and dies there.
+            // Why: quests end in lairs, the wilderness and dungeons, and a bot left standing there dies there.
             // Why: the job is done when the character is standing at a bank.
             if (!this.retreated.has(id) && !(await this.retreatToBank(module, id, rows))) {
                 return;
@@ -297,7 +310,7 @@ export class QuestEngine implements Task {
         }
         if (!this.provisioned.has(id)) {
             const plan = planProvisioning(module.record.items, snap.inv, this.lastBankCounts);
-            // Why: a 10gp gate while egg/milk/flour are still outstanding used to emit withdraw Coins every tick, because the float was restored after every purchase.
+            // Why: restoring the float after every purchase made a 10gp gate emit withdraw Coins every tick while egg/milk/flour were outstanding.
             const coinPlan = coinFloatPlan(
                 snap.inv.get('coins') ?? 0,
                 this.lastBankCounts.get('coins') ?? 0,
@@ -311,8 +324,7 @@ export class QuestEngine implements Task {
                 coinFloat = { name: 'Coins', qty: coinPlan.qty };
             }
             const foodItem = this.host.foodItem();
-            // Only withdraw food once the bank inventory is known, guessing a
-            // shortfall forces a failed booth trip and can scramble a full pack.
+            // Only withdraw food once the bank inventory is known; a guessed shortfall forces a failed booth trip and can scramble a full pack.
             const foodReady = module.foodReady?.(snap) ?? true;
             let foodFloat: { name: string; qty: number } | null = null;
             if (module.food && foodItem && this.bankKnown && foodReady) {
@@ -345,7 +357,9 @@ export class QuestEngine implements Task {
                 }
             }
             const extras = [coinFloat, foodFloat, potionFloat].filter((w): w is { name: string; qty: number } => w !== null);
-            if (plan.blocked.length > 0 && plan.withdraw.length === 0) {
+            if (!this.bankKnown && plan.blocked.length > 0) {
+                step = { kind: 'scanBank', bank: bankFor(module) };
+            } else if (plan.blocked.length > 0 && plan.withdraw.length === 0) {
                 this.host.log(`${module.record.name} short on items: ${plan.blocked.join(', ')} — parking`);
                 this.parkedReasons.set(id, plan.blocked.map(b => `missing: ${b}`));
                 this.parkOrGiveUp(id, module.record.name);
@@ -357,8 +371,7 @@ export class QuestEngine implements Task {
             } else if (plan.withdraw.length > 0 || extras.length > 0) {
                 step = { kind: 'withdraw', items: [...plan.withdraw, ...extras], bank: bankFor(module) };
             } else if (plan.satisfied) {
-                // Why: holding the food back is not being provisioned, closing the block here would
-                // retire it for the run and the quest would fight on an empty stomach.
+                // Why: with food held back the quest isn't provisioned yet, and closing the block here would retire it for the run.
                 if (foodReady) {
                     this.provisioned.add(id);
                 }
@@ -388,8 +401,8 @@ export class QuestEngine implements Task {
         const attempt = this.tracker.open(`${id}|${stepDesc}`, now);
         const stepLine = `${module.record.name}: ${stepDesc}`;
         const fresh = stepLine !== this.lastStepLogged;
-        // Why: a leg that keeps re-deciding to the same step is the normal way this engine loops, so silence on the repeat is the default.
-        // Why: the heartbeat is what stops a long chain of mine, smelt and hammer, all called `smith 8 nails`, from looking like a hang.
+        // Why: re-deciding the same step is how this engine loops, so repeats are silent by default.
+        // Why: the heartbeat stops a long mine, smelt and hammer chain, all called `smith 8 nails`, from looking like a hang.
         const announce = verbose || fresh || this.tracker.beat(now);
         if (announce) {
             const context = `stage ${snap.stage ?? '?'} · ${formatTile(snap.tile)} · ${snap.freeSlots} free`;
@@ -430,8 +443,7 @@ export class QuestEngine implements Task {
             : step;
         const startedAt = Date.now();
         const ok = await executeStep(bankAwareStep, module.hops ?? [], m => {
-            // Verbose keeps the repeats: a sub-log that fires once per rock is the
-            // record of a mining leg, and de-duping it erases the leg.
+            // Verbose keeps the repeats: a sub-log that fires once per rock is the record of a mining leg.
             if (verbose) {
                 this.host.log(`  ${m}`);
                 return;
@@ -458,9 +470,9 @@ export class QuestEngine implements Task {
             }
         }
 
-        // Why: a step that fails forever used to skip the watchdog, so Rune Mysteries stood at the Wizard's Tower ladder clicking Sedridor until a human stopped it.
         if (ok) {
             this.failStreak = 0;
+            this.failedWatchdog.reset();
         } else if (++this.failStreak % FAIL_WARN === 0) {
             this.host.log(`WARN: '${stepDesc}' has failed ${this.failStreak}x in a row `
                 + `over ${formatDuration(this.tracker.elapsed(Date.now()))}`);
@@ -473,10 +485,22 @@ export class QuestEngine implements Task {
         }
 
         if (advancesWorld(step)) {
-            const count = this.watchdog.note(progressSignature(this.buildSnapshot(module, stage, progress)));
+            const after = this.buildSnapshot(module, stage, progress);
+            const signature = progressSignature(after);
+            const combatActive = this.combatAdvancing(after);
+            if (combatActive) {
+                this.watchdog.reset();
+                this.failedWatchdog.reset();
+            }
+            const count = combatActive ? 0 : ok
+                ? this.watchdog.note(signature)
+                : this.failedWatchdog.noteFailure(progressSignature(snap), signature);
             this.noProgressCount = count;
             if (count === NO_PROGRESS_WARN) {
                 this.host.log(`WARN: ${count} steps with no progress on ${module.record.name} — check the decide()/prefer lists`);
+            } else if (count >= NO_PROGRESS_PARK && !ok && (module.readProgress || module.readStage)) {
+                // Why: journal oracles can open/close modals; confirm on the next normal read, not with an extra post-step action.
+                this.pendingFailedSignature = signature;
             } else if (count >= NO_PROGRESS_PARK) {
                 this.host.log(`no progress after ${count} steps on ${module.record.name}`);
                 this.parkOrGiveUp(id, module.record.name);
@@ -560,7 +584,7 @@ export class QuestEngine implements Task {
 
     // Why: `exit` comes first for the quests whose last step leaves them somewhere the navigator has no route out of.
     // Why: the bank walk itself is a `scanBank`, so it picks the nearest reachable bank like every other bank leg.
-    // Why: it is bounded, as a bot standing safely on the wrong side of a broken route is a better outcome than one that never finishes its queue.
+    // Why: bounded, since a bot parked on the wrong side of a broken route still finishes its queue.
 
     /** Drive a finished quest's character back to a bank before the queue moves on. */
     private async retreatToBank(module: QuestModule, id: string, rows: QueueRow[]): Promise<boolean> {
@@ -586,9 +610,23 @@ export class QuestEngine implements Task {
 
     private resetWatchdog(): void {
         this.watchdog.reset();
+        this.failedWatchdog.reset();
+        this.pendingFailedSignature = null;
         this.noProgressCount = 0;
         this.tracker.reset();
         this.failStreak = 0;
+        this.combatIdleSince = null;
+    }
+
+    private combatAdvancing(snap: QuestSnapshot): boolean {
+        if (!Game.inCombat()) {
+            this.combatIdleSince = null;
+            return false;
+        }
+        const xp = snap.combatXp ?? 0;
+        if (this.combatIdleSince === null || xp !== this.combatXp) this.combatIdleSince = Date.now();
+        this.combatXp = xp;
+        return Date.now() - this.combatIdleSince < COMBAT_STALL_MS;
     }
 
     /**
@@ -688,7 +726,8 @@ export class QuestEngine implements Task {
             prayer: Skills.effective('prayer'),
             attack: Skills.level('attack'),
             ranged: Skills.level('ranged'),
-            freeSlots: Inventory.free()
+            freeSlots: Inventory.free(),
+            combatXp: Skills.xp('attack') + Skills.xp('strength') + Skills.xp('defence') + Skills.xp('ranged') + Skills.xp('magic') + Skills.xp('hitpoints')
         };
     }
 
@@ -703,7 +742,7 @@ export class QuestEngine implements Task {
         for (const name of skillNames) {
             skillLevels.set(name, Skills.level(name));
         }
-        // Why: what the account has finished is read from every known quest, not only the ones with a module. A prerequisite whose own quest has no module yet, such as Biohazard ahead of Underground Pass or Heroes' Quest ahead of Legends, would otherwise be unsatisfiable, and the quest it gates would report BLOCKED forever.
+        // Why: completion is read from every known quest, so a prerequisite without a module yet (Biohazard for Underground Pass, Heroes' Quest for Legends) can still be satisfied.
         const completedQuests = new Set<string>();
         for (const r of QUESTS) {
             if (Quests.status(r.name) === 'complete') {
