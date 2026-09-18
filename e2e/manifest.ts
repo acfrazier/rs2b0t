@@ -3,6 +3,16 @@ import type { Case } from './manifestTypes.js';
 /** Every case the e2e suite can run. The runner iterates this; nothing globs the directory. */
 export const CASES: readonly Case[] = [
     {
+        id: 'lostcity-strike-safespot-live',
+        harness: 'lostcity-strike-safespot-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'vetted',
+        provenAt: 'bef82841aaff06f447e0924836a4fa6a9de302b8',
+        manual: true,
+        budgetMin: 24,
+        note: 'Fresh Magic 13 accounts fight the Tree Spirit with Fire Strike and no protection prayer. Checks safespot damage, rune exhaustion, retained food and five staves at quest completion.'
+    },
+    {
         id: 'snape-bank-distance-653-live',
         harness: 'snape-bank-distance-653-live.ts',
         covers: { scripts: ['HerbloreSecondaries'] },
