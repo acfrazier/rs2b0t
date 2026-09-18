@@ -1,7 +1,4 @@
-/**
- * GatheringBot task implementations (combat, mule, bank, cook, tools, gather).
- * Separated from the bot class for maintainability; behavior is unchanged.
- */
+/** GatheringBot task implementations for combat, mule, bank, cooking, tools, and gathering. */
 import { beyondLeash, shouldSoftHomeFromGatherMiss, tileWithinLeash } from '../../api/tasks/Anchor.js';
 import type { Task } from '../../api/bot/Bot.js';
 import { EventSignal } from '../../api/execution/EventSignal.js';
@@ -20,6 +17,7 @@ import { Npcs } from '../../api/npcs/Npcs.js';
 import { Traversal } from '../../api/walking/Traversal.js';
 import { isOpenableObstacle, openOp, walkOpening } from '../../event/webwalk/walkOpening.js';
 import { DirectNavigator } from '../../event/webwalk/DirectNavigator.js';
+import { stepOffCandidates } from '../../runtime/randomevents/eventEvade.js';
 import { ScriptRunner } from '../../runtime/ScriptRunner.js';
 import {
     gatherHuntRadius,
@@ -36,6 +34,7 @@ import {
 } from '../../api/trade/PartnerTrade.js';
 import { driveActivePartnerTrade, tradeScreenState } from '../../api/trade/drivePartnerTrade.js';
 import { BROKEN_PICKAXE, GAS_ROCK_IDS, GAS_ROCK_TICKS } from '../../data/miningRocks.js';
+import { ENT_LIFE_TICKS, ENT_NPC_IDS } from '../../data/woodcuttingLocations.js';
 import { bestPickaxe } from '../../api/acquisition/Tools.js';
 import { WHIRLPOOL_IDS, fishingRestockPlan } from '../../data/fishingMethods.js';
 import {
@@ -61,9 +60,18 @@ import {
 import { Banking } from '../../api/bank/Banking.js';
 import { parseRangeStyle } from '../../api/combat/CombatStyle.js';
 import { BROKEN_AXE, COINS, buyPlansCost, fishingGearShopCart, planGatherToolAcquire } from '../../api/acquisition/ToolAcquire.js';
+import { Shop } from '../../api/shop/Shop.js';
+
+/** Roachey's counter in the Fishing Guild, a short walk from the pier. */
+const SHOP_WALK_MS = 60_000;
+/** One hop along a camp's sweep is a few tiles, so a stop that will not arrive is a stop worth giving up on. */
+const SWEEP_WALK_MS = 30_000;
 import {
+    featherCoinsToDraw,
     fishingSessionBroken,
     hostileAttackerNearby,
+    locGatherShouldYield,
+    entAbortAction,
     shouldFleeCombat
 } from './GatheringBotLogic.js';
 import type GatheringBot from './GatheringBot.js';
@@ -1074,6 +1082,8 @@ export class BankCatch implements Task {
                 return;
             }
         }
+        if (!(await this.bot.healMinerAtBank(log))) return;
+
         const routePlan = this.bot.desertCampSupplyPlanAtOpenBank();
         if (routePlan && !routePlan.ok) {
             this.bot.stopStrictBankFailure(`desert camp: missing supplies: ${routePlan.missing.join(', ')}`);
@@ -1211,7 +1221,7 @@ export class FishCookLoad implements Task {
                     this.bot.log(`cook: walking to approach ${approach}${why ? ` — ${why}` : ''}`);
                     await walkOpening(approach, 1, obs, m => this.bot.log(m));
                 }
-                // Proactively open Large door / house Door at the approach tile.
+                // Open a Large door or house Door from its approach tile.
                 const shut = Locs.query()
                     .where(l => isOpenableObstacle(l.name, l.actions(), obs))
                     .where(l => l.distance() <= 3)
@@ -1795,6 +1805,73 @@ export class EnsureGatherToolEquipped implements Task {
     }
 }
 
+// Why: Roachey's feathers come back one a tick toward 1500, so a bought-out stack is fifteen minutes from full and the trip is worth taking on that clock rather than only when the pack runs dry. The shop is a short walk from the guild pier, and the run banks nothing on the way.
+export class BuyGuildFeathers implements Task {
+    constructor(private bot: GatheringBot) {}
+
+    validate(): boolean {
+        if (EventSignal.pending() || Game.inCombat() || Inventory.isFull()) {
+            return false;
+        }
+        const vendor = this.bot.baitVendor();
+        return vendor !== null && vendor.keeper !== 'Fernahei' && this.bot.guildFeatherTripDue();
+    }
+
+    async execute(): Promise<void> {
+        const bot = this.bot;
+        const vendor = bot.baitVendor();
+        if (!vendor) {
+            return;
+        }
+        const { keeper, stand, price, item } = vendor;
+        const log = (m: string) => bot.log(`  ${m}`);
+        // Why: the clock starts on the attempt rather than the sale, or a shop that will not open is retried every loop.
+        bot.noteGuildFeatherTrip();
+
+        if (Inventory.count(COINS) < price) {
+            bot.setStatus('feathers: drawing coins');
+            if (!(await bot.openScriptBank(log))) {
+                bot.log('feathers: could not open the bank for coins, will try again next round');
+                return;
+            }
+            await Execution.delayUntilTicks(() => Bank.loaded() || !Bank.isOpen(), 5);
+            await Bank.depositAllMatching(bot.restockDepositMatcher());
+            const draw = featherCoinsToDraw(Inventory.count(COINS), Bank.count(COINS), price);
+            if (draw > 0) {
+                bot.log(`feathers: drawing ${draw}gp of the ${Bank.count(COINS)}gp banked`);
+                await Bank.withdrawX(COINS, draw);
+            }
+            await bot.closeScriptBank(log, { allowForgetful: false });
+        }
+        const coins = Inventory.count(COINS);
+        if (coins < price) {
+            bot.log(`feathers: only ${coins}gp on hand or banked, skipping ${keeper} this round`);
+            return;
+        }
+        bot.setStatus(`feathers: walking to ${keeper}`);
+        if (!(await Traversal.walkResilient(stand, { radius: 2, attempts: 3, timeoutMs: SHOP_WALK_MS, log }))) {
+            bot.log(`feathers: could not reach ${keeper}, will try again next round`);
+            return;
+        }
+        if (!(await Shop.open(keeper))) {
+            bot.log(`feathers: could not open ${keeper}'s shop`);
+            return;
+        }
+        bot.setStatus('feathers: buying out the stack');
+        const before = Inventory.count(item);
+        const stock = Shop.stock().find(line => line.name === item)?.count ?? 0;
+        const room = Math.max(0, coins / price);
+        await Shop.buy(item, Math.min(stock, Math.floor(room)));
+        await Shop.close();
+        const got = Inventory.count(item) - before;
+        bot.log(got > 0
+            ? `feathers: bought ${got} from ${keeper} (holding ${Inventory.count(item)})`
+            : `feathers: ${keeper} had none to sell`);
+        bot.setStatus('feathers: back to the water');
+        await bot.walkHomeIfNeeded(log);
+    }
+}
+
 export class BuyShiloSupplies implements Task {
     constructor(private bot: GatheringBot) {}
 
@@ -2276,6 +2353,9 @@ export class Gather implements Task {
     /** NPC index of the spot we last successfully started fishing on (null = no active session). */
     private activeFishIndex: number | null = null;
 
+    /** Last clicked tree or rock tile; used to preserve the active target and abort an Ent on that tile. */
+    private activeMineTile: Tile | null = null;
+
     /**
      * Distance origin for ranking fishing spots (prefer nearest to player).
      * Game.tile() is a plain WorldTile, wrap with Tile.from for distanceTo.
@@ -2333,9 +2413,8 @@ export class Gather implements Task {
             .nearest();
     }
 
-    private findRock() {
+    private rockQuery() {
         // Why: the camp membership fence (anchor leash) and the ore or tree type filters come first.
-        // Why: rocks near the player are preferred, so the bot does not path across Dwarven tunnels or SE Varrock while a matching ore is underfoot.
         return Locs.query()
             .name(this.bot.targetName())
             .action(this.bot.actionName())
@@ -2346,8 +2425,22 @@ export class Gather implements Task {
                     this.bot.matchesRock(l.id) &&
                     !GAS_ROCK_IDS.has(l.id) &&
                     this.bot.usable(keyOf(l.tile()))
-            )
-            .nearestPreferLocal(LOCAL_MINE_PREFER_RADIUS);
+            );
+    }
+
+    private findRock(tile?: Tile) {
+        const query = this.rockQuery();
+        if (tile) query.withinOf(tile, 0);
+        return query.nearestPreferLocal(LOCAL_MINE_PREFER_RADIUS);
+    }
+
+    private pickRock() {
+        const query = this.rockQuery();
+        if (this.bot.mining() && Math.random() < 0.1) {
+            const rocks = query.results();
+            return rocks[Math.floor(Math.random() * rocks.length)] ?? null;
+        }
+        return query.nearestPreferLocal(LOCAL_MINE_PREFER_RADIUS);
     }
 
     validate(): boolean {
@@ -2411,6 +2504,15 @@ export class Gather implements Task {
         );
     }
 
+    private entAt(t: Tile): boolean {
+        return (
+            Npcs.query()
+                .withinOf(t, 0)
+                .where(n => ENT_NPC_IDS.has(n.id))
+                .nearest() !== null
+        );
+    }
+
     private spotByIndex(index: number) {
         return Npcs.query()
             .where(n => n.index === index)
@@ -2438,23 +2540,20 @@ export class Gather implements Task {
 
     /** Short-circuits cheap checks before scene queries. */
     private shouldYieldMine(tile: Tile): boolean {
-        if (EventSignal.pending() || Inventory.isFull() || ChatDialog.canContinue()) {
-            return true;
-        }
-        if (this.bot.minerFoodEnabled() && this.bot.shouldEatMinerFood()) {
-            return true;
-        }
-        if (combatBreaksGather(Game.inCombat(), this.bot.allowCombatGather())) {
-            return true;
-        }
-        // Gas is cheaper/more local than a full camp rock scan.
-        if (this.gasAt(tile)) {
-            return true;
-        }
-        return this.findRock() === null;
+        return locGatherShouldYield({
+            eventPending: EventSignal.pending(),
+            inventoryFull: Inventory.isFull(),
+            dialogPending: ChatDialog.canContinue(),
+            inCombat: Game.inCombat(),
+            allowCombatGather: this.bot.allowCombatGather(),
+            shouldEatMinerFood: this.bot.minerFoodEnabled() && this.bot.shouldEatMinerFood(),
+            clickedTileHazard: this.gasAt(tile) || this.entAt(tile),
+            noResourceInCamp: this.findRock(tile) === null
+        });
     }
 
     private async fleeGas(key: string, tile: Tile): Promise<void> {
+        this.activeMineTile = null;
         this.bot.log(`mine: smoking rock @ ${tile} — backing off`);
         this.bot.setStatus('mine: smoking rock');
         this.bot.cooldown(key, GAS_ROCK_TICKS + 10);
@@ -2470,8 +2569,49 @@ export class Gather implements Task {
         await Execution.delayTicks(2);
     }
 
+    /**
+     * Why: leaving the animation wait does not cancel p_opnpc; send a new action to stop Ent swings.
+     */
+    private async abortEnt(key: string, tile: Tile): Promise<void> {
+        this.bot.log(`gather: ent @ ${tile} — switching tree`);
+        this.bot.setStatus('gather: ent');
+        this.bot.cooldown(key, ENT_LIFE_TICKS + 10);
+
+        const neighbour = this.findRock();
+        const here = Game.tile();
+        const neighbourTile = neighbour?.tile() ?? null;
+        const inReach =
+            neighbourTile !== null && here !== null && Tile.from(here).distanceTo(neighbourTile) <= 1;
+        const action = entAbortAction({
+            neighbourInReach: inReach,
+            neighbourExists: neighbour !== null
+        });
+
+        if (action === 'chop-neighbour' && neighbour && neighbourTile) {
+            await neighbour.interact(this.bot.actionName());
+            this.activeMineTile = neighbourTile;
+            return;
+        }
+        if (action === 'walk-to-neighbour' && neighbourTile) {
+            this.activeMineTile = null;
+            DirectNavigator.walk(neighbourTile);
+            await Execution.delayTicks(2);
+            return;
+        }
+
+        this.activeMineTile = null;
+        if (here) {
+            const step = stepOffCandidates(here, tile)[0];
+            if (step) {
+                DirectNavigator.walk(step);
+            }
+        }
+        await Execution.delayTicks(2);
+    }
+
     async execute(): Promise<void> {
         if (!this.bot.hasGear()) {
+            this.activeMineTile = null;
             this.bot.setStatus(`gather: missing ${this.bot.gearLabel()}`);
             this.bot.log(`gather: missing ${this.bot.gearLabel()}`);
             await Execution.delayTicks(5);
@@ -2479,9 +2619,11 @@ export class Gather implements Task {
         }
 
         if (EventSignal.pending()) {
+            this.activeMineTile = null;
             return;
         }
         if (combatBreaksGather(Game.inCombat(), this.bot.allowCombatGather())) {
+            this.activeMineTile = null;
             return;
         }
 
@@ -2574,25 +2716,15 @@ export class Gather implements Task {
     }
 
     private async reclickMine(tile: Tile): Promise<boolean> {
-        const rock = this.findRock();
+        const rock = this.findRock(tile) ?? this.pickRock();
         if (!rock) {
+            this.activeMineTile = null;
             return false;
         }
-        // Prefer same tile when still up; otherwise nearest in leash.
-        const same =
-            Locs.query()
-                .name(this.bot.targetName())
-                .action(this.bot.actionName())
-                .where(
-                    l =>
-                        l.tile().equals(tile) &&
-                        this.bot.matchesRock(l.id) &&
-                        !GAS_ROCK_IDS.has(l.id) &&
-                        this.bot.usable(keyOf(l.tile()))
-                )
-                .nearest() ?? rock;
         this.bot.setStatus(`tick: reclick ${this.bot.actionName()}`);
-        return same.interact(this.bot.actionName());
+        const clicked = await rock.interact(this.bot.actionName());
+        this.activeMineTile = clicked ? rock.tile() : null;
+        return clicked;
     }
 
     private async executeFish(): Promise<void> {
@@ -2632,9 +2764,7 @@ export class Gather implements Task {
             const stop = this.bot.nextSweepStop();
             if (stop !== null) {
                 this.bot.setStatus(`fish: sweeping to ${stop}`);
-                await Traversal.walkResilient(stop, {
-                    radius: 1, attempts: 2, timeoutMs: 30_000, log: message => this.bot.log(`  ${message}`)
-                });
+                await Traversal.walkResilient(stop, { radius: 1, attempts: 2, timeoutMs: SWEEP_WALK_MS, log: m => this.bot.log(`  ${m}`) });
                 return;
             }
             // Named: membership disk from home. Freeform: hunt from player/start.
@@ -2758,7 +2888,20 @@ export class Gather implements Task {
             return;
         }
 
-        const target = this.findRock();
+        if (this.activeMineTile && Game.animating() && this.entAt(this.activeMineTile)) {
+            await this.abortEnt(keyOf(this.activeMineTile), this.activeMineTile);
+            return;
+        }
+
+        let target = this.activeMineTile ? this.findRock(this.activeMineTile) : null;
+        if (!target) {
+            if (this.activeMineTile && this.entAt(this.activeMineTile)) {
+                await this.abortEnt(keyOf(this.activeMineTile), this.activeMineTile);
+                return;
+            }
+            this.activeMineTile = null;
+            target = this.pickRock();
+        }
         if (!target) {
             // Keep-alive when near anchor with no matching loc, surface why we idle.
             if (Game.animating()) {
@@ -2807,36 +2950,50 @@ export class Gather implements Task {
             });
             if (!reached) {
                 this.bot.log(`gather: could not approach ${this.bot.targetName()} @ ${tile} from ${here}`);
+                this.activeMineTile = null;
+                return;
             }
-            return;
+            target = this.findRock(tile);
+            if (!target || this.shouldYieldMine(tile)) {
+                this.activeMineTile = null;
+                return;
+            }
         }
         const key = keyOf(tile);
         // Track whether this session produced ore/logs, successful deplete must not
         // soft-cooldown the tile (iron respawn ~6t < old 8t cooldown → far path thrash).
         let gotProduct = false;
 
-        if (!Game.animating()) {
+        if (!Game.animating() || !this.activeMineTile?.equals(tile)) {
             this.bot.setStatus(`${this.bot.actionName()} ${this.bot.targetName()} at ${tile}`);
             const before = Inventory.used();
             if (!(await target.interact(this.bot.actionName()))) {
+                this.activeMineTile = null;
                 this.bot.log(`no '${this.bot.actionName()}' op on ${this.bot.targetName()}? ops=[${target.actions().join(', ')}]`);
                 await Execution.delayTicks(2);
                 return;
             }
+            this.activeMineTile = tile;
 
             await Execution.delayUntilTicks(() => Inventory.used() > before || Game.animating() || this.shouldYieldMine(tile), 20);
             await Sustain.run();
             if (this.gasAt(tile)) {
+                this.activeMineTile = null;
                 await this.fleeGas(key, tile);
+                return;
+            }
+            if (this.entAt(tile)) {
+                await this.abortEnt(key, tile);
                 return;
             }
             if (Inventory.used() > before) {
                 gotProduct = true;
             }
             if (Inventory.used() === before && !Game.animating()) {
+                this.activeMineTile = null;
                 if (ChatDialog.canContinue()) {
                     this.bot.reject(key);
-                } else if (shouldCooldownGatherTile(false, this.findRock() !== null)) {
+                } else if (shouldCooldownGatherTile(false, this.findRock(tile) !== null)) {
                     // Failed click with other targets available, brief skip only.
                     this.bot.cooldown(key);
                 }
@@ -2852,8 +3009,12 @@ export class Gather implements Task {
         for (let guard = 0; guard < 200; guard++) {
             await Sustain.run();
             if (this.shouldYieldMine(tile)) {
+                this.activeMineTile = null;
                 if (this.gasAt(tile)) {
+                    this.activeMineTile = null;
                     await this.fleeGas(key, tile);
+                } else if (this.entAt(tile)) {
+                    await this.abortEnt(key, tile);
                 }
                 return;
             }
@@ -2861,7 +3022,12 @@ export class Gather implements Task {
             await Execution.delayUntilTicks(() => Inventory.used() > mark || !Game.animating() || this.shouldYieldMine(tile), 14);
             await Sustain.run();
             if (this.gasAt(tile)) {
+                this.activeMineTile = null;
                 await this.fleeGas(key, tile);
+                return;
+            }
+            if (this.entAt(tile)) {
+                await this.abortEnt(key, tile);
                 return;
             }
             if (Inventory.used() > mark) {
@@ -2874,9 +3040,11 @@ export class Gather implements Task {
             if (!Game.animating()) {
                 // Why: an empty rock or a stump already drops out of findRock, so a natural end needs no soft cooldown.
                 // Why: iron respawns faster than an 8-tick tile skip, nearby ore is back up while the bot paths across the mine.
+                this.activeMineTile = null;
                 return;
             }
         }
+        this.activeMineTile = null;
     }
 
     // Why: the cycle is t1 click tree, t2–t4 wait, t5 knife log, t6 drop log, repeat (#160).
@@ -2886,6 +3054,10 @@ export class Gather implements Task {
     /** Farmer willows 6-tick cycle. */
     private async executeFarmerWillow(): Promise<void> {
         if (EventSignal.pending() || Inventory.isFull() || ChatDialog.canContinue()) {
+            return;
+        }
+        if (this.activeMineTile && Game.animating() && this.entAt(this.activeMineTile)) {
+            await this.abortEnt(keyOf(this.activeMineTile), this.activeMineTile);
             return;
         }
 
@@ -2925,15 +3097,21 @@ export class Gather implements Task {
                 await Execution.delayTicks(1);
                 return;
             }
+            this.activeMineTile = tile;
             // Brief wait for anim/log; do not AFK the full cut, t5 will process.
             await Execution.delayUntilTicks(
                 () =>
                     Inventory.used() > before
                     || Game.animating()
                     || EventSignal.pending()
-                    || Inventory.isFull(),
+                    || Inventory.isFull()
+                    || this.entAt(tile),
                 3
             );
+            if (this.entAt(tile)) {
+                await this.abortEnt(keyOf(tile), tile);
+                return;
+            }
             if (Inventory.used() > before) {
                 this.bot.noteGatherRoll();
             }
@@ -3015,10 +3193,16 @@ export class Gather implements Task {
                 if (EventSignal.pending() || Inventory.isFull() || ChatDialog.canContinue()) {
                     return true;
                 }
+                if (this.activeMineTile && this.entAt(this.activeMineTile)) {
+                    return true;
+                }
                 const p = farmerWillowPhase(Game.tick(), this.bot.farmerCycleStartTick());
                 return p !== 'wait';
             },
             7
         );
+        if (this.activeMineTile && this.entAt(this.activeMineTile)) {
+            await this.abortEnt(keyOf(this.activeMineTile), this.activeMineTile);
+        }
     }
 }

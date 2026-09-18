@@ -1,5 +1,4 @@
-/** Live BankSorter harness: proves the cold sort and the incremental re-sort against a bank on a running engine.
- *  Why: bank seeding adds rather than sets, so every run wipes with `~clearbank` before seeding. */
+/** Live BankSorter cold-sort and incremental re-sort check. */
 
 //   HEADED=1 bun e2e/banksorter-live.ts --tick 200
 import type { Page } from 'playwright-core';
@@ -28,7 +27,7 @@ interface BankedRow {
     cost: number;
 }
 
-// Why: one unidentified herb only. Every one of them reads back as "Herb", and the seed verify counts by name.
+// Why: unidentified herbs all read as "Herb", so seed only one.
 const COLD_SEED: BankSeedItem[] = [
     { debugName: 'bones', displayName: 'Bones', qty: 20 },
     { debugName: 'shark', displayName: 'Shark', qty: 30 },

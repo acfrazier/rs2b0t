@@ -1,36 +1,63 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 
-import { CC_LOGOUT, finishRelog, logoutIfaceId, titleAfterLogoutPress } from '../../e2e/lib/cleanLogout.js';
+import { pressCleanLogout } from '../../e2e/lib/cleanLogout.js';
 
-describe('clean logout (274bot Relog)', () => {
-    test('presses the CC_LOGOUT iface, not a hardcoded 2458', () => {
-        const ifaces: Array<{ clientCode: number } | null | undefined> = Array.from({ length: 10 }, () => null);
-        ifaces[7] = { clientCode: CC_LOGOUT };
-        ifaces[2458] = undefined;
-        expect(logoutIfaceId(ifaces)).toBe(7);
+const host = globalThis as unknown as Record<string, unknown>;
+const saved = Object.getOwnPropertyDescriptor(globalThis, 'rs2b0t');
+afterEach(() => {
+    if (saved) {
+        Object.defineProperty(globalThis, 'rs2b0t', saved);
+    } else {
+        delete host.rs2b0t;
+    }
+});
+
+function fixture(buttonSent = true) {
+    const presses: number[] = [];
+    const polls: boolean[] = [];
+    let logouts = 0;
+    const client = {
+        ingame: true,
+        logoutTimer: 0,
+        stream: { remoteClosed: false, socket: { readyState: 1 } },
+        logout: () => { logouts++; client.ingame = false; }
+    };
+    host.rs2b0t = { client, actions: { ifButton: (com: number) => { presses.push(com); return buttonSent; } } };
+    const page = {
+        evaluate: async <R, A>(fn: (arg: A) => R, arg: A): Promise<R> => fn(arg),
+        waitForFunction: async (fn: () => boolean) => {
+            polls.push(fn());
+            if (!polls[0]) {
+                client.stream.remoteClosed = true;
+                polls.push(fn());
+            }
+            if (!polls.at(-1)) { throw new Error('logout timed out'); }
+        }
+    };
+    return { page, client, presses, polls, logouts: () => logouts };
+}
+
+describe('clean logout', () => {
+    test('presses once, arms the timer and leaves the game when the socket closes', async () => {
+        const f = fixture();
+        expect(await pressCleanLogout(f.page)).toBe('ifbutton');
+        expect(f.presses).toEqual([2458]);
+        expect(f.client.logoutTimer).toBe(250);
+        expect(f.polls).toEqual([false, true]);
+        expect(f.client.ingame).toBe(false);
+        expect(f.logouts()).toBe(1);
     });
 
-    test('missing CC_LOGOUT iface is false, no panic', () => {
-        expect(logoutIfaceId([])).toBe(null);
-        expect(logoutIfaceId([{ clientCode: 1 }, null])).toBe(null);
+    test('falls back to client logout when the button cannot be sent', async () => {
+        const f = fixture(false);
+        expect(await pressCleanLogout(f.page)).toBe('client');
+        expect(f.client.ingame).toBe(false);
+        expect(f.logouts()).toBe(1);
     });
 
-    test('a dead socket after the press goes to title, not lostCon reconnect', () => {
-        expect(titleAfterLogoutPress({ ingame: true, logoutTimer: 250, remoteClosed: true })).toBe('title');
-        expect(titleAfterLogoutPress({ ingame: false, logoutTimer: 0, remoteClosed: true })).toBe('title');
-    });
-
-    test('an armed timer that already expired on a dead socket is the lostCon overlay', () => {
-        expect(titleAfterLogoutPress({ ingame: true, logoutTimer: 0, remoteClosed: true })).toBe('lost-con-reconnect');
-    });
-
-    test('still connected after the press stays ingame until LOGOUT or close', () => {
-        expect(titleAfterLogoutPress({ ingame: true, logoutTimer: 250, remoteClosed: false })).toBe('ingame');
-    });
-
-    test('Relog does not DC-wait: a dead socket titles even if the 250-frame timer already ran out', () => {
-        expect(finishRelog(true, true)).toBe('title-now');
-        expect(finishRelog(false, true)).toBe('done');
-        expect(finishRelog(true, false)).toBe('wait');
+    test('missing client cannot be reported as a successful logout', async () => {
+        const f = fixture();
+        delete host.rs2b0t;
+        await expect(pressCleanLogout(f.page)).rejects.toThrow('client unavailable');
     });
 });
