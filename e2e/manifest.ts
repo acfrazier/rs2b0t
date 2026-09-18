@@ -126,6 +126,16 @@ export const CASES: readonly Case[] = [
         note: 'Exclusive local door run. Waits for Donovan to enter his natural pocket, opens the real bedroom door, proves collision blocks him, then Reach closes the leaf and reaches real dialogue; screenshots docs/e2e/issue-771*.png.'
     },
     {
+        id: 'ranged-ammo-483-live',
+        harness: 'ranged-ammo-483-live.ts',
+        covers: { scripts: ['FireGiant'] },
+        status: 'vetted',
+        provenAt: 'a029256ea6f047f095f908475c8c64b52355fb3e',
+        manual: true,
+        budgetMin: 18,
+        note: 'Fresh local accounts; custom Crossbow/Bolts and Rune knife must equip, merge carried refills and gain ranged XP against Fire giants. Isolated deployment; --no-deploy requires CLIENT_PAGE.'
+    },
+    {
         id: 'fisher-shilo-shopping-live',
         harness: 'fisher-shilo-shopping-live.ts',
         covers: { scripts: ['GatheringBot'] },
