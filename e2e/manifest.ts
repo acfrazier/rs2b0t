@@ -3,6 +3,16 @@ import type { Case } from './manifestTypes.js';
 /** Every case the e2e suite can run. The runner iterates this; nothing globs the directory. */
 export const CASES: readonly Case[] = [
     {
+        id: 'desktop-instances',
+        harness: 'desktop-instances-test.ts',
+        covers: { subsystems: ['multibox'] },
+        status: 'vetted',
+        provenAt: 'dc9ded2f381c756a06a21483ed733b85b9bf4b5b',
+        manual: true,
+        budgetMin: 3,
+        note: 'Two live launcher builds and real Electron windows share saved accounts/settings across separate ports. Checks migration, concurrent vault edits, iframe storage, zero synchronous settings reads during path drawing, write/revert races, persistence and independent shutdown. Requires desktop dependencies and a display; no game login.'
+    },
+    {
         id: 'lostcity-strike-safespot-live',
         harness: 'lostcity-strike-safespot-live.ts',
         covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
@@ -1087,6 +1097,15 @@ export const CASES: readonly Case[] = [
         provenAt: '64a451e9',
         budgetMin: 8,
         note: 'starts at Varrock West with the kit banked there; coming within 20 tiles of the Al Kharid booth fails the run'
+    },
+    {
+        id: 'gathering-power-drop-test',
+        harness: 'gathering-power-drop-test.ts',
+        covers: { scripts: ['GatheringBot'] },
+        status: 'vetted',
+        provenAt: '8edeb1e4b098c586182585dfbed86bcdcb7c61c1',
+        budgetMin: 12,
+        note: 'checks Miner batch dropping with Bank=false, completes a mining/drop cycle, and preserves supplies across iron, clay and coal camps'
     },
     {
         id: 'miner-bank-food-live',
