@@ -1033,6 +1033,16 @@ export const CASES: readonly Case[] = [
         note: 'normal tick speed; chocolate and two bank loads of unicorn horns, with five products per tick'
     },
     {
+        id: 'herblore-survival-live',
+        harness: 'herblore-survival-live.ts',
+        covers: { scripts: ['HerbloreSecondaries'] },
+        status: 'documented',
+        documentedIn: 'docs/how-to/e2e-suite.md',
+        manual: true,
+        budgetMin: 18,
+        note: 'Requires ENGINE_DIR and PROOF_DIR. Fresh level-3 account collects real eggs, banks and returns at normal tick speed; inspect HP, food and position samples for eating during travel.'
+    },
+    {
         id: 'herblore-secondaries-test',
         harness: 'herblore-secondaries-test.ts',
         covers: { scripts: ['HerbloreSecondaries'] },
