@@ -913,6 +913,16 @@ export const CASES: readonly Case[] = [
         note: 'both toggles on from an empty pack at the Seers bank. Picking passes; the spin leg does not. Make-X is accepted 17 times at the wheel and the flax count never moves, so the run parks until the watchdog walks it home'
     },
     {
+        id: 'flaxrunner-bank-results-live',
+        harness: 'flaxrunner-bank-results-live.ts',
+        covers: { scripts: ['FlaxRunner'] },
+        status: 'documented',
+        documentedIn: 'docs/how-to/e2e-suite.md',
+        manual: true,
+        budgetMin: 12,
+        note: 'Local engine only. Seeds strings and teleports the account to test failed bank prerequisites and a successful deposit.'
+    },
+    {
         id: 'gatheringbot-cooker-pair-test',
         harness: 'gatheringbot-cooker-pair-test.ts',
         covers: { scripts: ['GatheringBot'] },
@@ -1040,6 +1050,16 @@ export const CASES: readonly Case[] = [
         documentedIn: 'docs/how-to/grind-herblore-secondaries.md',
         budgetMin: 8,
         note: 'normal tick speed; chocolate and two bank loads of unicorn horns, with five products per tick'
+    },
+    {
+        id: 'herblore-survival-live',
+        harness: 'herblore-survival-live.ts',
+        covers: { scripts: ['HerbloreSecondaries'] },
+        status: 'documented',
+        documentedIn: 'docs/how-to/e2e-suite.md',
+        manual: true,
+        budgetMin: 18,
+        note: 'Requires ENGINE_DIR and PROOF_DIR. Fresh level-3 account collects real eggs, banks and returns at normal tick speed; inspect HP, food and position samples for eating during travel.'
     },
     {
         id: 'herblore-secondaries-test',
