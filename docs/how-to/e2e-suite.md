@@ -80,6 +80,24 @@ generator is not reported as a regression.
 `hosted-proof-test.ts`, `hosted-wall-test.ts` and `external-script-test.ts` need a
 registered account or a second origin, so no runner can provide their environment.
 
+## FlaxRunner bank failures
+
+Run this local-only regression with an engine that permits account cheats:
+
+```sh
+ENGINE_DIR=/path/to/engine bun e2e/flaxrunner-bank-results-live.ts --base http://127.0.0.1:1080
+```
+
+The harness seeds one bow string per scenario. It tests an unreachable walk, a
+failed bank opening after a successful walk, and a successful deposit.
+Per-account teleports create the failures. The harness records API results
+without replacing them. Failed prerequisites must preserve the string and trip
+count. The successful deposit must remove the string and count one trip.
+
+Set `EXPECT_MODE=before` to assert the original defect. Set `PROOF_DIR` to
+choose the JSON and screenshot directory. The default is
+`out/flaxrunner-bank-results`. The harness removes its isolated client after each run.
+
 ## See also
 
 - [The live-harness ABI](write-a-harness.md)
