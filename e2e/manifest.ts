@@ -3,6 +3,15 @@ import type { Case } from './manifestTypes.js';
 /** Every case the e2e suite can run. The runner iterates this; nothing globs the directory. */
 export const CASES: readonly Case[] = [
     {
+        id: 'gnome-magic-north-stair-live',
+        harness: 'gnome-magic-north-stair-live.ts',
+        covers: { scripts: ['GnomeMagicChopper'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 5,
+        note: 'Starts north of the bank and checks the northern staircase ascent during gear bootstrap. Requires ENGINE_DIR for an isolated client deployment.'
+    },
+    {
         id: 'desktop-storage-ipc',
         harness: 'desktop-storage-ipc-test.ts',
         covers: { subsystems: ['multibox'] },
