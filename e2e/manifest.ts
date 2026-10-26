@@ -704,6 +704,16 @@ export const CASES: readonly Case[] = [
         status: 'unvetted'
     },
     {
+        id: 'firegiant-full-pack-bank-live',
+        harness: 'firegiant-full-pack-bank-live.ts',
+        covers: { scripts: ['FireGiant'] },
+        status: 'documented',
+        documentedIn: 'docs/how-to/e2e-suite.md',
+        manual: true,
+        budgetMin: 25,
+        note: 'Local engine only. A restock that fills the pack, and one dropped Big bones after a 24-food restock, must not bank before the first fight.'
+    },
+    {
         id: 'jivedragons-live',
         harness: 'jivedragons-live.ts',
         covers: { scripts: ['JiveDragons'] },
