@@ -120,6 +120,27 @@ Set `EXPECT_MODE=before` to assert the original defect. Set `PROOF_DIR` to
 choose the JSON and screenshot directory. The default is
 `out/flaxrunner-bank-results`. The harness removes its isolated client after each run.
 
+## FireGiant full-pack bank loop
+
+Run this local-only regression with an engine that permits account cheats:
+
+```sh
+ENGINE_DIR=/path/to/engine bun e2e/firegiant-full-pack-bank-live.ts --base http://127.0.0.1:1080
+```
+
+The harness uses one maxed account with Waterfall Quest complete. It tests a
+25-food restock that fills all 28 slots, and a 24-food pack at the melee
+anchor with one dropped Big bones on the floor. Neither full pack may bank
+before the first fight. The first scenario must reach the dungeon and gain
+combat XP. The second scenario must stay in the dungeon and log a kill. It
+also samples the pack every 100 ms and fails unless a sample holds 28 used
+slots, 24 food and the bones before any combat XP lands, so a run where the
+bones never arrive or eating comes first cannot pass.
+
+Set `EXPECT_MODE=before` to assert the original defect. Set `PROOF_DIR` to
+choose the JSON and screenshot directory. The default is
+`out/firegiant-full-pack-bank`. The harness removes its isolated client after each run.
+
 ## See also
 
 - [The live-harness ABI](write-a-harness.md)
