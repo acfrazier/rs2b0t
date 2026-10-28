@@ -13,7 +13,7 @@ bun tools/nav/build-collision.ts --engine "$ENGINE_DIR"
 
 ## Run
 
-The harness starts a fresh account with a Rune axe, 26 Knives, and one free backpack slot. After the first real Magic log bank trip, it adds one Strange fruit to the account. The fruit fills the last slot, with no logs held.
+The harness starts a fresh account with a Rune axe, 26 Knives, and one free backpack slot. After the first Magic log bank trip, it adds one Strange fruit to the account. The fruit fills the last slot, with no logs held.
 
 The browser helper uses Google Chrome by default. Set `HARNESS_CHROMIUM_EXECUTABLE` if the host needs a different Chromium executable.
 

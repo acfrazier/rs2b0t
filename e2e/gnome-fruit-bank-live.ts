@@ -111,7 +111,7 @@ function nearTree(snapshot: Snapshot): boolean {
 
 function receipt(outcome: 'PASS' | 'FAIL', error: string | null) {
     return {
-        case: 'gnome_chop',
+        case: 'gnome-magic-full-pack-fruit',
         outcome,
         commit,
         base,
