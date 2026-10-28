@@ -139,7 +139,7 @@ function receipt(outcome: 'PASS' | 'FAIL', error: string | null) {
 
 try {
     await proof.ensureDirs();
-    browser = await launchBrowser({ swiftshader: true });
+    browser = await launchBrowser({ swiftshader: true, executablePath: process.env.HARNESS_CHROMIUM_EXECUTABLE });
     page = await browser.newPage();
     page.on('pageerror', (error: Error) => pageErrors.push(error.message));
 
