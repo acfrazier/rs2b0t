@@ -180,7 +180,7 @@ export const CASES: readonly Case[] = [
     {
         id: 'nature-runner-coins-739-live',
         harness: 'nature-runner-coins-739-live.ts',
-        covers: { scripts: ['NatureCrafter'] },
+        covers: { scripts: ['JiveRC'] },
         status: 'vetted',
         provenAt: '39e3095468c329823aabd554db5455c2cef02401',
         budgetMin: 3,
@@ -1342,10 +1342,28 @@ export const CASES: readonly Case[] = [
         status: 'unvetted'
     },
     {
+        id: 'mulecrafter-bankless-test',
+        harness: 'mulecrafter-test.ts',
+        covers: { scripts: ['MuleCrafter'] },
+        env: { TRADES_PER_BANK: '0', BANK_FILL: '0' },
+        status: 'vetted',
+        provenAt: 'a52af7e2',
+        budgetMin: 3,
+        note: 'crafter + one mule with bankFill=false and tradesPerBank=0; the documented bankless setup must still trade, enter the altar on empty, and craft'
+    },
+    {
         id: 'multibox-profile-transfer-test',
         harness: 'multibox-profile-transfer-test.ts',
         covers: { subsystems: ['multibox'] },
         status: 'unvetted'
+    },
+    {
+        id: 'multibox-roster-test',
+        harness: 'multibox-roster-test.ts',
+        covers: { subsystems: ['multibox'] },
+        status: 'unvetted',
+        budgetMin: 3,
+        note: 'Roster modal with fixture clients checks settings copies, individual edits, world changes, travel and keyboard focus. No game login.'
     },
     {
         id: 'multibox-tab-renderer-test',
@@ -1369,9 +1387,19 @@ export const CASES: readonly Case[] = [
         note: 'Murder Mystery start to finish; --stage seeds the guilty sibling as well as the evidence'
     },
     {
+        id: 'jiverc-cosmic-live',
+        harness: 'jiverc-cosmic-live.ts',
+        covers: { scripts: ['JiveRC'] },
+        status: 'documented',
+        manual: true,
+        budgetMin: 22,
+        documentedIn: 'docs/e2e/jiverc-cosmic.md',
+        note: 'Local server: outside and inside altar trades, repeated Cosmic crafting, runner restocks, and master banking with a return to crafting.'
+    },
+    {
         id: 'naturecrafter-soak-test',
         harness: 'naturecrafter-soak-test.ts',
-        covers: { scripts: ['NatureCrafter'] },
+        covers: { scripts: ['JiveRC'] },
         status: 'unvetted'
     },
     {

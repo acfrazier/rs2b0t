@@ -70,7 +70,7 @@ import GemCutter, { GEM_CUTTER_SETTINGS } from './GemCutter/GemCutter.js';
 import EssMiner, { SETTINGS as ESSMINER_SETTINGS } from './EssMiner/EssMiner.js';
 import CoalTrucks from './CoalTrucks/CoalTrucks.js';
 import RuneCrafter, { SETTINGS as RUNECRAFTER_SETTINGS } from './RuneCrafter/RuneCrafter.js';
-import NatureCrafter, { SETTINGS as NATURECRAFTER_SETTINGS } from './NatureCrafter/NatureCrafter.js';
+import JiveRC, { SETTINGS as JIVERC_SETTINGS } from './JiveRC/JiveRC.js';
 import MuleCrafter, { SETTINGS as MULECRAFTER_SETTINGS } from './MuleCrafter/MuleCrafter.js';
 import RoguesPurse from './RoguesPurse/RoguesPurse.js';
 import HerbloreSecondaries, { HERBLORE_SECONDARIES_SETTINGS } from './HerbloreSecondaries/HerbloreSecondaries.js';
@@ -399,12 +399,12 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
-    name: 'NatureCrafter',
-    description: 'Master Nature Crafter — a master stands at the nature altar (Karamja), takes essence from configured runners via trade, and crafts natures; runners bank essence at Ardougne, un-note it at the general store, and ship it to the master. Mode + partner name(s) via settings',
+    name: 'JiveRC',
+    description: 'Master/runner crafting for Nature, Air and Cosmic runes. Nature runners unnote at Jiminua, Air runners bank at Falador East, and Cosmic runners bank in Zanaris. Start Cosmic accounts in Zanaris or the cosmic altar.',
     category: 'Runecrafting',
-    tags: ['runecrafting', 'nature', 'trade', 'master', 'runner', 'karamja'],
-    settingsSchema: NATURECRAFTER_SETTINGS,
-    create: () => new NatureCrafter()
+    tags: ['runecrafting', 'nature', 'air', 'cosmic', 'trade', 'master', 'runner', 'jive'],
+    settingsSchema: JIVERC_SETTINGS,
+    create: () => new JiveRC()
 });
 
 ScriptRegistry.register({
@@ -759,7 +759,7 @@ ScriptRegistry.register({
 
 ScriptRegistry.register({
     name: 'MuleCrafter',
-    description: 'Crafter + mule runecrafting loop — both run bank→ruins→bank each cycle. Crafter has the talisman, crafts at the altar, trades runes for essence at the ruins. Mule ferries essence to the ruins and runes back to the bank. Dry mule signals at the bank and the crafter shares 1/N essence. Multi-mule round-robin with comma-separated partner names.',
+    description: 'Crafter + mule runecrafting loop — meet at the altar temple or overworld ruins, and trade with any configured mule that is available. Crafter has the talisman; bankFill=false prevents all crafter bank visits and overrides Bank after trades but still trades with configured mules, while bankFill=true enables scheduled bank trips. Mule ferries essence and runes between the meeting point and bank.',
     category: 'Runecrafting',
     tags: ['runecrafting', 'trade', 'crafter', 'mule', 'falador', 'edgeville'],
     settingsSchema: MULECRAFTER_SETTINGS,
