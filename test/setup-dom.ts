@@ -5,7 +5,9 @@ process.env.STRICT_PACKETS = '1';
 process.env.STRICT_CONFIG = '1';
 
 // Why: happy-dom's fetch rejects file://, so anything transitively importing Client.ts aborts on tinymidipcm's wasm load. Keep Bun's fetch for file://.
-const nativeFetch = globalThis.fetch;
+export const nativeFetch = globalThis.fetch;
+// Bun.serve requires its native Response, not happy-dom's browser replacement.
+export const nativeResponse = globalThis.Response;
 
 GlobalRegistrator.register();
 
