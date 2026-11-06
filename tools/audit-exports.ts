@@ -1,70 +1,44 @@
 #!/usr/bin/env bun
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+// Compiler census: bun run audit:exports writes out/audit-exports/integrated.json from raw rows (G0 is not a CI failure).
+import { execSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { runExportCensus } from './lib/exportCensus.js';
 
-const DECL = /^export\s+(?:declare\s+)?(?:async\s+)?(?:const|let|var|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/gm;
+export { classifyExportGroup, integrateCensus } from './lib/exportCensus.js';
+export { runExportCensus };
+export { collectHeritageDeclarations, createConduitResolver, exportInterestNames, moduleExportTargets } from './lib/exportCensusCore.js';
 
-/** Escapes every regex metacharacter, including the $ an identifier can carry. */
-function escapeRegExp(literal: string): string {
-    return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function parseAuditArgs(argv: readonly string[], cwd = process.cwd()): { root: string; out: string; revision?: string } {
+    const rootFlag = argv.findIndex(a => a === '--root');
+    const outFlag = argv.findIndex(a => a === '--out');
+    const revFlag = argv.findIndex(a => a === '--revision');
+    const root = rootFlag >= 0 && argv[rootFlag + 1] ? resolve(cwd, argv[rootFlag + 1]) : cwd;
+    const out = outFlag >= 0 && argv[outFlag + 1] ? resolve(cwd, argv[outFlag + 1]) : resolve(root, 'out/audit-exports');
+    const revision = revFlag >= 0 ? argv[revFlag + 1] : undefined;
+    return { root, out, revision };
 }
 
-export function findDeadExports(sources: Map<string, string>, scanPrefix: string, dts: string): string[] {
-    const dead: string[] = [];
-    for (const [file, src] of sources) {
-        if (!file.startsWith(scanPrefix)) {
-            continue;
-        }
-        const names: string[] = [];
-        let m: RegExpExecArray | null;
-        DECL.lastIndex = 0;
-        while ((m = DECL.exec(src))) {
-            names.push(m[1]);
-        }
-        for (const name of names) {
-            const word = new RegExp(`\\b${escapeRegExp(name)}\\b`);
-            if (word.test(dts)) {
-                continue;
-            }
-            let used = false;
-            for (const [other, text] of sources) {
-                if (other !== file && word.test(text)) {
-                    used = true;
-                    break;
-                }
-            }
-            if (!used) {
-                dead.push(`${file}\t${name}`);
-            }
-        }
+function defaultRevision(root: string): string {
+    if (process.env.RS2B0T_REVISION) {
+        return process.env.RS2B0T_REVISION;
     }
-    return dead.sort();
-}
-
-function walk(dir: string, out: string[] = []): string[] {
-    for (const entry of readdirSync(dir)) {
-        const p = join(dir, entry);
-        if (statSync(p).isDirectory()) {
-            walk(p, out);
-        } else if (p.endsWith('.ts')) {
-            out.push(p);
-        }
+    try {
+        return execSync('git rev-parse HEAD', { cwd: root, encoding: 'utf8' }).trim();
+    } catch {
+        return 'unknown';
     }
-    return out;
 }
 
 if (import.meta.main) {
-    const root = process.cwd();
-    const files = ['src', 'test', 'tools'].flatMap(d => walk(join(root, d)));
-    const sources = new Map(files.map(f => [relative(root, f), readFileSync(f, 'utf8')]));
-    const dts = readFileSync(join(root, 'packages/rs2b0t-api/index.d.ts'), 'utf8');
-    const dead = findDeadExports(sources, 'src/bot', dts);
-    if (dead.length > 0) {
-        console.error(`${dead.length} exports referenced nowhere outside their declaring file:\n`);
-        for (const row of dead) {
-            console.error('  ' + row);
-        }
-        process.exit(1);
-    }
-    console.log('audit:exports — clean');
+    const parsed = parseAuditArgs(process.argv.slice(2));
+    const root = process.env.RS2B0T_ROOT ?? parsed.root;
+    const out = process.env.RS2B0T_OUT ?? parsed.out;
+    const revision = parsed.revision ?? defaultRevision(root);
+    const result = runExportCensus({ root, out, revision, writeArtifacts: true });
+    const integrated = result.integrated;
+    const g0 = integrated.exports.rawExternalConsumerGroups['G0-noref'] ?? 0;
+    console.log(
+        `audit:exports — ${integrated.exports.total} bindings, ${integrated.exports.protected} protected, ${g0} G0, ${integrated.exports.sourceTestOnlyCount} source-test-only, ${integrated.conduits.resolved}/${integrated.conduits.total} conduits resolved`
+    );
+    console.log(`wrote ${resolve(out)}/integrated.json`);
 }

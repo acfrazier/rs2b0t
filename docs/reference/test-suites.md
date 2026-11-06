@@ -31,6 +31,15 @@ not silent green passes (#341). Build the pack via
 [`tools/nav/build-collision.ts`](../../tools/nav/build-collision.ts) or
 [`tools/deploy-local.sh`](../../tools/deploy-local.sh), then re-run `bun test test/event/webwalk`.
 
+### Export census
+
+`bun run audit:exports` (`tools/audit-exports.ts`) builds one TypeScript program over
+`src/`, `test/`, `e2e/` and `tools/`, including `.js`/`.mjs`/`.cjs` and `#/` specifiers,
+named and star re-export conduits, local/default aliases and transitive heritage. It
+writes `out/audit-exports/integrated.json` from those raw rows. G0 is zero references of
+every measured kind; a same-file use is not dead; a G0 count is a candidate list, not a
+CI failure. Fixtures live in `test/tools/audit-exports.test.ts`.
+
 ## See also
 
 - [Why this is testable](../decisions/testability.md)
