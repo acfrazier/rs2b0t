@@ -37,7 +37,7 @@ const TARGET_RSA: Record<string, LoginKey> = {
         rsan: process.env.LIVE_RSAN ?? ''
     },
     prod: {
-        rsae: process.env.PROD_RSAE ?? '65537',
+        rsae: process.env.PROD_RSAE ?? '',
         rsan: process.env.PROD_RSAN ?? ''
     }
 };
@@ -54,7 +54,7 @@ const DUMMY_RSA: LoginKey = { rsae: '65537', rsan: `1${'7'.repeat(308)}` };
 
 let rsa = TARGET_RSA[TARGET_NAME]!;
 let rsaMode: 'keyed' | 'dummy' = 'keyed';
-if ((TARGET_NAME === 'live' || TARGET_NAME === 'proxy' || TARGET_NAME === 'prod') && rsa.rsan === '') {
+if ((TARGET_NAME === 'live' || TARGET_NAME === 'proxy' || TARGET_NAME === 'prod') && (rsa.rsan === '' || rsa.rsae === '')) {
     if (TARGET_NAME === 'prod' && dummyRsa) {
         rsa = DUMMY_RSA;
         rsaMode = 'dummy';
