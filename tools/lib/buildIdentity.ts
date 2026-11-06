@@ -8,10 +8,20 @@ export type BuildIdentity = {
     short: string;
     dirty: boolean;
     builtAt: string;
+    /** `dummy` marks the CI `prod` compile, which bakes a fixed public test pair instead of a real
+     *  engine key; pack and deploy helpers refuse such an artifact. Absent means a keyed build. */
+    rsa?: 'dummy';
 };
 
+export interface LoginKey {
+    rsae: string;
+    rsan: string;
+}
+
 export function resolveBuildIdentity(now: () => Date = () => new Date()): BuildIdentity {
-    const builtAt = now().toISOString();
+    // Why: build:all-targets resolves one identity and passes it down, so the client and bot
+    // bundles of a single build cannot disagree about when it happened.
+    const builtAt = (process.env.RS2B0T_BUILD_TIME ?? '').trim() || now().toISOString();
     const envCommit = (process.env.RS2B0T_GIT_COMMIT ?? process.env.GITHUB_SHA ?? '').trim();
     if (envCommit) {
         const dirty = /^(1|true|yes)$/i.test(process.env.RS2B0T_GIT_DIRTY ?? '');
@@ -59,7 +69,22 @@ export function buildIdentityDefines(identity: BuildIdentity): Record<string, st
 }
 
 export function buildIdentityLabel(identity: BuildIdentity): string {
-    return identity.dirty ? `${identity.short}-dirty` : identity.short;
+    const dirty = identity.dirty ? '-dirty' : '';
+    return identity.rsa === 'dummy' ? `${identity.short}${dirty}-dummy` : `${identity.short}${dirty}`;
+}
+
+/** Why: both bundlers share one define map, so a build bakes the same target, strict flags and identity into every entry; `rsa` is required because Client.ts reads both LOGIN_* values at load. */
+export function buildDefines(identity: BuildIdentity, target: string, rsa: LoginKey): Record<string, string> {
+    return {
+        'process.env.SECURE_ORIGIN': JSON.stringify(process.env.SECURE_ORIGIN ?? 'false'),
+        'process.env.RS2B0T_TARGET': JSON.stringify(target),
+        'process.env.LOGIN_RSAE': JSON.stringify(rsa.rsae),
+        'process.env.LOGIN_RSAN': JSON.stringify(rsa.rsan),
+        // Config decoders enable strict mode only for '1'.
+        'process.env.STRICT_PACKETS': JSON.stringify(process.env.STRICT_PACKETS ?? ''),
+        'process.env.STRICT_CONFIG': JSON.stringify(process.env.STRICT_CONFIG ?? ''),
+        ...buildIdentityDefines(identity)
+    };
 }
 
 /** Sidecar for `curl .../rs2b0t/version.json` without parsing the JS bundle. */
@@ -72,7 +97,8 @@ export function writeVersionJson(path: string, identity: BuildIdentity): void {
                 short: identity.short,
                 dirty: identity.dirty,
                 builtAt: identity.builtAt,
-                label: buildIdentityLabel(identity)
+                label: buildIdentityLabel(identity),
+                rsa: identity.rsa ?? 'keyed'
             },
             null,
             2

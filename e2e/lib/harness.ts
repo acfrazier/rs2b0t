@@ -1,9 +1,10 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 import { chromium } from 'playwright-core';
 import type { Browser, Page } from 'playwright-core';
 
+import { engineArchiveProblems } from '../../tools/lib/manifest.js';
 import { pressCleanLogout } from './cleanLogout.js';
 import { engineLoginKey, type EngineLoginKey } from './engineLoginKey.js';
 
@@ -55,6 +56,12 @@ export function deployIsolatedClient(tag: string, engineDir = process.env.ENGINE
     if (!existsSync(shared)) {
         fail(`deploy: ${shared} not found — set ENGINE_DIR to the engine serving this run`);
     }
+    // Why: the bundled client decodes configs with the engine's archives; a mismatch desyncs every
+    // later entry and looks like a bot bug. The manifest pins the archives the data came from (pitfall 7).
+    const archiveProblems = engineArchiveProblems(process.cwd(), engineDir);
+    if (archiveProblems.length > 0) {
+        fail(`deploy: ${engineDir} does not match data/manifest.json\n  ${archiveProblems.join('\n  ')}`);
+    }
     let key: EngineLoginKey;
     try {
         key = engineLoginKey(engineDir);
@@ -65,12 +72,31 @@ export function deployIsolatedClient(tag: string, engineDir = process.env.ENGINE
     const build = Bun.spawnSync(['bun', 'run', 'build:bot'], {
         stdout: 'pipe',
         stderr: 'pipe',
-        env: { ...process.env, LOCAL_RSAE: key.rsae, LOCAL_RSAN: key.rsan, B0T_OUT_DIR: buildDir }
+        // Pitfall 3: an e2e deploy runs the strict client, so a bad packet or config fails the run.
+        env: { ...process.env, LOCAL_RSAE: key.rsae, LOCAL_RSAN: key.rsan, B0T_OUT_DIR: buildDir, STRICT_PACKETS: '1', STRICT_CONFIG: '1' }
     });
     if (build.exitCode !== 0) {
         fail(`deploy: build:bot failed\n${build.stderr.toString()}`);
     }
     console.log(`deploy: baked engine login key e=${key.rsae.slice(0, 8)}… n=${key.rsan.slice(0, 12)}…`);
+
+    // Why: the CI compile check bakes a fixed test pair that matches no engine; deploying it turns a
+    // proven build into a login-reply-6 mystery (pitfall 8).
+    const versionPath = `${buildDir}/version.json`;
+    if (existsSync(versionPath)) {
+        const version: unknown = JSON.parse(readFileSync(versionPath, 'utf8'));
+        const rsa = typeof version === 'object' && version !== null && 'rsa' in version ? version.rsa : undefined;
+        if (rsa === 'dummy') {
+            fail(`deploy: ${versionPath} says rsa: dummy — a compile-check bundle cannot log in; run build:bot with LOCAL_RSAE/LOCAL_RSAN`);
+        }
+    }
+
+    // Why: the tap is development-only; a bundle that names it would ship recording code (pitfall 20).
+    for (const name of readdirSync(buildDir)) {
+        if (!name.endsWith('.js')) continue;
+        const path = `${buildDir}/${name}`;
+        if (readFileSync(path, 'utf8').includes('tap-377')) fail(`deploy: ${path} names the recording tap module`);
+    }
     // Why: `build:bot` does not bake the collision pack, and without it every Navigator dies on boot and walking degrades in silence to the scene stepper.
     if (!existsSync('out/collision.lcnav.gz')) {
         fail('deploy: out/collision.lcnav.gz missing — run tools/nav/build-collision.ts first');

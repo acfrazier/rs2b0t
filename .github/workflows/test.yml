@@ -2,7 +2,7 @@ name: test
 
 on:
   push:
-    branches: [main]
+    branches: [main, rev377]
   pull_request:
 
 permissions:
@@ -20,7 +20,21 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - run: bun test
+      # Why: every browser and worker entry, both targets, before the test that requires them
+      # (pitfall 7). There is no production key on a hosted runner, so the prod compile is the
+      # dummy-marker check; bundleDefines asserts the marker.
+      - name: build every target
+        run: bun run build:all-targets -- --dummy-rsa
+
+      # Why: output integrity and generator staleness only; the content- and engine-backed --check
+      # runs are local, receipted gates (section 3, Q11).
+      - name: data manifest
+        run: bun tools/lib/manifest.ts verify
+
+      - name: unit tests
+        run: |
+          set -o pipefail
+          bun test 2>&1 | tee "$RUNNER_TEMP/bun-test.log"
 
       - name: typecheck
         run: bun run typecheck
@@ -33,3 +47,17 @@ jobs:
 
       - name: prose extras
         run: bun run lint:prose:extras
+
+      # Why: a green hosted run must say what it did not check; every SKIP line names its input.
+      - name: skip summary
+        if: always()
+        run: |
+          {
+            echo '## Skipped checks'
+            echo ''
+            if [ -f "$RUNNER_TEMP/bun-test.log" ]; then
+              grep -E '^SKIP: ' "$RUNNER_TEMP/bun-test.log" || echo 'None reported.'
+            else
+              echo 'The test step did not produce a log.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
