@@ -4,6 +4,17 @@ import path from 'node:path';
 import { unzipSync } from 'fflate';
 
 import { bunzip2 } from '#/client/io/BZip2.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
+
+type ClientRevision = 289 | 377;
+
+function resolveRevision(revision?: number): ClientRevision {
+    const selected = revision ?? (process.env.REVISION === undefined ? CLIENT_VERSION : Number(process.env.REVISION));
+    if (selected !== 289 && selected !== 377) {
+        throw new Error(`Unsupported loc config revision: ${selected}`);
+    }
+    return selected;
+}
 
 export class Reader {
     readonly data: Uint8Array;
@@ -132,25 +143,36 @@ export class LocDef {
     active = -1;
     op: (string | null)[] | null = null;
     debugname: string | null = null;
+    category: number | null = null;
 
-    decodeType(dat: Reader): void {
+    decodeType(dat: Reader, revision?: number): void {
+        const selectedRevision = resolveRevision(revision);
         while (dat.available > 0) {
             const code: number = dat.g1();
             if (code === 0) {
-                break;
+                return;
             }
-            this.decode(code, dat);
+            this.decode(code, dat, selectedRevision);
         }
+        throw new Error('Loc config record is missing its terminator');
     }
 
-    private decode(code: number, dat: Reader): void {
+    private decode(code: number, dat: Reader, revision: ClientRevision): void {
         if (code === 1) {
             const count = dat.g1();
-            this.models = new Uint16Array(count);
-            this.shapes = new Uint8Array(count);
-            for (let i = 0; i < count; i++) {
-                this.models[i] = dat.g2();
-                this.shapes[i] = dat.g1();
+            // The 377 decoder keeps the first model list but still consumes later payloads.
+            if (revision !== 377 || this.models === null) {
+                this.models = new Uint16Array(count);
+                this.shapes = new Uint8Array(count);
+                for (let i = 0; i < count; i++) {
+                    this.models[i] = dat.g2();
+                    this.shapes[i] = dat.g1();
+                }
+            } else {
+                for (let i = 0; i < count; i++) {
+                    dat.g2();
+                    dat.g1();
+                }
             }
         } else if (code === 2) {
             this.name = dat.gjstr();
@@ -158,10 +180,25 @@ export class LocDef {
             dat.gjstr();
         } else if (code === 5) {
             const count = dat.g1();
-            this.models = new Uint16Array(count);
-            this.shapes = null;
-            for (let i = 0; i < count; i++) {
-                this.models[i] = dat.g2();
+            // A zero-count 377 opcode 5 does not create or replace a model list.
+            if (revision !== 377) {
+                this.models = new Uint16Array(count);
+                this.shapes = null;
+                for (let i = 0; i < count; i++) {
+                    this.models[i] = dat.g2();
+                }
+            } else if (count > 0) {
+                if (this.models === null) {
+                    this.models = new Uint16Array(count);
+                    this.shapes = null;
+                    for (let i = 0; i < count; i++) {
+                        this.models[i] = dat.g2();
+                    }
+                } else {
+                    for (let i = 0; i < count; i++) {
+                        dat.g2();
+                    }
+                }
             }
         } else if (code === 14) {
             this.width = dat.g1();
@@ -172,10 +209,27 @@ export class LocDef {
         } else if (code === 18) {
             this.blockrange = false;
         } else if (code === 19) {
-            this.active = dat.g1();
-        } else if (code === 21 || code === 22 || code === 23 || code === 25 || code === 62 || code === 64 || code === 73 || code === 74) {
+            const active = dat.g1();
+            // Java sets active for 1; later non-1 values do not clear it.
+            if (revision === 377) {
+                if (active === 1) {
+                    this.active = 1;
+                } else if (this.active === -1) {
+                    this.active = 0;
+                }
+            } else {
+                this.active = active;
+            }
+        } else if (code === 21 || code === 22 || code === 23 || code === 25 || code === 62 || code === 64 || code === 73) {
             // Payload-less opcodes: recognised so the cursor stays aligned, nothing to read.
-        } else if (code === 24 || code === 60 || code === 61 || code === 65 || code === 66 || code === 67 || code === 68) {
+        } else if (code === 74) {
+            if (revision === 377) {
+                this.blockwalk = false;
+                this.blockrange = false;
+            }
+        } else if (code === 61) {
+            this.category = dat.g2();
+        } else if (code === 24 || code === 60 || code === 65 || code === 66 || code === 67 || code === 68) {
             dat.g2();
         } else if (code === 28 || code === 69 || code === 75) {
             dat.g1();
@@ -194,6 +248,15 @@ export class LocDef {
             }
         } else if (code === 70 || code === 71 || code === 72) {
             dat.g2s();
+        } else if (code === 77) {
+            dat.g2();
+            if (revision === 377) {
+                dat.g2();
+            }
+            const count = dat.g1();
+            for (let i = 0; i <= count; i++) {
+                dat.g2();
+            }
         } else if (code === 249) {
             const count = dat.g1();
             for (let i = 0; i < count; i++) {
@@ -224,7 +287,33 @@ export class LocDef {
     }
 }
 
-export function loadLocTypes(engineDir: string): { configs: LocDef[]; names: Map<string, number> } {
+function sourceRevision(engineDir: string): number | undefined {
+    const environmentPath = path.join(engineDir, 'src/util/Environment.ts');
+    if (fs.existsSync(environmentPath)) {
+        const source = fs.readFileSync(environmentPath, 'utf8');
+        const revision = /\bENGINE_REVISION:\s*tryParseInt\(process\.env\.ENGINE_REVISION,\s*(\d+)\s*\)/.exec(source);
+        if (revision) {
+            return Number(revision[1]);
+        }
+    }
+
+    const worldConfigPath = path.join(engineDir, 'src/util/WorldConfig.ts');
+    if (fs.existsSync(worldConfigPath)) {
+        const source = fs.readFileSync(worldConfigPath, 'utf8');
+        const revision = /\bengine:\s*\{\s*revision:\s*(\d+)\s*\}/.exec(source);
+        if (revision) {
+            return Number(revision[1]);
+        }
+    }
+    return undefined;
+}
+
+export function loadLocTypes(engineDir: string, revision?: number): { configs: LocDef[]; names: Map<string, number> } {
+    const selectedRevision = resolveRevision(revision);
+    const engineRevision = sourceRevision(engineDir);
+    if (engineRevision !== undefined && engineRevision !== selectedRevision) {
+        throw new Error(`Loc config revision mismatch: requested ${selectedRevision}, engine declares ${engineRevision}`);
+    }
     const server = new Reader(new Uint8Array(fs.readFileSync(path.join(engineDir, 'data/pack/server/loc.dat'))));
     const jag = new JagArchive(new Uint8Array(fs.readFileSync(path.join(engineDir, 'data/pack/client/config'))));
     const clientDat = jag.read('loc.dat');
@@ -234,19 +323,28 @@ export function loadLocTypes(engineDir: string): { configs: LocDef[]; names: Map
     const client = new Reader(clientDat);
 
     const count = server.g2();
-    client.pos = 2;
+    const clientCount = client.g2();
+    if (clientCount !== count) {
+        throw new Error(`Loc config count mismatch: server has ${count}, client has ${clientCount}`);
+    }
 
     const configs: LocDef[] = [];
     const names = new Map<string, number>();
     for (let id = 0; id < count; id++) {
         const config = new LocDef();
-        config.decodeType(server);
-        config.decodeType(client);
+        config.decodeType(server, selectedRevision);
+        config.decodeType(client, selectedRevision);
         config.postDecode();
         configs[id] = config;
         if (config.debugname) {
             names.set(config.debugname, id);
         }
+    }
+    if (server.available !== 0) {
+        throw new Error(`Trailing bytes in server loc config: ${server.available}`);
+    }
+    if (client.available !== 0) {
+        throw new Error(`Trailing bytes in client loc config: ${client.available}`);
     }
     return { configs, names };
 }
