@@ -8,6 +8,8 @@ type EngineFixture = {
     revision: number;
     client: Prot[];
     server: Prot[];
+    serverProtSizes: number[];
+    serverProtKnown: number[];
 };
 type SizesFixture = {
     source: { repository: string; commit: string; file: string; line: number };
@@ -28,6 +30,7 @@ function validateDescriptors(protocols: Prot[]): void {
         if (!Number.isInteger(protocol.id) || protocol.id < 0 || protocol.id > 255) {
             throw new Error(`out-of-range opcode ${protocol.id}`);
         }
+        if (protocol.length < -2) throw new Error(`invalid packet length ${protocol.length}`);
         if (ids.has(protocol.id)) throw new Error(`duplicate opcode ${protocol.id}`);
         if (names.has(protocol.name)) throw new Error(`duplicate protocol name ${protocol.name}`);
         ids.add(protocol.id);
@@ -64,7 +67,19 @@ describe('377 protocol tables (committed three-way fixtures)', () => {
         expect(engine.server).toHaveLength(75);
     });
 
-    test('rejects duplicate and out-of-range engine descriptor ids', () => {
+    test('engine fixture contains generated size and known-opcode tables', () => {
+        const expectedSizes = new Array<number>(257).fill(0);
+        for (const protocol of engine.server) expectedSizes[protocol.id] = protocol.length;
+
+        expect(engine.serverProtSizes).toHaveLength(257);
+        expect(engine.serverProtSizes[256]).toBe(0);
+        expect(engine.serverProtSizes[187]).toBe(0);
+        expect(engine.serverProtSizes).toEqual(expectedSizes);
+        expect(engine.serverProtKnown).toHaveLength(75);
+        expect(engine.serverProtKnown).toEqual(engine.server.map(protocol => protocol.id));
+    });
+
+    test('rejects duplicate, out-of-range, and invalid engine descriptors', () => {
         expect(() =>
             validateDescriptors([
                 { name: 'FIRST', id: 10, length: 0 },
@@ -73,6 +88,7 @@ describe('377 protocol tables (committed three-way fixtures)', () => {
         ).toThrow('duplicate opcode 10');
         expect(() => validateDescriptors([{ name: 'BAD', id: 256, length: 0 }])).toThrow('out-of-range opcode 256');
         expect(() => validateDescriptors([{ name: 'BAD', id: -1, length: 0 }])).toThrow('out-of-range opcode -1');
+        expect(() => validateDescriptors([{ name: 'BAD', id: 1, length: -3 }])).toThrow('invalid packet length -3');
     });
 
     test('every engine server descriptor has matching Java and Rust size', () => {

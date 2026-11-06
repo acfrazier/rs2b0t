@@ -7,8 +7,8 @@ function packet(bytes: number[]): Packet {
 }
 
 describe('377 packet transforms', () => {
-    test('matches Rust PacketReader377 byte, word, 3-byte, and dword vectors', () => {
-        // Expected read values follow packet_377.rs:729-787.
+    test('matches Rust PacketReader377 byte, word, 3-byte, and dword transforms', () => {
+        // Expected transforms follow packet_377.rs:729-787; Rust's exact edge vectors are copied below.
         const cases: Array<{ name: string; bytes: number[]; expected: number; read: (packet: Packet) => number }> = [
             { name: 'g1_alt1', bytes: [0xb4], expected: 0x34, read: packet => packet.g1_alt1() },
             { name: 'g1_alt2', bytes: [0xcc], expected: 0x34, read: packet => packet.g1_alt2() },
@@ -37,6 +37,22 @@ describe('377 packet transforms', () => {
         }
     });
 
+    test('matches Rust signed and mixed-endian reader edge vectors', () => {
+        // Exact input and result vectors from crates/client/tests/revision_377_packets.rs:709-717.
+        const signed = packet([0xff, 0xff, 0x00, 0x80, 0x7f, 0xff, 0x80, 0xff]);
+        expect(signed.g1b()).toBe(-1);
+        expect(signed.g1b_alt1()).toBe(127);
+        expect(signed.g1b_alt2()).toBe(0);
+        expect(signed.g1b_alt3()).toBe(0);
+        expect(signed.g2b_alt1()).toBe(-129);
+        expect(signed.g2b_alt2()).toBe(-32641);
+        expect(signed.pos).toBe(8);
+
+        const mixedDword = packet([0x34, 0x12, 0x78, 0x56]);
+        expect(mixedDword.g4_alt3()).toBe(0x12345678);
+        expect(mixedDword.pos).toBe(4);
+    });
+
     test('keeps Client-TS 377 signed aliases and engine-compatible wider transforms', () => {
         const signedWord = packet([0xcc, 0xed]);
         expect(signedWord.g2s_alt1()).toBe(-0x1234);
@@ -58,6 +74,25 @@ describe('377 packet transforms', () => {
         expect(packet([0x12, 0x34, 0x56, 0xf8]).g4s_alt1()).toBe(-0x07a9cbee);
         expect(packet([0x12, 0x34, 0xf8, 0x78]).g4s_alt2()).toBe(-0x0787edcc);
         expect(packet([0x12, 0xf8, 0x56, 0x78]).g4s_alt3()).toBe(-0x07ed87aa);
+    });
+
+    test('sign-extends negative signed alternate words and 24-bit values', () => {
+        const cases: Array<{ name: string; bytes: number[]; expected: number; read: (packet: Packet) => number }> = [
+            { name: 'g3s_alt1 minimum', bytes: [0x00, 0x00, 0x80], expected: -0x800000, read: packet => packet.g3s_alt1() },
+            { name: 'g3s_alt2 minimum', bytes: [0x80, 0x00, 0x00], expected: -0x800000, read: packet => packet.g3s_alt2() },
+            { name: 'g3s_alt3 minimum', bytes: [0x00, 0x80, 0x00], expected: -0x800000, read: packet => packet.g3s_alt3() },
+            { name: 'g3s_alt1 negative', bytes: [0xaa, 0xcb, 0xed], expected: -0x123456, read: packet => packet.g3s_alt1() },
+            { name: 'g3s_alt2 negative', bytes: [0xed, 0xaa, 0xcb], expected: -0x123456, read: packet => packet.g3s_alt2() },
+            { name: 'g3s_alt3 negative', bytes: [0xcb, 0xed, 0xaa], expected: -0x123456, read: packet => packet.g3s_alt3() },
+            { name: 'g2s_alt3 minimum', bytes: [0x80, 0x80], expected: -0x8000, read: packet => packet.g2s_alt3() },
+            { name: 'g2s_alt3 negative', bytes: [0x4c, 0xed], expected: -0x1234, read: packet => packet.g2s_alt3() }
+        ];
+
+        for (const vector of cases) {
+            const input = packet(vector.bytes);
+            expect(vector.read(input), vector.name).toBe(vector.expected);
+            expect(input.pos, `${vector.name} consumed bytes`).toBe(vector.bytes.length);
+        }
     });
 
     test('copies reverse and minus-128 blocks', () => {

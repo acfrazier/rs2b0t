@@ -2,18 +2,19 @@ import { describe, expect, test } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { skipUnless } from '../lib/skipUnless.js';
 import {
-    DEFAULT_ENGINE_DIR,
+    buildServerProtocolTables,
     generateProt,
     generateProtocolFixtures,
     parseProtocols,
     parseRevision
 } from '../../tools/gen-prot.js';
 
-const ENGINE = process.env.ENGINE_DIR ?? DEFAULT_ENGINE_DIR;
+const ENGINE_DIR = process.env.ENGINE_DIR?.trim() || undefined;
+const JAVA_DIR = process.env.JAVA_DIR?.trim() || undefined;
+const RUST_DIR = process.env.RUST_DIR?.trim() || undefined;
 const FIXTURE_DIR = join(import.meta.dir, 'fixtures', 'prot377');
-const JAVA_DIR = process.env.JAVA_DIR;
-const RUST_DIR = process.env.RUST_DIR;
 
 function engineRevision(engineDir: string): number | null {
     const readIfPresent = (path: string): string => {
@@ -21,56 +22,40 @@ function engineRevision(engineDir: string): number | null {
         return existsSync(file) ? readFileSync(file, 'utf8') : '';
     };
     try {
-        return parseRevision(
-            readIfPresent('src/util/WorldConfig.ts'),
-            readIfPresent('src/util/Environment.ts')
-        );
+        return parseRevision(readIfPresent('src/util/WorldConfig.ts'), readIfPresent('src/util/Environment.ts'));
     } catch {
         return null;
     }
 }
 
-const committedVersionMatch = readFileSync('src/client/io/ClientProt.ts', 'utf8').match(
-    /export const CLIENT_VERSION = (\d+);/
-);
-if (!committedVersionMatch) throw new Error('committed ClientProt.ts has no CLIENT_VERSION');
-const committedVersion = Number(committedVersionMatch[1]);
-
-const engineInputPresent = existsSync(ENGINE);
-const currentEngineRevision = engineInputPresent ? engineRevision(ENGINE) : null;
-const engineMatchesClient = currentEngineRevision === committedVersion;
-if (!engineInputPresent) {
-    console.log('SKIP: test/io/protDrift.test.ts: ENGINE_DIR absent or on another revision (ENGINE_DIR is unset or does not exist)');
-} else if (!engineMatchesClient) {
+const currentEngineRevision =
+    ENGINE_DIR && existsSync(ENGINE_DIR) ? engineRevision(ENGINE_DIR) : null;
+const engineFixtureReady = currentEngineRevision === 377;
+const javaFixtureReady = Boolean(JAVA_DIR);
+const rustFixtureReady = Boolean(RUST_DIR);
+if (!engineFixtureReady) {
     console.log(
-        `SKIP: test/io/protDrift.test.ts: ENGINE_DIR absent or on another revision (engine is revision ${currentEngineRevision}, the committed client is ${committedVersion})`
+        `SKIP: test/io/protDrift.test.ts: 377 engine fixture refresh requires revision 377 (found ${currentEngineRevision ?? 'no readable engine'})`
     );
 }
+if (!javaFixtureReady) console.log('SKIP: test/io/protDrift.test.ts: JAVA_DIR is unset');
+if (!rustFixtureReady) console.log('SKIP: test/io/protDrift.test.ts: RUST_DIR is unset');
 
-const fixtureInputs = [
-    {
-        name: 'ENGINE_DIR',
-        present: existsSync(join(ENGINE, 'src/network/game/client/ClientGameProt.ts'))
-    },
-    {
-        name: 'JAVA_DIR',
-        present: Boolean(JAVA_DIR && existsSync(join(JAVA_DIR, 'src/main/java/jagex2/io/Protocol.java')))
-    },
-    {
-        name: 'RUST_DIR',
-        present: Boolean(RUST_DIR && existsSync(join(RUST_DIR, 'crates/client/src/io/server_prot_sizes_377.inc.rs')))
-    }
-];
-const missingFixtureInputs = fixtureInputs.filter(input => !input.present).map(input => input.name);
-const fixtureEngineRevision = engineInputPresent ? engineRevision(ENGINE) : null;
-const fixtureRevisionMatches = fixtureEngineRevision === 377;
-const canRefreshFixtures = missingFixtureInputs.length === 0 && fixtureRevisionMatches;
-if (!canRefreshFixtures) {
-    const reason =
-        missingFixtureInputs.length > 0
-            ? `fixture inputs missing: ${missingFixtureInputs.join(', ')}`
-            : `fixture engine revision is ${fixtureEngineRevision}, expected 377`;
-    console.log(`SKIP: test/io/protDrift.test.ts: ${reason}`);
+type EngineProtocolFixture = {
+    revision: number;
+    server: Array<{ name: string; id: number; length: number }>;
+    serverProtSizes: number[];
+    serverProtKnown: number[];
+};
+const engineFixture = JSON.parse(readFileSync(join(FIXTURE_DIR, 'engine-prot.json'), 'utf8')) as EngineProtocolFixture;
+
+function expectFixtureMatches(
+    name: string,
+    fixtures: Record<string, unknown>
+): void {
+    expect(`${JSON.stringify(fixtures[name], null, 2)}\n`, name).toBe(
+        readFileSync(join(FIXTURE_DIR, name), 'utf8')
+    );
 }
 
 describe('protocol revision parsing', () => {
@@ -90,68 +75,77 @@ describe('protocol revision parsing', () => {
         expect(parseProtocols(source, 289)[0].name).toBe('SEND_SNAPSHOT');
     });
 
-    test('rejects duplicate and out-of-range protocol opcodes', () => {
-        expect(() =>
-            parseProtocols(
-                'static readonly FIRST = new ClientProt(10, 0); static readonly SECOND = new ClientProt(10, 1);',
-                377
-            )
-        ).toThrow('duplicate protocol opcode 10');
+    test('matches only protocol declarations at line starts', () => {
+        const source = [
+            '// static readonly COMMENTED = new ClientProt(10, 0);',
+            'static readonly REAL = new ClientProt(11, 0);'
+        ].join('\n');
+        expect(parseProtocols(source, 377)).toEqual([{ name: 'REAL', id: 11, length: 0 }]);
+    });
+
+    test('rejects duplicate opcodes and invalid packet lengths', () => {
+        const duplicates = [
+            'static readonly FIRST = new ClientProt(10, 0);',
+            'static readonly SECOND = new ClientProt(10, 1);'
+        ].join('\n');
+        expect(() => parseProtocols(duplicates, 377)).toThrow('duplicate protocol opcode 10');
         expect(() => parseProtocols('static readonly BAD = new ClientProt(256, 0);', 377)).toThrow(
             'out-of-range opcode 256'
         );
         expect(() => parseProtocols('static readonly BAD = new ClientProt(-1, 0);', 377)).toThrow(
             'out-of-range opcode -1'
         );
+        expect(() => parseProtocols('static readonly BAD = new ClientProt(10, -3);', 377)).toThrow(
+            'invalid packet length -3'
+        );
+        expect(parseProtocols('static readonly VARIABLE = new ServerProt(10, -2);', 377)[0].length).toBe(-2);
     });
 });
 
-describe.skipIf(fixtureEngineRevision !== 377)('revision 377 protocol generation', () => {
-    test('emits a 257-entry size table and every known server opcode', () => {
-        const generated = generateProt(ENGINE);
-        const sizesMatch = generated.server.match(/export const ServerProtSizes = \[([\s\S]*?)\];/);
-        const knownMatch = generated.server.match(/export const ServerProtKnown: readonly number\[\] = \[([\s\S]*?)\];/);
-        expect(sizesMatch).not.toBeNull();
-        expect(knownMatch).not.toBeNull();
-
-        const sizes = sizesMatch![1]
-            .split(',')
-            .map(value => value.trim())
-            .filter(Boolean)
-            .map(Number);
-        const known = knownMatch![1]
-            .split(',')
-            .map(value => value.trim())
-            .filter(Boolean)
-            .map(Number);
-
-        expect(sizes).toHaveLength(257);
-        expect(sizes[256]).toBe(0);
-        expect(known).toHaveLength(75);
-        expect(known).toEqual(generated.serverProtocols.map(protocol => protocol.id));
+describe('protocol fixtures generated tables', () => {
+    test('checks engine fixture size and membership arrays without ENGINE_DIR', () => {
+        const generated = buildServerProtocolTables(engineFixture.server, engineFixture.revision);
+        expect(engineFixture.serverProtSizes).toHaveLength(257);
+        expect(engineFixture.serverProtSizes[256]).toBe(0);
+        expect(engineFixture.serverProtSizes[187]).toBe(0);
+        expect(engineFixture.serverProtKnown).toHaveLength(75);
+        expect(engineFixture.serverProtSizes).toEqual(generated.sizes);
+        expect(engineFixture.serverProtKnown).toEqual(generated.known);
     });
 });
 
-
-describe.skipIf(!engineMatchesClient)('protocol drift (matching engine revision)', () => {
+describe.skipIf(skipUnless('engine'))('protocol drift (matching engine revision)', () => {
     test('committed ClientProt matches the engine', () => {
-        const { client } = generateProt(ENGINE);
+        const { client } = generateProt(ENGINE_DIR!);
         expect(client).toBe(readFileSync('src/client/io/ClientProt.ts', 'utf8'));
     });
 
     test('committed ServerProt matches the engine', () => {
-        const { server } = generateProt(ENGINE);
+        const { server } = generateProt(ENGINE_DIR!);
         expect(server).toBe(readFileSync('src/client/io/ServerProt.ts', 'utf8'));
     });
 });
 
-describe.skipIf(!canRefreshFixtures)('protocol fixture refresh (pinned 377 sources)', () => {
-    test('regenerates all committed fixtures byte-identically', () => {
-        const fixtures = generateProtocolFixtures(ENGINE, JAVA_DIR!, RUST_DIR!);
-        for (const [name, fixture] of Object.entries(fixtures)) {
-            expect(`${JSON.stringify(fixture, null, 2)}\n`, name).toBe(
-                readFileSync(join(FIXTURE_DIR, name), 'utf8')
-            );
-        }
+describe.skipIf(!engineFixtureReady)('engine protocol fixture refresh', () => {
+    test('refreshes only engine-prot.json from ENGINE_DIR', () => {
+        const fixtures = generateProtocolFixtures({ engineDir: ENGINE_DIR! });
+        expect(Object.keys(fixtures)).toEqual(['engine-prot.json']);
+        expectFixtureMatches('engine-prot.json', fixtures);
+    });
+});
+
+describe.skipIf(!javaFixtureReady)('Java protocol fixture refresh', () => {
+    test('refreshes only java-server-sizes.json from JAVA_DIR', () => {
+        const fixtures = generateProtocolFixtures({ javaDir: JAVA_DIR! });
+        expect(Object.keys(fixtures)).toEqual(['java-server-sizes.json']);
+        expectFixtureMatches('java-server-sizes.json', fixtures);
+    });
+});
+
+describe.skipIf(!rustFixtureReady)('Rust protocol fixture refresh', () => {
+    test('refreshes only rust-server-sizes.json from RUST_DIR', () => {
+        const fixtures = generateProtocolFixtures({ rustDir: RUST_DIR! });
+        expect(Object.keys(fixtures)).toEqual(['rust-server-sizes.json']);
+        expectFixtureMatches('rust-server-sizes.json', fixtures);
     });
 });
