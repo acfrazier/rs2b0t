@@ -8,6 +8,10 @@ import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 type ClientRevision = 289 | 377;
 
+interface DecodeMarkers {
+    opcode77Count: number;
+}
+
 function resolveRevision(revision?: number): ClientRevision {
     const selected = revision ?? (process.env.REVISION === undefined ? CLIENT_VERSION : Number(process.env.REVISION));
     if (selected !== 289 && selected !== 377) {
@@ -145,34 +149,29 @@ export class LocDef {
     debugname: string | null = null;
     category: number | null = null;
 
-    decodeType(dat: Reader, revision?: number): void {
+    decodeType(dat: Reader, revision?: number, markers?: DecodeMarkers): void {
         const selectedRevision = resolveRevision(revision);
         while (dat.available > 0) {
             const code: number = dat.g1();
             if (code === 0) {
                 return;
             }
-            this.decode(code, dat, selectedRevision);
+            this.decode(code, dat, selectedRevision, markers);
         }
         throw new Error('Loc config record is missing its terminator');
     }
 
-    private decode(code: number, dat: Reader, revision: ClientRevision): void {
+    // Collision fields mirror engine/src/cache/config/LocType.ts:112-143.
+    // The server consumes them in engine/src/engine/GameMap.ts:338-348,412-424.
+    private decode(code: number, dat: Reader, revision: ClientRevision, markers?: DecodeMarkers): void {
         if (code === 1) {
             const count = dat.g1();
-            // The 377 decoder keeps the first model list but still consumes later payloads.
-            if (revision !== 377 || this.models === null) {
-                this.models = new Uint16Array(count);
-                this.shapes = new Uint8Array(count);
-                for (let i = 0; i < count; i++) {
-                    this.models[i] = dat.g2();
-                    this.shapes[i] = dat.g1();
-                }
-            } else {
-                for (let i = 0; i < count; i++) {
-                    dat.g2();
-                    dat.g1();
-                }
+            // Model and shape lists use server overwrites; names and actions remain available for nav reports.
+            this.models = new Uint16Array(count);
+            this.shapes = new Uint8Array(count);
+            for (let i = 0; i < count; i++) {
+                this.models[i] = dat.g2();
+                this.shapes[i] = dat.g1();
             }
         } else if (code === 2) {
             this.name = dat.gjstr();
@@ -180,25 +179,10 @@ export class LocDef {
             dat.gjstr();
         } else if (code === 5) {
             const count = dat.g1();
-            // A zero-count 377 opcode 5 does not create or replace a model list.
-            if (revision !== 377) {
-                this.models = new Uint16Array(count);
-                this.shapes = null;
-                for (let i = 0; i < count; i++) {
-                    this.models[i] = dat.g2();
-                }
-            } else if (count > 0) {
-                if (this.models === null) {
-                    this.models = new Uint16Array(count);
-                    this.shapes = null;
-                    for (let i = 0; i < count; i++) {
-                        this.models[i] = dat.g2();
-                    }
-                } else {
-                    for (let i = 0; i < count; i++) {
-                        dat.g2();
-                    }
-                }
+            this.models = new Uint16Array(count);
+            this.shapes = null;
+            for (let i = 0; i < count; i++) {
+                this.models[i] = dat.g2();
             }
         } else if (code === 14) {
             this.width = dat.g1();
@@ -209,24 +193,11 @@ export class LocDef {
         } else if (code === 18) {
             this.blockrange = false;
         } else if (code === 19) {
-            const active = dat.g1();
-            // Java sets active for 1; later non-1 values do not clear it.
-            if (revision === 377) {
-                if (active === 1) {
-                    this.active = 1;
-                } else if (this.active === -1) {
-                    this.active = 0;
-                }
-            } else {
-                this.active = active;
-            }
+            this.active = dat.g1();
         } else if (code === 21 || code === 22 || code === 23 || code === 25 || code === 62 || code === 64 || code === 73) {
             // Payload-less opcodes: recognised so the cursor stays aligned, nothing to read.
         } else if (code === 74) {
-            if (revision === 377) {
-                this.blockwalk = false;
-                this.blockrange = false;
-            }
+            // The server stores breakroutefinding separately (engine/src/cache/config/LocType.ts:205-206); it does not change collision.
         } else if (code === 61) {
             this.category = dat.g2();
         } else if (code === 24 || code === 60 || code === 65 || code === 66 || code === 67 || code === 68) {
@@ -249,6 +220,9 @@ export class LocDef {
         } else if (code === 70 || code === 71 || code === 72) {
             dat.g2s();
         } else if (code === 77) {
+            if (markers) {
+                markers.opcode77Count++;
+            }
             dat.g2();
             if (revision === 377) {
                 dat.g2();
@@ -274,6 +248,7 @@ export class LocDef {
         }
     }
 
+    // Match engine/src/cache/config/LocType.ts:237-249 for the active default derived after decode.
     postDecode(): void {
         if (this.active === -1) {
             this.active = 0;
@@ -314,6 +289,8 @@ export function loadLocTypes(engineDir: string, revision?: number): { configs: L
     if (engineRevision !== undefined && engineRevision !== selectedRevision) {
         throw new Error(`Loc config revision mismatch: requested ${selectedRevision}, engine declares ${engineRevision}`);
     }
+    // Pack-only copies lack engine source; revision 377 has opcode 77 records while this 289 pack does not.
+    const revisionMarkers = engineRevision === undefined ? { opcode77Count: 0 } : undefined;
     const server = new Reader(new Uint8Array(fs.readFileSync(path.join(engineDir, 'data/pack/server/loc.dat'))));
     const jag = new JagArchive(new Uint8Array(fs.readFileSync(path.join(engineDir, 'data/pack/client/config'))));
     const clientDat = jag.read('loc.dat');
@@ -330,14 +307,27 @@ export function loadLocTypes(engineDir: string, revision?: number): { configs: L
 
     const configs: LocDef[] = [];
     const names = new Map<string, number>();
-    for (let id = 0; id < count; id++) {
-        const config = new LocDef();
-        config.decodeType(server, selectedRevision);
-        config.decodeType(client, selectedRevision);
-        config.postDecode();
-        configs[id] = config;
-        if (config.debugname) {
-            names.set(config.debugname, id);
+    try {
+        for (let id = 0; id < count; id++) {
+            const config = new LocDef();
+            config.decodeType(server, selectedRevision, revisionMarkers);
+            config.decodeType(client, selectedRevision, revisionMarkers);
+            config.postDecode();
+            configs[id] = config;
+            if (config.debugname) {
+                names.set(config.debugname, id);
+            }
+        }
+    } catch (error) {
+        if (revisionMarkers?.opcode77Count && selectedRevision === 289) {
+            throw new Error('Loc config revision mismatch: requested 289, pack declares 377 (revision-377 opcode 77 records)');
+        }
+        throw error;
+    }
+    if (revisionMarkers) {
+        const packRevision: ClientRevision = revisionMarkers.opcode77Count > 0 ? 377 : 289;
+        if (packRevision !== selectedRevision) {
+            throw new Error(`Loc config revision mismatch: requested ${selectedRevision}, pack declares ${packRevision} (revision-377 opcode 77 records ${revisionMarkers.opcode77Count === 0 ? 'absent' : 'present'})`);
         }
     }
     if (server.available !== 0) {
