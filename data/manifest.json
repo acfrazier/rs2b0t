@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "revision": 289,
+  "cutover": false,
+  "engine": {
+    "commit": null,
+    "archives": {
+      "config": null,
+      "interface": null
+    }
+  },
+  "content": {
+    "commit": null
+  },
+  "toolchain": {
+    "node": null,
+    "bun": null
+  },
+  "generators": {},
+  "artifacts": []
+}

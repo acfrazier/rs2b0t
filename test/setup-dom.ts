@@ -1,5 +1,9 @@
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 
+// Why: the strict flags are class-definition-time constants, and this preload runs before every test module; the e2e runner and isolated deploys build with both on.
+process.env.STRICT_PACKETS = '1';
+process.env.STRICT_CONFIG = '1';
+
 // Why: happy-dom's fetch rejects file://, so anything transitively importing Client.ts aborts on tinymidipcm's wasm load. Keep Bun's fetch for file://.
 const nativeFetch = globalThis.fetch;
 

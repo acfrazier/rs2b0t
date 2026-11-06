@@ -15,8 +15,31 @@ cd "$ROOT"
 
 [ -d "$ENGINE/public" ] || { echo "engine public/ not found at $ENGINE" >&2; exit 1; }
 
-TARGET=prod PROD_RSAN="$PROD_RSAN" bun run build
-TARGET=prod PROD_RSAN="$PROD_RSAN" bun run build:bot
+# Refuse the CI dummy-key compile: it proves the target builds, never that login works (pitfall 8).
+# Checked before and after the rebuild, so a dummy out/ is never silently packaged or rebuilt over.
+refuse_dummy() {
+    MODE="$(sed -n 's/.*"rsa": *"\([^"]*\)".*/\1/p' out/version.json 2>/dev/null | head -1)"
+    if [ "$MODE" = "dummy" ]; then
+        echo "refuse: out/version.json says rsa: dummy — rebuild keyed (PROD_RSAE and PROD_RSAN from this engine's private.pem) before packing" >&2
+        exit 1
+    fi
+}
+refuse_dummy
+
+# Why: a client whose config decoder was derived from another engine's archives desyncs every later
+# config entry (pitfall 7); the manifest pins the archives P4a read.
+bun tools/lib/manifest.ts archives "$ENGINE" || { echo "refuse: $ENGINE/data/pack/client does not match data/manifest.json" >&2; exit 1; }
+
+TARGET=prod PROD_RSAE="${PROD_RSAE:-65537}" PROD_RSAN="$PROD_RSAN" bun run build
+TARGET=prod PROD_RSAE="${PROD_RSAE:-65537}" PROD_RSAN="$PROD_RSAN" bun run build:bot
+
+refuse_dummy
+
+# Why: the tap is development-only; a bundle that names it would ship recording code (pitfall 20).
+if grep -l "tap-377" out/*.js >/dev/null 2>&1; then
+    echo "refuse: a tap module name is in the shipped bundles: $(grep -l "tap-377" out/*.js | tr '\n' ' ')" >&2
+    exit 1
+fi
 
 # the nav worker needs the baked collision pack; build it once if absent
 [ -f out/collision.lcnav.gz ] || bun tools/nav/build-collision.ts --engine "$ENGINE"

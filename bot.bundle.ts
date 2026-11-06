@@ -2,16 +2,29 @@ import fs from 'fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 
-import { buildIdentityDefines, buildIdentityLabel, resolveBuildIdentity, writeVersionJson } from './tools/lib/buildIdentity.js';
+import { buildDefines, buildIdentityLabel, resolveBuildIdentity, writeVersionJson } from './tools/lib/buildIdentity.js';
+import type { BuildIdentity, LoginKey } from './tools/lib/buildIdentity.js';
 
 // Build src/bot/main.ts as botclient.js, keeping console output.
 // Why: external scripts and self-tests use ABI property names, so skip terser; Bun only shortens locals.
+
+const USAGE = 'usage: bun bot.bundle.ts [dev] [--dummy-rsa]';
+const args = process.argv.slice(2);
+const dev = args.includes('dev');
+const dummyRsa = args.includes('--dummy-rsa');
+const unknown = args.filter(arg => arg !== 'dev' && arg !== '--dummy-rsa');
+if (unknown.length > 0) {
+    console.error(`unknown argument(s): ${unknown.join(', ')}\n${USAGE}`);
+    process.exit(2);
+}
+const prod = !dev;
 
 const TARGET_NAME = process.env.TARGET ?? 'local';
 
 // 1024-bit RSA keys, exponent 65537.
 // Local matches the engine's private.pem; override with LOCAL_RSAE/LOCAL_RSAN. Live uses LIVE_RSAN.
-const TARGET_RSA: Record<string, { rsae: string; rsan: string }> = {
+// prod runs on the game server; PROD_RSAE/PROD_RSAN are that engine's public pair (section 6).
+const TARGET_RSA: Record<string, LoginKey> = {
     local: {
         rsae: process.env.LOCAL_RSAE ?? '65537',
         rsan:
@@ -23,9 +36,8 @@ const TARGET_RSA: Record<string, { rsae: string; rsan: string }> = {
         rsae: '65537',
         rsan: process.env.LIVE_RSAN ?? ''
     },
-    // prod runs on the game server; ops/scripts/build.sh supplies PROD_RSAN from client.js.
     prod: {
-        rsae: '65537',
+        rsae: process.env.PROD_RSAE ?? '',
         rsan: process.env.PROD_RSAN ?? ''
     }
 };
@@ -35,28 +47,30 @@ if (!(TARGET_NAME in TARGET_RSA)) {
     process.exit(1);
 }
 
-const rsa = TARGET_RSA[TARGET_NAME] ?? TARGET_RSA.local;
-if ((TARGET_NAME === 'live' || TARGET_NAME === 'proxy' || TARGET_NAME === 'prod') && rsa.rsan === '') {
-    const envVar = TARGET_NAME === 'prod' ? 'PROD_RSAN' : 'LIVE_RSAN';
-    console.error(`TARGET=${TARGET_NAME} requires ${envVar} (rs2b2t rotated modulus). Aborting.`);
+/** A fixed public test pair for the CI `prod` compile. It matches no engine, so a login under it
+ *  fails with reply 6; `version.json` marks the artifact `rsa: dummy`, and `tools/pack-rs2b0t.sh`
+ *  and `deployIsolatedClient` refuse to deploy it. */
+const DUMMY_RSA: LoginKey = { rsae: '65537', rsan: `1${'7'.repeat(308)}` };
+
+let rsa = TARGET_RSA[TARGET_NAME]!;
+let rsaMode: 'keyed' | 'dummy' = 'keyed';
+if ((TARGET_NAME === 'live' || TARGET_NAME === 'proxy' || TARGET_NAME === 'prod') && (rsa.rsan === '' || rsa.rsae === '')) {
+    if (TARGET_NAME === 'prod' && dummyRsa) {
+        rsa = DUMMY_RSA;
+        rsaMode = 'dummy';
+    } else {
+        const envVars = TARGET_NAME === 'prod' ? 'PROD_RSAE and PROD_RSAN' : 'LIVE_RSAN';
+        console.error(`TARGET=${TARGET_NAME} requires ${envVars} (rs2b2t rotated modulus), or --dummy-rsa for a prod compile check. Aborting.`);
+        process.exit(1);
+    }
+}
+if (dummyRsa && rsaMode !== 'dummy') {
+    console.error(`--dummy-rsa is a prod compile check only; TARGET=${TARGET_NAME} already has a key (or is local). Aborting.`);
     process.exit(1);
 }
 
-const identity = resolveBuildIdentity();
-
-const define = {
-    'process.env.SECURE_ORIGIN': JSON.stringify(process.env.SECURE_ORIGIN ?? 'false'),
-    'process.env.RS2B0T_TARGET': JSON.stringify(TARGET_NAME),
-    'process.env.LOGIN_RSAE': JSON.stringify(rsa.rsae),
-    'process.env.LOGIN_RSAN': JSON.stringify(rsa.rsan),
-    // Config decoders enable strict mode only for '1'.
-    'process.env.STRICT_PACKETS': JSON.stringify(process.env.STRICT_PACKETS ?? ''),
-    'process.env.STRICT_CONFIG': JSON.stringify(process.env.STRICT_CONFIG ?? ''),
-    ...buildIdentityDefines(identity)
-};
-
-const args = process.argv.slice(2);
-const prod = args[0] !== 'dev';
+const identity: BuildIdentity = rsaMode === 'dummy' ? { ...resolveBuildIdentity(), rsa: 'dummy' } : resolveBuildIdentity();
+const define = buildDefines(identity, TARGET_NAME, rsa);
 
 const out = process.env.B0T_OUT_DIR ?? 'out';
 fs.mkdirSync(out, { recursive: true });
@@ -106,3 +120,6 @@ fs.writeFileSync(
     }) + '\n'
 );
 console.log(`bot bundle built (${prod ? 'prod' : 'dev'}): ${join(out, 'botclient.js')}  git=${buildIdentityLabel(identity)}`);
+if (rsaMode === 'dummy') {
+    console.log('rsa: dummy — a compile check only; tools/pack-rs2b0t.sh and deployIsolatedClient refuse this artifact');
+}

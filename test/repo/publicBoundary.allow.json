@@ -1,0 +1,88 @@
+{
+    "entries": [
+        {
+            "path": "docs/e2e/issue-279.json",
+            "needle": "/Users/",
+            "match": "  \"command\": \"ENGINE_DIR=/Users/elliottriplett/code/rs2b2t-engine bun e2e/leather-thread-279-live.ts --base http://localhost:8890 --minutes 6\",",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "docs/e2e/issue-310.json",
+            "needle": "/Users/",
+            "match": "  \"command\": \"ENGINE_DIR=/Users/elliottriplett/code/rs2b2t-engine bun e2e/flour-collector-310-live.ts --base http://localhost:8890 --minutes 8\",",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "docs/e2e/issue-771.json",
+            "needle": "/Users/",
+            "match": "  \"command\": \"ENGINE_DIR=/Users/elliottriplett/code/rs2b2t-engine bun e2e/donovan-door-771-live.ts --base http://localhost:8890 --minutes 5\",",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "docs/e2e/issue-847-run.json",
+            "needle": "/Users/",
+            "match": "  \"command\": \"ENGINE_DIR=/Users/elliottriplett/code/rs2b2t-engine bun e2e/witchs-house-patrol-847-live.ts --base http://localhost:8890\",",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "docs/e2e/lostcity-strike-run.json",
+            "needle": "/Users/",
+            "match": "  \"command\": \"ENGINE_DIR=/Users/elliottriplett/code/rs2b2t-engine bun e2e/lostcity-strike-safespot-live.ts --base http://localhost:8890\",",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "e2e/clues/live-clue-sweep.ts",
+            "needle": "/Users/",
+            "match": "    fs.writeFileSync('/Users/elliottriplett/code/rs2b0t/out/clue-sweep.json', JSON.stringify(results, null, 1));",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "test/client/config/worlds.test.ts",
+            "needle": "password=",
+            "match": "    const from = new URL('https://w1.rs2b2t.com/rs2b0t/wall?lowmem=0&members=1&nodeid=10&box=alice&password=secret&autologin=1&next=https://evil.test');",
+            "reason": "synthetic-credential-fixture"
+        },
+        {
+            "path": "test/client/config/worlds.test.ts",
+            "needle": "password=",
+            "match": "    const from = new URL('https://w2.rs2b2t.com/rs2b0t/wall?nodeid=10&lowmem=0&members=0&password=secret');",
+            "reason": "synthetic-credential-fixture"
+        },
+        {
+            "path": "test/client/config/worlds.test.ts",
+            "needle": "password=",
+            "match": "    const wall = new URL('http://localhost:8081/multibox.html?lowmem=0&password=secret');",
+            "reason": "synthetic-credential-fixture"
+        },
+        {
+            "path": "test/runtime/box.test.ts",
+            "needle": "password=",
+            "match": "    expect(wallLinkHref('', new URL('https://w2.rs2b2t.com/rs2b0t/?nodeid=10&lowmem=0&members=0&password=secret')))",
+            "reason": "synthetic-credential-fixture"
+        },
+        {
+            "path": "tools/nav/build-collision.ts",
+            "needle": "/Users/",
+            "match": "    let engine = '/Users/elliotninjaone/code/lostcity-dev/engine';",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "tools/nav/derive-doors.ts",
+            "needle": "/Users/",
+            "match": "    let engine = '/Users/elliotninjaone/code/lostcity-dev/engine';",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "tools/nav/probe-locs.ts",
+            "needle": "/Users/",
+            "match": "let engine = '/Users/elliotninjaone/code/lostcity-dev/engine';",
+            "reason": "upstream-home-path"
+        },
+        {
+            "path": "e2e/jive-private-reward.rs2",
+            "needle": ".rs2",
+            "match": ".rs2",
+            "reason": "upstream-289-fixture"
+        }
+    ]
+}
