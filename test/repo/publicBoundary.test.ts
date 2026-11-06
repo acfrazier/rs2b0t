@@ -117,6 +117,49 @@ function readAllowlist(path: string): AllowEntry[] {
     });
 }
 
+function headerHasPath(value: unknown): boolean {
+    if (typeof value === 'string') return /[\\/:~]/.test(value);
+    if (!value || typeof value !== 'object') return false;
+    return Object.entries(value).some(([key, child]) => /(?:path|directory|dir)$/i.test(key) || headerHasPath(child));
+}
+
+/** Publication checks are independent of the cache bundle and inspect staged bytes, not working-tree replacements. */
+function recordingViolations(root: string): string[] {
+    const files = git(root, ['ls-files', '-z', '--', 'test/io/recordings']);
+    if (files.code !== 0) throw new Error('could not enumerate indexed recordings');
+    const problems: string[] = [];
+    for (const path of files.out.split('\0').filter(path => path.endsWith('.jsonl'))) {
+        const blob = git(root, ['show', `:${path}`]);
+        if (blob.code !== 0) throw new Error('could not read an indexed recording');
+        let records: unknown[];
+        try { records = blob.out.trimEnd().split('\n').map(line => JSON.parse(line)); }
+        catch { problems.push(`${path}: invalid recording JSON`); continue; }
+        const header = records[0];
+        if (!header || typeof header !== 'object' || !('type' in header) || header.type !== 'header') {
+            problems.push(`${path}: recording must begin with a header`);
+            continue;
+        }
+        if (headerHasPath(header)) problems.push(`${path}: recording header contains a path`);
+        let acceptedSegment: unknown = undefined;
+        for (const [offset, record] of records.slice(1).entries()) {
+            if (!record || typeof record !== 'object' || !('type' in record)) {
+                problems.push(`${path}: invalid record at line ${offset + 2}`);
+                continue;
+            }
+            if (record.type === 'login') {
+                acceptedSegment = undefined;
+                const replies = 'replies' in record ? record.replies : undefined;
+                const segment = 'segment' in record ? record.segment : undefined;
+                if (typeof segment === 'number' && Array.isArray(replies) && replies[0] === 0 && [2, 15].includes(replies.at(-1))) acceptedSegment = segment;
+            } else if (record.type === 'end') acceptedSegment = undefined;
+            else if (record.type === 'frame' && (!('segment' in record) || acceptedSegment === undefined || record.segment !== acceptedSegment)) {
+                problems.push(`${path}: game frame precedes an accepted login reply at line ${offset + 2}`);
+            }
+        }
+    }
+    return problems;
+}
+
 const TEMP_DIRS: string[] = [];
 
 /** A throwaway git repository so the fabricated violations go through the real index scan. */
@@ -188,6 +231,43 @@ describe('publicBoundary', () => {
         const [first] = allow;
         expect(first).toBeDefined();
         expect(violations(findings, [...allow, first!])).toEqual([expect.stringContaining('duplicate allowlist entry')]);
+    });
+});
+
+describe('publicBoundary recordings', () => {
+    const file = 'test/io/recordings/377/example.jsonl';
+    const header = { type: 'header', engineCommit: 'abcdef0123', accountPrefix: 'tap', archiveHashes: { config: '0123abcd' } };
+    const login = { type: 'login', segment: 1, replies: [0, 2] };
+    const frame = { type: 'frame', segment: 1, direction: 'in', bytes: '05' };
+    const jsonl = (...records: unknown[]) => records.map(record => JSON.stringify(record)).join('\n') + '\n';
+
+    test('every indexed recording has a path-free header and accepted login before game frames', () => {
+        expect(recordingViolations(process.cwd())).toEqual([]);
+    });
+    test('a recording header path fails, including nested and non-home paths', () => {
+        for (const source of ['/home/operator/engine', 'C:\\engine\\cache', '../cache']) {
+            const dir = tempRepo({ [file]: jsonl({ ...header, provenance: { source } }, login, frame) });
+            expect(recordingViolations(dir)).toEqual([expect.stringContaining('header contains a path')]);
+        }
+    });
+    test('an inbound frame before any login reply fails', () => {
+        const dir = tempRepo({ [file]: jsonl(header, frame, login) });
+        expect(recordingViolations(dir)).toEqual([expect.stringContaining('precedes an accepted login reply')]);
+    });
+    test('failed login replies and a previous segment do not authorize frames', () => {
+        for (const records of [
+            [header, { ...login, replies: [0, 6] }, frame],
+            [header, login, { ...frame, segment: 2 }],
+            [header, login, { type: 'end', segment: 1 }, frame]
+        ]) {
+            const dir = tempRepo({ [file]: jsonl(...records) });
+            expect(recordingViolations(dir)).toEqual([expect.stringContaining('precedes an accepted login reply')]);
+        }
+    });
+    test('valid indexed bytes pass even if the working tree contains a different recording', () => {
+        const dir = tempRepo({ [file]: jsonl(header, login, frame) });
+        writeFileSync(join(dir, file), jsonl({ ...header, enginePath: '/home/operator/engine' }, frame));
+        expect(recordingViolations(dir)).toEqual([]);
     });
 });
 
