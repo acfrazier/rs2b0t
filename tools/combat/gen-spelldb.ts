@@ -1,10 +1,11 @@
 import { filesUnder } from '../lib/content.js';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { resolveOut } from '../lib/genout.js';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const CONTENT = process.env.CONTENT_DIR ?? join(homedir(), 'code', 'rs2b2t-content');
-const OUT = 'src/bot/data/spelldb.ts';
+const OUT = resolveOut('src/bot/data/spelldb.ts');
 
 const SSB_ORDER = [
     'wind_strike', 'water_strike', 'earth_strike', 'fire_strike',
@@ -154,6 +155,7 @@ if (process.argv.includes('--check')) {
     }
     console.log(`${OUT} is up to date`);
 } else {
+    mkdirSync(dirname(OUT), { recursive: true });
     writeFileSync(OUT, text);
     console.log(`wrote ${OUT}`);
 }

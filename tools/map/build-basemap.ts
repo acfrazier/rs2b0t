@@ -15,6 +15,7 @@ import {
     type BasemapManifest,
     type WorldmapKeyIndex
 } from '#/bot/panel/worldMapBasemap.js';
+import { resolveRevision } from '../lib/genout.js';
 import { encodePngRgba, pix2dToRgba } from './encodePng.js';
 
 const SCHEMA_TAG = `basemap-schema-${BASEMAP_SCHEMA}`;
@@ -25,6 +26,7 @@ type BakeArgs = {
     outDir: string;
     revision: string;
     fetchUrl: string;
+    noFetch: boolean;
 };
 
 function parseArgs(): BakeArgs {
@@ -32,8 +34,9 @@ function parseArgs(): BakeArgs {
     let engine = process.env.ENGINE_DIR ?? `${process.env.HOME}/code/rs2b2t-engine`;
     let jag: string | null = null;
     let outDir = 'out';
-    let revision = '274';
+    let revision: string | null = null;
     let fetchUrl = 'https://2004.lostcity.rs/worldmap.jag';
+    let noFetch = false;
     for (let i = 0; i < args.length; i++) {
         const a = args[i];
         if (a === '--engine') {
@@ -44,11 +47,13 @@ function parseArgs(): BakeArgs {
             outDir = args[++i];
         } else if (a === '--revision') {
             revision = args[++i];
+        } else if (a === '--no-fetch') {
+            noFetch = true;
         } else if (a === '--fetch-url') {
             fetchUrl = args[++i];
         } else if (a === '--help' || a === '-h') {
             console.log(
-                'usage: bun tools/map/build-basemap.ts [--engine DIR] [--jag PATH] [--out DIR] [--revision TAG]'
+                'usage: bun tools/map/build-basemap.ts [--engine DIR] [--jag PATH] [--out DIR] [--revision TAG] [--no-fetch]'
             );
             process.exit(0);
         } else {
@@ -56,10 +61,10 @@ function parseArgs(): BakeArgs {
             process.exit(2);
         }
     }
-    return { engine, jag, outDir, revision, fetchUrl };
+    return { engine, jag, outDir, revision: revision ?? String(resolveRevision()), fetchUrl, noFetch };
 }
 
-async function resolveJag(opts: ReturnType<typeof parseArgs>): Promise<{ bytes: Uint8Array; source: string }> {
+async function resolveJag(opts: BakeArgs): Promise<{ bytes: Uint8Array; source: string }> {
     if (opts.jag) {
         if (!fs.existsSync(opts.jag)) {
             throw new Error(`--jag not found: ${opts.jag}`);
@@ -73,6 +78,11 @@ async function resolveJag(opts: ReturnType<typeof parseArgs>): Promise<{ bytes: 
     const cacheJag = path.join(opts.outDir, 'worldmap.jag');
     if (fs.existsSync(cacheJag)) {
         return { bytes: new Uint8Array(fs.readFileSync(cacheJag)), source: cacheJag };
+    }
+    // Why: a run whose engine never packed the worldmap must fail loudly, not bake 2004scape's
+    // later map revision into a period data set (pitfall 25).
+    if (opts.noFetch) {
+        throw new Error(`worldmap.jag not found under ${opts.engine} and --no-fetch set; run the engine's packWorldmap first`);
     }
     console.log(`worldmap.jag missing under engine; downloading ${opts.fetchUrl}…`);
     const res = await fetch(opts.fetchUrl);
