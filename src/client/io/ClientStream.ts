@@ -1,6 +1,16 @@
 import { trafficMeter } from './TrafficMeter.js';
 
-export default class ClientStream {
+export interface ClientStreamLike {
+    readonly closed: boolean;
+    readonly available: number;
+    readonly msSinceData: number;
+    write(src: Uint8Array, len: number): void;
+    read(): Promise<number>;
+    readBytes(dst: Uint8Array, off: number, len: number): Promise<void>;
+    close(): void;
+}
+
+export default class ClientStream implements ClientStreamLike {
     private readonly socket: WebSocket;
     private readonly wsin: WebSocketReader;
     private readonly wsout: WebSocketWriter;

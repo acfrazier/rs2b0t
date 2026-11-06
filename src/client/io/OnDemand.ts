@@ -11,6 +11,16 @@ import OnDemandProvider from '#/client/io/OnDemandProvider.js';
 import OnDemandRequest from '#/client/io/OnDemandRequest.js';
 import Packet from '#/client/io/Packet.js';
 
+export interface OnDemandWorker {
+    onmessage: ((event: MessageEvent) => void) | null;
+    onerror: ((event: ErrorEvent) => void) | null;
+    postMessage(message: unknown): void;
+    terminate(): void;
+}
+
+export type OnDemandWorkerFactory = () => OnDemandWorker;
+
+
 export default class OnDemand extends OnDemandProvider {
     versions: number[][] = [];
     crcs: number[][] = [];
@@ -28,13 +38,18 @@ export default class OnDemand extends OnDemandProvider {
     message: string = '';
     cycle: number = 0;
     failCount: number = 0;
-    worker: Worker | null = null;
+    worker: OnDemandWorker | null = null;
     private lastIngame: boolean = false;
     private workerMessageId: number = 0;
     private workerAcks: Map<number, () => void> = new Map();
 
-    constructor(versionlist: JagFile, app: Client) {
+    constructor(
+        versionlist: JagFile,
+        app: Client,
+        workerFactory?: OnDemandWorkerFactory
+    ) {
         super();
+        if (workerFactory) this.workerFactory = workerFactory;
 
         const version: string[] = ['model_version', 'anim_version', 'midi_version', 'map_version'];
         for (let i = 0; i < 4; i++) {
@@ -286,13 +301,16 @@ export default class OnDemand extends OnDemandProvider {
         }
     }
 
+    private workerFactory(): OnDemandWorker {
+        return new Worker(new URL('./ondemandworker.js', import.meta.url), { type: 'module' });
+    }
+
     private startWorker(): void {
         if (this.worker) {
             return;
         }
 
-        const worker = new Worker(new URL('./ondemandworker.js', import.meta.url), { type: 'module' });
-        this.worker = worker;
+        const worker = this.workerFactory();
         this.lastIngame = this.app.ingame;
 
         worker.onmessage = (event: MessageEvent): void => {

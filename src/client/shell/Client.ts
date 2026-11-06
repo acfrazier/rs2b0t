@@ -59,7 +59,7 @@ import Pix32 from '#/client/graphics/Pix32.js';
 import PixFont from '#/client/graphics/PixFont.js';
 import PixMap from '#/client/graphics/PixMap.js';
 
-import ClientStream from '#/client/io/ClientStream.js';
+import ClientStream, { type ClientStreamLike } from '#/client/io/ClientStream.js';
 import { ClientProt, CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import Database from '#/client/io/Database.js';
 import Isaac from '#/client/io/Isaac.js';
@@ -68,6 +68,7 @@ import Packet from '#/client/io/Packet.js';
 import OnDemand from '#/client/io/OnDemand.js';
 import { assertPacketConsumed } from '#/client/io/packetGuard.js';
 import { ServerProt, ServerProtSizes } from '#/client/io/ServerProt.js';
+import * as ServerProtTable from '#/client/io/ServerProt.js';
 
 import { reverseDnsLookup } from '#/client/util/WebDns.js';
 
@@ -87,9 +88,34 @@ const SCROLLBAR_GRIP_FOREGROUND = 0x4d4233;
 const SCROLLBAR_GRIP_HIGHLIGHT = 0x766654;
 const SCROLLBAR_GRIP_LOWLIGHT = 0x332d25;
 
+class StrictPacketError extends Error {}
+
+function isNumberList(value: unknown): value is readonly number[] {
+    return Array.isArray(value) && value.every(item => Number.isInteger(item));
+}
+
+// The preparation branch retains its sizes-only 289 table; cutover tables supply explicit membership.
+const KNOWN_SERVER_OPCODES: ReadonlySet<number> = (() => {
+    const known = new Set<number>();
+    if ('ServerProtKnown' in ServerProtTable) {
+        if (!isNumberList(ServerProtTable.ServerProtKnown)) throw new Error('invalid generated server opcode membership');
+        for (const opcode of ServerProtTable.ServerProtKnown) known.add(opcode);
+    } else {
+        for (let opcode = 0; opcode < 256; opcode++) {
+            if ((ServerProtSizes[opcode] ?? 0) !== 0) known.add(opcode);
+        }
+        for (const opcode of [ServerProt.IF_CLOSE, ServerProt.P_COUNTDIALOG, ServerProt.LOGOUT, ServerProt.CAM_RESET, ServerProt.UNSET_MAP_FLAG, ServerProt.VARP_SYNC, ServerProt.RESET_ANIMS]) known.add(opcode);
+    }
+    return known;
+})();
+
+function isKnownServerOpcode(opcode: number): boolean {
+    return KNOWN_SERVER_OPCODES.has(opcode);
+}
+
 interface LoginAttempt {
     cancelled: boolean;
-    stream: ClientStream | null;
+    stream: ClientStreamLike | null;
     done: Promise<void>;
 }
 
@@ -196,7 +222,7 @@ export class Client extends GameShell {
     private npcCount: number = 0;
     private npcIds: Int32Array = new Int32Array(16384);
 
-    private stream: ClientStream | null = null;
+    private stream: ClientStreamLike | null = null;
     private loginSeed: bigint = 0n;
     private randomIn: Isaac | null = null;
     private out: Packet = Packet.alloc(1);
@@ -892,7 +918,7 @@ export class Client extends GameShell {
 
             await this.drawProgress('Connecting to update server', 60);
 
-            this.onDemand = new OnDemand(versionlist, this);
+            this.onDemand = this.createOnDemand(versionlist);
             AnimFrame.init(this.onDemand.getAnimFrameCount());
             Model.init(this.onDemand.getFileCount(0), this.onDemand);
 
@@ -1843,7 +1869,11 @@ export class Client extends GameShell {
         }
     }
 
-    protected async openLoginStream(): Promise<ClientStream> {
+    protected createOnDemand(versionlist: JagFile): OnDemand {
+        return new OnDemand(versionlist, this);
+    }
+
+    protected async openLoginStream(): Promise<ClientStreamLike> {
         return new ClientStream(await ClientStream.openSocket(TARGET.wsHost, TARGET.tls));
     }
 
@@ -6123,6 +6153,15 @@ export class Client extends GameShell {
                 if (this.randomIn) {
                     this.ptype = (this.ptype - this.randomIn.nextInt) & 0xff;
                 }
+                if (!isKnownServerOpcode(this.ptype)) {
+                    const message = `T1 - unknown opcode ${this.ptype},${ServerProtSizes[this.ptype] ?? 'unmapped'} - ${this.ptype1},${this.ptype2}`;
+                    console.error(message);
+                    if (Client.STRICT_PACKETS) {
+                        throw new StrictPacketError(message);
+                    }
+                    await this.logout();
+                    return true;
+                }
                 this.psize = ServerProtSizes[this.ptype];
                 available--;
             }
@@ -7379,9 +7418,17 @@ export class Client extends GameShell {
                 return true;
             }
 
-            console.error(`T1 - ${this.ptype},${this.psize} - ${this.ptype1},${this.ptype2}`);
+            const message = `T1 - ${this.ptype},${this.psize} - ${this.ptype1},${this.ptype2}`;
+            console.error(message);
+            if (Client.STRICT_PACKETS) {
+                throw new StrictPacketError(message);
+            }
             await this.logout();
         } catch (e) {
+            if (e instanceof StrictPacketError) {
+                throw e;
+            }
+
             if (e instanceof WebSocket && e.readyState === 3) {
                 await this.lostCon();
             } else {
@@ -7394,6 +7441,9 @@ export class Client extends GameShell {
                 console.error(str);
 
                 await this.logout();
+                if (Client.STRICT_PACKETS) {
+                    throw e;
+                }
             }
         }
 
