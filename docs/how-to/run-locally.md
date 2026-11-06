@@ -110,6 +110,7 @@ bun test test/event/webwalk             # one directory
 bun test test/docs            # the manual's own link integrity
 
 bun run lint                             # eslint across the repo
+bun run audit:exports                    # compiler census; writes out/audit-exports/integrated.json
 bun run format src/bot/event/webwalk/Navigator.ts  # prettier, on paths you name
 
 bun run smoke                                     # against localhost:8890
