@@ -29,11 +29,13 @@ The output directory must not exist. The driver creates a fresh disposable accou
 
 For revision 377, select `tutorial`, `mainland`, or `instance`. The latter two require `--harness-lib` naming the operator-approved account helper module. Its `mainlandAccount` prepares only the fixture account. The receipt labels every seed operation; no seed is credited as the interaction being proved. No scenario starts, stops, repacks, or edits an engine.
 
-The driver asserts a built scene and a stable route head for five server ticks before each checkpoint. It rejects packet-handler failures and players outside the disposable prefix. It asserts movement, interface results, count-dialog withdrawal, both non-adjacent bank rearrangement modes, instanced scene construction, clean logout, and a same-client relogin. Screenshots and a structured receipt accompany each attempt. A failed attempt is retained, not silently promoted to a recording.
+The driver asserts a built scene and a stable route head for five server ticks before each checkpoint. It rejects packet-handler failures and players outside the disposable prefix. It asserts movement, interface results, count-dialog withdrawal, both non-adjacent bank rearrangement modes, instanced scene construction, clean logout, and a same-client relogin. Successful checkpoints have screenshots. Failure receipts retain allowlisted state and packet byte counts, not arbitrary packet dumps or exception text. A failed attempt is retained, not silently promoted to a recording.
 
 ## Validation boundary
 
 `check-recording` validates membership and frame lengths against an explicit revision's descriptors, session ordering, checkpoint counts, and publication fields. Revision 377 descriptors must match the committed P1 fixture. Required scenario opcodes are separate capture acceptance checks: a well-formed recording alone does not prove that the intended actions occurred.
+
+The strict client consumes the fixed `HINT_ARROW` padding for NPC, player, and clear variants. The production-handler regression checks all six bytes and the decoded target values; it does not bypass the packet-consumption guard.
 
 Check a committed recording and its index entry with:
 

@@ -22,6 +22,8 @@ interface CaptureClient {
     bankArrangeMode?: number;
     ptype: number;
     ptype0: number;
+    psize: number;
+    in: { pos: number };
     stream: { available: number } | null;
     tcpIn?: () => Promise<boolean>;
     readPacket?: () => Promise<boolean>;
@@ -45,6 +47,7 @@ interface Observer {
     segment: number;
     foreignPlayer: boolean;
     packetFailure: boolean;
+    packetFailureDetails?: CaptureSnapshot['packetFailureDetails'];
     state(): CaptureSnapshot;
 }
 interface CaptureWindow {
@@ -67,6 +70,7 @@ export interface CaptureSnapshot {
     bankArrangeMode: number;
     foreignPlayer: boolean;
     packetFailure: boolean;
+    packetFailureDetails?: { opcode: number; previousOpcode: number; declared: number; consumed: number; kind: string; message?: string };
 }
 
 /** Observe the existing client. No client or harness bundle is changed. */
@@ -94,7 +98,7 @@ export async function installObserver(page: Page, prefix: string, playerInfoOpco
                     moving: (p?.routeLength ?? 0) > 0, remaining: c.onDemand?.remaining() ?? -1,
                     main: c.mainModalId, chat: c.chatModalId, side: c.sideModalId,
                     countDialog: c.chatbackInputOpen === 1 || c.dialogInputOpen === true, bankArrangeMode: c.bankArrangeMode ?? 0,
-                    foreignPlayer: o.foreignPlayer, packetFailure: o.packetFailure
+                    foreignPlayer: o.foreignPlayer, packetFailure: o.packetFailure, packetFailureDetails: o.packetFailureDetails
                 };
             }
         };
@@ -105,7 +109,16 @@ export async function installObserver(page: Page, prefix: string, playerInfoOpco
             const ingame = c.ingame;
             let result: boolean;
             try { result = await original.call(c); }
-            catch { o.packetFailure = true; throw new Error('capture observed a packet-handler failure'); }
+            catch (error) {
+                o.packetFailure = true;
+                const message = error instanceof Error && /^(?:packet \d+ declared \d+ bytes, consumed \d+|T1 - [-\d, ]+)$/.test(error.message) ? error.message : undefined;
+                o.packetFailureDetails = {
+                    opcode: c.ptype, previousOpcode: c.ptype0, declared: c.psize, consumed: c.in.pos,
+                    kind: error instanceof TypeError ? 'TypeError' : error instanceof RangeError ? 'RangeError' : 'Error',
+                    ...(message ? { message } : {})
+                };
+                throw new Error('capture observed a packet-handler failure');
+            }
             if (c.ptype === -1 && (result || (ingame && !c.ingame))) {
                 o.inboundCount++;
                 if (c.ptype0 === playerInfoOpcode) o.tick++;

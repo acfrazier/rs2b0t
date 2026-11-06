@@ -6902,6 +6902,9 @@ export class Client extends GameShell {
 
                 if (this.hintType === 1) {
                     this.hintNpc = this.in.g2();
+                    // HINT_ARROW is always six bytes; entity targets include three padding bytes.
+                    this.in.g2();
+                    this.in.g1();
                 }
 
                 if (this.hintType >= 2 && this.hintType <= 6) {
@@ -6930,6 +6933,13 @@ export class Client extends GameShell {
 
                 if (this.hintType === 10) {
                     this.hintPlayer = this.in.g2();
+                    this.in.g2();
+                    this.in.g1();
+                } else if (this.hintType === 255) {
+                    // HintArrowEncoder encodes the clear variant as -1 followed by five zero bytes.
+                    this.in.g2();
+                    this.in.g2();
+                    this.in.g1();
                 }
 
                 this.ptype = -1;

@@ -6,6 +6,7 @@ import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import { assertPacketConsumed } from '#/client/io/packetGuard.js';
 import Packet from '#/client/io/Packet.js';
 import OnDemand, { type OnDemandWorker } from '#/client/io/OnDemand.js';
+import { ServerProt } from '#/client/io/ServerProt.js';
 
 import { skipUnless } from '../lib/skipUnless.js';
 import type { FrameRecord, LoginRecord, Protocol } from '../../tools/tap-377/format.js';
@@ -175,4 +176,37 @@ describe.skipIf(missingIndex || missingEngine || missingCacheBundle)('production
             gameSockets: false
         });
     });
+});
+
+test('production HINT_ARROW consumes entity and clear padding without skipping the packet guard', async () => {
+    // Load the browser client after the test preload and audio boundaries have been installed.
+    const { Client } = await import('#/client/shell/Client.js');
+    const client = Object.create(Client.prototype) as InstanceType<typeof Client>;
+    Object.assign(client, { in: new Packet(new Uint8Array(32)), ptype: -1, ptype0: -1, ptype1: -1, ptype2: -1, psize: 0, randomIn: null });
+    const decode = async (body: number[]): Promise<void> => {
+        const wire = Uint8Array.from([ServerProt.HINT_ARROW, ...body]);
+        let position = 0;
+        Reflect.set(client, 'stream', {
+            get available() { return wire.length - position; },
+            msSinceData: 0,
+            async read() { return wire[position++]; },
+            async readBytes(destination: Uint8Array, offset: number, length: number) {
+                destination.set(wire.subarray(position, position + length), offset);
+                position += length;
+            },
+            write() {}, close() {}
+        });
+        expect(await Reflect.get(client, 'tcpIn').call(client)).toBe(true);
+        expect(Reflect.get(client, 'in').pos).toBe(6);
+        expect(position).toBe(wire.length);
+    };
+    await decode([1, 1, 44, 0, 0, 0]);
+    expect(Reflect.get(client, 'hintNpc')).toBe(300);
+    await decode([10, 0, 7, 0, 0, 0]);
+    expect(Reflect.get(client, 'hintPlayer')).toBe(7);
+    await decode([2, 12, 128, 12, 129, 16]);
+    expect(Reflect.get(client, 'hintTileX')).toBe(3200);
+    expect(Reflect.get(client, 'hintTileZ')).toBe(3201);
+    await decode([255, 0, 0, 0, 0, 0]);
+    expect(Reflect.get(client, 'hintType')).toBe(255);
 });
