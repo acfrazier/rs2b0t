@@ -346,6 +346,8 @@ export interface IntegratedJson {
     members: {
         total: number;
         groups: Record<string, number>;
+        published: number;
+        publicationHeld: number;
         zeroLeaves: Array<{ owner: string; member: string; file: string; line: number; okind: string | null; ownerXrefs: number }>;
         docHeldZero: MemberOutRow[];
         privateCandidates: MemberOutRow[];
@@ -378,6 +380,8 @@ export function integrateCensus(input: {
     conduits: Pick<ConduitsJson, 'total' | 'resolved' | 'unresolved' | 'mappedRows'>;
 }): IntegratedJson {
     const publishedRows = input.exportRows.filter(row => row.published);
+    const publishedMembers = input.members.filter(row => row.status === 'published');
+    const publicationHeldMembers = input.members.filter(row => row.status === 'publication-held');
     const sourceTestCandidates = input.candidates.filter(row => row.file.startsWith('src/') && row.group === 'G3-testonly');
     const sourceTestOnly = sourceTestCandidates.filter(row => row.sameFileValue === 0);
     const testOnlyMembers = input.members.filter(row => row.status === 'candidate' && row.group === 'G3-testonly');
@@ -388,7 +392,7 @@ export function integrateCensus(input: {
         base: input.scope.base,
         snapshot: input.scope.root,
         scope: input.scope,
-        method: 'Generated from the final raw census outputs. Compiler-option-aware module resolution maps named, star, and namespace re-exports to checker-resolved source declarations; aliases/default identifiers and transitive heritage are included. Publication and structural/documentation holds remain conservative.',
+        method: 'Generated from the final raw census outputs. Compiler-option-aware module resolution maps named, star, and namespace re-exports to checker-resolved source declarations; aliases/default identifiers and transitive heritage are included. Publication and structural/documentation holds remain conservative. Extra-root members are publication-held, not published.',
         exports: {
             total: input.exportRows.length,
             protected: publishedRows.length,
@@ -404,6 +408,8 @@ export function integrateCensus(input: {
         members: {
             total: input.members.length,
             groups: countBy(input.members.map(row => row.group)),
+            published: publishedMembers.length,
+            publicationHeld: publicationHeldMembers.length,
             zeroLeaves: input.members
                 .filter(row => row.status === 'candidate' && ['method', 'accessor'].includes(row.mkind) && row.group === 'G0-noref' && ['class', 'instance'].includes(row.okind ?? '') && !row.docsHold)
                 .map(({ owner, member, file, line, okind, ownerXrefs }) => ({ owner, member, file, line, okind, ownerXrefs })),
@@ -422,7 +428,8 @@ export function integrateCensus(input: {
             'Conduit resolution follows tsconfig compiler options; unresolved conduit targets and their source specifiers remain in conduits.json.',
             'Generated CommonJS surfaces and nested object/returned-shape members are held and not claimed as exhaustively enumerated.',
             'Observed test-only direct references do not prove absence of structural or dynamic dispatch; the removal gate still applies.',
-            'This is a static inventory of the configured source, test, e2e, tools, and named root scope; it does not establish runtime consumers outside that scope.'
+            'This is a static inventory of the configured source, test, e2e, tools, and named root scope; it does not establish runtime consumers outside that scope.',
+            'Member status published is the npm barrel and docs-held surfaces. Extra __rs2b0t root members are publication-held. Both stay protected from removal.'
         ]
     };
 }
@@ -454,6 +461,8 @@ export interface CensusArtifacts {
         groups: Record<string, number>;
         memberRows: number;
         memberGroups: Record<string, number>;
+        publishedMembers: number;
+        publicationHeldMembers: number;
         thisFallback: number;
         dtsCollisions: number;
         mappedBindings: number;
@@ -540,6 +549,7 @@ function loadContractPairs(root: string): Set<string> {
     return pairs;
 }
 
+/** Extra `__rs2b0t` roots absent from index.js. Their members stay publication-held. */
 function addInstalledExtraRootPairs(pairs: Set<string>, checker: ts.TypeChecker, entries: ReadonlyArray<{ key: string; node: ts.Identifier | null }>, packageKeys: ReadonlySet<string>): void {
     for (const entry of entries) {
         if (packageKeys.has(entry.key) || !entry.node) {
@@ -1216,7 +1226,8 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
     };
     const ownerDynByType = new Set<string>();
     const contractPairs = loadContractPairs(ROOT);
-    addInstalledExtraRootPairs(contractPairs, checker, ABI_ENTRIES, P_JS_SET);
+    const extraRootPairs = new Set<string>();
+    addInstalledExtraRootPairs(extraRootPairs, checker, ABI_ENTRIES, P_JS_SET);
     interface MemberRow {
         owner: string;
         okind: 'class' | 'object' | 'instance';
@@ -1228,6 +1239,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
         prot: boolean;
         hook: boolean;
         publishedPair: boolean;
+        publicationHeld: boolean;
         overridesPublished: boolean;
         retainedDispatch?: boolean;
         retainedWhy: string | null;
@@ -1335,6 +1347,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
                         prot: isProt,
                         hook: false,
                         publishedPair: false,
+                        publicationHeld: false,
                         overridesPublished: false,
                         retainedWhy: null,
                         nameStart: nameNode ? nameNode.getStart(sf) : m.getStart(sf),
@@ -1346,6 +1359,8 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
                         row.retainedWhy = 'protected-extension-hook';
                     } else if (contractPairs.has(o.name + '.' + nm)) {
                         row.publishedPair = true;
+                    } else if (extraRootPairs.has(o.name + '.' + nm)) {
+                        row.publicationHeld = true;
                     } else if (o.name === 'reader') {
                         row.publishedPair = true;
                         row.retainedWhy = 'reader90-retained';
@@ -1366,7 +1381,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
                             }
                             const bname = bsym.name;
                             for (const row of memberRows) {
-                                if (row.file !== f || row.owner !== o.name || row.publishedPair || row.hook || row.retainedDispatch) {
+                                if (row.file !== f || row.owner !== o.name || row.publishedPair || row.publicationHeld || row.hook || row.retainedDispatch) {
                                     continue;
                                 }
                                 if (baseNames.has(row.member) && (contractPairs.has(bname + '.' + row.member) || bname === 'reader')) {
@@ -1423,7 +1438,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
     }
     for (const r of memberRows) {
         const pin = DISPATCH_PINNED.find(d => d.owner === r.owner && d.member === r.member && (!d.file || (r.exportFile ?? r.file) === d.file));
-        if (pin && !r.publishedPair && !r.hook && !r.overridesPublished && !r.retainedDispatch) {
+        if (pin && !r.publishedPair && !r.publicationHeld && !r.hook && !r.overridesPublished && !r.retainedDispatch) {
             r.retainedDispatch = true;
             r.retainedWhy = 'pinned:' + pin.why;
         }
@@ -1432,7 +1447,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
     {
         for (let i = 0; i < memberRows.length; i++) {
             const r = memberRows[i];
-            if (r.publishedPair || r.hook || r.overridesPublished || r.retainedDispatch) {
+            if (r.publishedPair || r.publicationHeld || r.hook || r.overridesPublished || r.retainedDispatch) {
                 continue;
             }
             const sf = program.getSourceFile(join(ROOT, r.file));
@@ -1576,6 +1591,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
                         prot: isProt,
                         hook: false,
                         publishedPair: false,
+                        publicationHeld: false,
                         overridesPublished: false,
                         retainedWhy: null,
                         nameStart: m.name ? m.name.getStart(csf) : m.getStart(csf),
@@ -1587,6 +1603,8 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
                         row.retainedWhy = 'protected-extension-hook';
                     } else if (contractPairs.has(io.owner + '.' + nm)) {
                         row.publishedPair = true;
+                    } else if (extraRootPairs.has(io.owner + '.' + nm)) {
+                        row.publicationHeld = true;
                     } else if (io.owner === 'reader') {
                         row.publishedPair = true;
                         row.retainedWhy = 'reader90-retained';
@@ -1610,7 +1628,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
                     }
                     const idx = memberRows.length;
                     memberRows.push(row);
-                    if (row.declKey && !row.publishedPair && !row.hook && !row.overridesPublished) {
+                    if (row.declKey && !row.publishedPair && !row.publicationHeld && !row.hook && !row.overridesPublished) {
                         if (!memberSymDecl.has(row.declKey)) {
                             memberSymDecl.set(row.declKey, []);
                         }
@@ -1621,11 +1639,11 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
             }
         }
     }
-    const memberNames = new Set(memberRows.filter(r => !r.publishedPair && !r.hook && !r.overridesPublished && !r.retainedDispatch).map(r => r.member));
+    const memberNames = new Set(memberRows.filter(r => !r.publishedPair && !r.publicationHeld && !r.hook && !r.overridesPublished && !r.retainedDispatch).map(r => r.member));
     const memberIdxByName = new Map<string, number[]>();
     for (let i = 0; i < memberRows.length; i++) {
         const r = memberRows[i];
-        if (r.publishedPair || r.hook || r.overridesPublished || r.retainedDispatch) {
+        if (r.publishedPair || r.publicationHeld || r.hook || r.overridesPublished || r.retainedDispatch) {
             continue;
         }
         if (!memberIdxByName.has(r.member)) {
@@ -2178,7 +2196,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
 
     const members: MemberOutRow[] = memberRows.map((r, j) => {
         const b = mbuckets.get(j) ?? newRefBucket();
-        const status = r.publishedPair ? 'published' : r.hook ? 'retained-hook' : r.overridesPublished ? 'retained-override' : r.retainedDispatch ? 'retained-dispatch' : 'candidate';
+        const status = r.publishedPair ? 'published' : r.publicationHeld ? 'publication-held' : r.hook ? 'retained-hook' : r.overridesPublished ? 'retained-override' : r.retainedDispatch ? 'retained-dispatch' : 'candidate';
         let group: string = status === 'candidate' ? classifyExportGroup(b, b.sameV, b.sameT) : status;
         const dynOwner = dynamicOwners.has(r.file + ':' + r.owner) || ownerDynByType.has(r.file + ':' + r.owner);
         if (status === 'candidate' && group === 'G0-noref' && dynOwner) {
@@ -2387,6 +2405,8 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
             groups,
             memberRows: members.length,
             memberGroups,
+            publishedMembers: members.filter(row => row.status === 'published').length,
+            publicationHeldMembers: members.filter(row => row.status === 'publication-held').length,
             thisFallback: thisFallbackHits.length,
             dtsCollisions: dtsOnlyDecisions.length,
             mappedBindings

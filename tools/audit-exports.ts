@@ -38,7 +38,7 @@ if (import.meta.main) {
     const integrated = result.integrated;
     const g0 = integrated.exports.rawExternalConsumerGroups['G0-noref'] ?? 0;
     console.log(
-        `audit:exports — ${integrated.exports.total} bindings, ${integrated.exports.protected} protected, ${g0} G0, ${integrated.exports.sourceTestOnlyCount} source-test-only, ${integrated.conduits.resolved}/${integrated.conduits.total} conduits resolved`
+        `audit:exports — ${integrated.exports.total} bindings, ${integrated.exports.protected} protected, ${g0} G0, ${integrated.exports.sourceTestOnlyCount} source-test-only, ${integrated.conduits.resolved}/${integrated.conduits.total} conduits resolved, ${integrated.members.published} published members, ${integrated.members.publicationHeld} publication-held members`
     );
     console.log(`wrote ${resolve(out)}/integrated.json`);
 }

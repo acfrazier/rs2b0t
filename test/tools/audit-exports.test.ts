@@ -409,7 +409,7 @@ describe('runExportCensus fixtures', () => {
         }
     });
 
-    test('extra ABI-installed members stay held; package-only unused members do not', () => {
+    test('extra-root members are publication-held; npm barrel members are published', () => {
         const root = fixtureRoot();
         try {
             writeTree(root, {
@@ -432,13 +432,14 @@ describe('runExportCensus fixtures', () => {
 
             const extra = result.members.find(m => m.owner === 'ExtraRoot' && m.member === 'installedMethod');
             expect(extra).toBeDefined();
-            expect(extra!.status).toBe('published');
+            expect(extra!.status).toBe('publication-held');
+            expect(extra!.group).toBe('publication-held');
             expect(extra!.via).toBe('abi-installed');
             expect(result.integrated.members.zeroLeaves.some(row => row.owner === 'ExtraRoot' && row.member === 'installedMethod')).toBe(false);
 
             const note = result.members.find(m => m.owner === 'EssenceSession' && m.member === 'noteEntry');
             expect(note).toBeDefined();
-            expect(note!.status).toBe('published');
+            expect(note!.status).toBe('publication-held');
             expect(result.integrated.members.testOnlyObserved.some(row => row.owner === 'EssenceSession' && row.member === 'noteEntry')).toBe(false);
 
             const reset = result.members.find(m => m.owner === 'EssenceSession' && m.member === '_resetForTests');
@@ -452,6 +453,9 @@ describe('runExportCensus fixtures', () => {
 
             const declared = result.members.find(m => m.owner === 'PackageRoot' && m.member === 'declared');
             expect(declared?.status).toBe('published');
+            expect(declared?.group).toBe('published');
+            expect(result.integrated.members.published).toBeGreaterThanOrEqual(1);
+            expect(result.integrated.members.publicationHeld).toBeGreaterThanOrEqual(2);
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
