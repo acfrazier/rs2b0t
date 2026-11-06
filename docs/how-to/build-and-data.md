@@ -1,0 +1,63 @@
+[Manual](../README.md) › [Running locally](../RUNNING.md) › Build and data plumbing
+
+# Build and data plumbing
+
+## Build every target
+
+`bun run build:all-targets` builds every browser and worker entry (`client`, `mapview`,
+`ondemandworker`, `botclient`, `multibox`, `navworker`) for the `local` and `prod` targets,
+with both strict flags baked in and one build identity across the two bundlers. CI runs it,
+and `test/tools/bundleDefines.test.ts` then requires every output.
+
+`TARGET=prod` needs the game server's public pair, `PROD_RSAE` and `PROD_RSAN`. A hosted
+runner has neither, so it passes `--dummy-rsa`: the artifact bakes a fixed public test pair,
+`out/version.json` reads `"rsa": "dummy"`, and `tools/pack-rs2b0t.sh` and
+`deployIsolatedClient` refuse to deploy it. A dummy compile proves the target builds; it
+proves nothing about login.
+
+```sh
+bun run build:all-targets -- --dummy-rsa   # compile check, nothing to deploy
+bun run build:all-targets                  # deploy build, needs PROD_RSAE/PROD_RSAN
+bun run build:all-targets -- --plan        # print the matrix without building
+```
+
+## Data manifest, staging and the cutover
+
+`data/manifest.json` records the engine and content commits the data came from, the sha256
+of the engine's `data/pack/client/{config,interface}` archives, the generator script hashes,
+and every artifact's hash, kind and qualification. Three readers:
+
+- `bun tools/lib/manifest.ts verify`: every listed artifact and generator still has its
+  recorded hash. Hosted CI runs it; a generator edited without regenerating fails it.
+- `bun tools/lib/manifest.ts archives <engine>`: the engine serving a run has the archives
+  the data was derived from. `tools/pack-rs2b0t.sh` and `deployIsolatedClient` run the same
+  check and refuse a mismatch.
+- `bun tools/cutover-377.ts`: moves `data/377/<repo path>` onto its repo path, deletes the
+  staging tree and the 289 recordings, and rewrites the manifest. It refuses an unlisted
+  staged file or a hash mismatch before moving anything.
+
+Until the cutover, `data/377/` is tracked but inert: `bunfig.toml` roots test discovery at
+`test/`, `tsconfig.json` excludes the tree and eslint ignores it.
+`test/repo/stagingInert.test.ts` keeps a throwing test and an unresolvable import there, so
+removing one of the three exclusions fails the suite.
+
+## What a run did not check
+
+A test that needs a local input prints one `SKIP: <file>: <reason>` line from
+`test/lib/skipUnless.ts`, in five input-keyed groups: `ENGINE_DIR` (absent or on another
+revision), `CONTENT_DIR`, `RS2B0T_CACHE_BUNDLE`, `out/collision.lcnav.gz`, and the prod key
+pair, which never skips because the dummy compile covers it. CI copies those lines into its
+job summary.
+
+A content- or engine-backed `--check` is a local, mandatory gate: `driftVerdict` fails a
+receipt whose skip list names any of the first four groups, so a green hosted run is never a
+substitute for the local `bun run e2e -- --gates-only` receipt.
+
+## Publication guard
+
+`test/repo/publicBoundary.test.ts` scans the Git index for absolute home-directory paths
+(`/Users`, `/Volumes`), PEM armour and private-key material, `password` query values, and
+tracked `.pem`/`.rs2`/`.loc`/`.npc`/`.obj`/`.inv`/`.pack` files. Upstream `main` carries 14
+such matches; they are frozen in `test/repo/publicBoundary.allow.json` by path, rule, exact
+text and reason. Any other match fails, and an entry that stops matching fails too. The list
+grows only at an upstream merge, for lines upstream carries.

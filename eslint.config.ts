@@ -16,7 +16,8 @@ const APP_ENTRYPOINT = {
 };
 
 export default defineConfig([
-    globalIgnores(['src/client/3rdparty/', 'out/', 'desktop/', 'packages/', 'docs/script-template/', 'public-bot/', '.claude/', 'identifier.js']),
+    // Why: data/377/ is the tracked, inert 377 staging tree; its imports resolve only after the cutover.
+    globalIgnores(['src/client/3rdparty/', 'out/', 'desktop/', 'packages/', 'docs/script-template/', 'public-bot/', '.claude/', 'identifier.js', 'data/377/']),
     { files: ['**/*.{js,mjs,cjs,ts,mts,cts}'], plugins: { js }, extends: ['js/recommended'], languageOptions: { globals: globals.browser } },
     tseslint.configs.recommended,
     {

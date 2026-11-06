@@ -4,20 +4,19 @@ import path from 'path';
 import { minify } from 'terser';
 
 import { nth_identifier } from './identifier.js';
-import { buildIdentityDefines, resolveBuildIdentity } from './tools/lib/buildIdentity.js';
+import { buildDefines, resolveBuildIdentity } from './tools/lib/buildIdentity.js';
 
-const define = {
-    'process.env.SECURE_ORIGIN': JSON.stringify(process.env.SECURE_ORIGIN ?? 'false'),
-    // Why: config/target.ts reads this unconditionally; leaving it undefined puts a ReferenceError in the browser bundle.
-    'process.env.RS2B0T_TARGET': JSON.stringify(process.env.RS2B0T_TARGET ?? 'local'),
-    // original key, used 2003-2010
-    'process.env.LOGIN_RSAE': JSON.stringify(process.env.LOGIN_RSAE ?? '58778699976184461502525193738213253649000149147835990136706041084440742975821'),
-    'process.env.LOGIN_RSAN': JSON.stringify(process.env.LOGIN_RSAN ?? '7162900525229798032761816791230527296329313291232324290237849263501208207972894053929065636522363163621000728841182238772712427862772219676577293600221789'),
-    // Config decoders enable strict mode only for '1'.
-    'process.env.STRICT_PACKETS': JSON.stringify(process.env.STRICT_PACKETS ?? ''),
-    'process.env.STRICT_CONFIG': JSON.stringify(process.env.STRICT_CONFIG ?? ''),
-    ...buildIdentityDefines(resolveBuildIdentity())
+// Why: config/target.ts reads this unconditionally; leaving it undefined puts a ReferenceError in the browser bundle.
+const TARGET_NAME = process.env.RS2B0T_TARGET ?? 'local';
+
+// The original key, used 2003-2010. Only the login block of this client uses it; the bot build bakes
+// the target engine's pair, and build:all-targets builds both with one identity.
+const CLIENT_RSA = {
+    rsae: process.env.LOGIN_RSAE ?? '58778699976184461502525193738213253649000149147835990136706041084440742975821',
+    rsan: process.env.LOGIN_RSAN ?? '7162900525229798032761816791230527296329313291232324290237849263501208207972894053929065636522363163621000728841182238772712427862772219676577293600221789'
 };
+
+const define = buildDefines(resolveBuildIdentity(), TARGET_NAME, CLIENT_RSA);
 
 
 type BunOutput = {
@@ -149,7 +148,12 @@ if (!fs.existsSync('out')) {
 fs.copyFileSync('src/client/3rdparty/tinymidipcm/tinymidipcm.wasm', 'out/tinymidipcm.wasm');
 
 const args = process.argv.slice(2);
-const prod = args[0] !== 'dev';
+const unknown = args.filter(arg => arg !== 'dev');
+if (unknown.length > 0) {
+    console.error(`unknown argument(s): ${unknown.join(', ')}`);
+    process.exit(2);
+}
+const prod = !args.includes('dev');
 
 const entrypoints = [
     'src/client/shell/Client.ts',

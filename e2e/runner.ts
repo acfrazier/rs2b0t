@@ -13,7 +13,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Why: e2e-report stays on the tools side because it needs no browser; e2e may import tools.
-import { driftVerdict, errorTail } from '../tools/lib/e2e-report.js';
+import { driftVerdict, errorTail, parseSkips } from '../tools/lib/e2e-report.js';
+import type { SkipLine } from '../tools/lib/e2e-report.js';
 import { CASES } from './manifest.js';
 import { casesForLevel, selectByChanges } from './manifestQuery.js';
 import type { Case, Level } from './manifestTypes.js';
@@ -31,7 +32,12 @@ const DEFAULT_BUDGET = 12;
 
 /** Optional output verdict that overrides the process exit code. */
 // Why: generators may report STALE before an unrelated audio-shim teardown failure.
+// Why: it also fails a gate that skipped a local input (pitfalls 10, 29), so a receipt cannot
+// quote a green gate that never read its content or engine.
 const DRIFT = driftVerdict;
+
+/** Every `SKIP:` line a gate printed, kept for the report and the end-of-run summary. */
+const SKIPS: { gate: string; skip: SkipLine }[] = [];
 
 interface Gate { name: string; cmd: string[]; verdict?: (text: string) => Status; }
 const OFFLINE_GATES: Gate[] = [
@@ -141,6 +147,12 @@ async function run(label: string, cmd: string[], logFile: string, budgetMs: numb
 const mins = (ms: number): string => `${(ms / 60000).toFixed(1)}m`;
 const ICON: Record<Status, string> = { pass: '✅', fail: '❌', timeout: '⏱', skip: '⏭' };
 
+function skipSection(): string {
+    if (SKIPS.length === 0) return '## Skipped checks\n\nNone.\n';
+    const rows = SKIPS.map(({ gate, skip }) => `| ${gate} | ${skip.file} | ${skip.reason} | ${skip.input ?? 'other'} |`).join('\n');
+    return `## Skipped checks\n\n| Gate | Test | Reason | Group |\n|---|---|---|---|\n${rows}\n`;
+}
+
 function report(now: Run, before: Run | null): string {
     const prev = new Map((before?.results ?? []).map(r => [r.name, r.status]));
     const newlyBroken = now.results.filter(r => r.status !== 'pass' && prev.get(r.name) === 'pass');
@@ -175,6 +187,7 @@ function report(now: Run, before: Run | null): string {
         section('Failing, no baseline entry', untracked, 'Nothing new and failing.'),
         '## Everything\n\n| Item | Status | Time | Last output |\n|---|---|---|---|\n' +
             now.results.map(r => `| ${ICON[r.status]} ${r.name} | ${r.status} | ${mins(r.ms)} | ${r.note} |`).join('\n') + '\n',
+        skipSection(),
         `Logs: \`${LOGS}/\`\n`
     ].join('\n');
 }
@@ -210,7 +223,9 @@ const now: Run = { startedAt: new Date().toISOString(), git, level, results: [] 
 console.log(`e2e: level=${level} commit=${git}`);
 
 for (const { name, cmd, verdict } of OFFLINE_GATES) {
-    const r = await run(name, cmd, join(LOGS, `${name.replace(/\W+/g, '-')}.log`), 20 * 60_000, verdict);
+    const logPath = join(LOGS, `${name.replace(/\W+/g, '-')}.log`);
+    const r = await run(name, cmd, logPath, 20 * 60_000, verdict);
+    for (const skip of parseSkips(readFileSync(logPath, 'utf8'))) SKIPS.push({ gate: name, skip });
     now.results.push({ name, kind: 'gate', status: r.status, ms: r.ms, note: r.status === 'pass' ? '' : r.tail });
     console.log(`  ${ICON[r.status]} ${name} (${mins(r.ms)})${r.status === 'pass' ? '' : `\n      ${r.tail}`}`);
 }
@@ -272,6 +287,10 @@ writeFileSync(join(OUT, 'report.md'), md);
 writeFileSync(LATEST, JSON.stringify(now, null, 1));
 
 console.log(`\n${md.split('## Everything')[0]}`);
+if (SKIPS.length > 0) {
+    console.log(`skips: ${SKIPS.length}`);
+    for (const { gate, skip } of SKIPS) console.log(`  ${gate}: ${skip.file}: ${skip.reason}`);
+}
 console.log(`report: ${OUT}/report.md`);
 
 const broken = now.results.filter(r => r.status !== 'pass' && r.status !== 'skip').length;

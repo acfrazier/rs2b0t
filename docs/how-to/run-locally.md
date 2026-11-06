@@ -116,8 +116,9 @@ bun run smoke                                     # against localhost:8890
 bun run smoke http://localhost:8888 user pass     # another engine, named account
 ```
 
-`bunfig.toml` preloads `test/setup-dom.ts`, which registers happy-dom globally. That is
-what lets DOM-touching modules be imported in unit tests.
+`bunfig.toml` preloads `test/setup-dom.ts`, which registers happy-dom globally and sets
+`STRICT_PACKETS=1 STRICT_CONFIG=1` before any client class is defined; that is what lets DOM
+tests import client modules, and what makes a bad packet or config opcode fail under `bun test`.
 
 `bun run lint` must pass before opening a pull request.
 
@@ -125,6 +126,10 @@ what lets DOM-touching modules be imported in unit tests.
 so `prettier --write .` produces an enormous unrelated diff.
 
 `bun run smoke` does **not** deploy, deploy first or it loads a stale client.
+
+## Build and data plumbing
+
+`bun run build:all-targets`, the manifest, the `data/377/` cutover and the skip groups: [build and data](build-and-data.md).
 
 ## Maintainer appendix
 
