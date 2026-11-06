@@ -14,15 +14,17 @@ The external contract is the union of all three, not the npm barrel alone:
    properties, inherited members, callable results, and protected subclass hooks
    such as `TaskBot.add`.
 2. Properties installed on `globalThis.__rs2b0t`. Fourteen of those roots are
-   absent from the npm barrel and stay held until a publication ruling.
+   absent from the npm barrel; their members stay publication-held until a
+   publication ruling.
 3. Surfaces named on the linked pages below, including `Paint.begin`,
    `paintState`, the `PaintFrame` widgets plus `end`, `RunManager.override`,
    `Prayer`, `EssenceSession`, `nearestAltar`, `BUILD_INFO`, `PartnerTrade`,
    cooking ranges, `locRef`, and `Area.rectangular` / `Area.circular`.
 
 `reader` is an untyped record; its current public methods stay held. Installing a
-runtime member does not publish it. `bun run check:api-contract` fails if a held
-name in this union disappears.
+runtime member does not publish it, but a runtime member that `index.d.ts` lacks
+fails CI, and a `@internal` JSDoc tag keeps a member off the contract.
+`bun run check:api-contract` also fails if a held name in this union disappears.
 
 ## Pages
 
