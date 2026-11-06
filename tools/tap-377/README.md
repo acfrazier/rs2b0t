@@ -10,6 +10,8 @@ A JSONL file starts with a versioned header: revision, engine/content/client com
 
 The cache bundle is separate from the public recording. It contains the nine archive responses and the compressed OnDemand files requested during capture. `test/io/recordings/index.json` pins both the recording and the cache bundle by SHA-256. Keep cache bundles and receipts in the approved evidence directory; never add the engine key or raw content source to Git.
 
+Archive URLs retain the client's signed CRC suffix, including negative values; the tap forwards them unchanged. The OnDemand factory seam retains one worker per loader until `stop()`, so initialization and subsequent requests reach the same worker. Synthetic tests cover both contracts.
+
 ## Capture driver
 
 Run the reference scenario with the current 289 rs2b0t client first. Prove that recording through the production replay runtime before capturing any 377 scenario. The 377 scenarios use the existing harness page without changing its client or harness bundle.

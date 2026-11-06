@@ -5,6 +5,7 @@ import { describe, expect, mock, test } from 'bun:test';
 import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import { assertPacketConsumed } from '#/client/io/packetGuard.js';
 import Packet from '#/client/io/Packet.js';
+import OnDemand, { type OnDemandWorker } from '#/client/io/OnDemand.js';
 
 import { skipUnless } from '../lib/skipUnless.js';
 import type { FrameRecord, LoginRecord, Protocol } from '../../tools/tap-377/format.js';
@@ -110,6 +111,32 @@ describe('RecordedStream', () => {
         expect(second).toEqual(new Uint8Array([11, 2, 0xa1, 0xa2]));
         expect(stream.consumedInboundCount).toBe(2);
     });
+});
+
+test('OnDemand retains its injected worker, forwards requests, and terminates it once', () => {
+    const messages: unknown[] = [];
+    let created = 0;
+    let terminated = 0;
+    const worker: OnDemandWorker = {
+        onmessage: null, onerror: null,
+        postMessage: message => { messages.push(message); },
+        terminate: () => { terminated++; }
+    };
+    const loader = Object.create(OnDemand.prototype) as OnDemand;
+    Object.assign(loader, {
+        app: { ingame: false, db: null }, worker: null, versions: [], crcs: [], workerAcks: new Map(),
+        workerFactory: () => { created++; return worker; }
+    });
+    Reflect.get(loader, 'startWorker').call(loader);
+    Reflect.get(loader, 'postWorker').call(loader, { type: 'request', archive: 1, file: 7 });
+    expect(created).toBe(1);
+    expect(loader.worker).toBe(worker);
+    expect(messages).toHaveLength(2);
+    expect(messages[1]).toEqual({ type: 'request', archive: 1, file: 7 });
+    loader.stop();
+    loader.stop();
+    expect(terminated).toBe(1);
+    expect(loader.worker).toBeNull();
 });
 
 const recordingIndex = resolve('test/io/recordings/index.json');

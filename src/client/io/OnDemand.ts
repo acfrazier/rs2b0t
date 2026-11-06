@@ -311,6 +311,7 @@ export default class OnDemand extends OnDemandProvider {
         }
 
         const worker = this.workerFactory();
+        this.worker = worker;
         this.lastIngame = this.app.ingame;
 
         worker.onmessage = (event: MessageEvent): void => {

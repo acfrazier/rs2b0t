@@ -9,11 +9,20 @@ import Isaac from '../../src/client/io/Isaac.js';
 import { checkRecording, parseRecording } from '../../tools/tap-377/check-recording.js';
 import { ARCHIVES, type ArchiveName, type Descriptor, type Protocol, type RecordingHeader, type RecordingRecord } from '../../tools/tap-377/format.js';
 import { load377Protocol } from '../../tools/tap-377/protocol.js';
-import { acceptsLoginRequest } from '../../tools/tap-377/tap.js';
+import { acceptsLoginRequest, archiveForRequest } from '../../tools/tap-377/tap.js';
 import { GameFrameDecoder, OnDemandStream } from '../../tools/tap-377/wire.js';
 import { decryptRsaBlock, readRsaPrivateKey, type RsaPrivateKey } from '../../tools/tap-377/rsa.js';
 
 const protocol = load377Protocol();
+
+test('archive capture recognizes signed CRC suffixes without changing the request path', () => {
+    for (const archive of ARCHIVES) {
+        const url = new URL(`http://capture.invalid/${archive}${archive === 'crc' ? '' : '-564448443'}`);
+        expect(archiveForRequest(url)).toBe(archive);
+    }
+    expect(archiveForRequest(new URL('http://capture.invalid/title--1'))).toBeNull();
+    expect(archiveForRequest(new URL('http://capture.invalid/config1/other'))).toBeNull();
+});
 
 describe('tap game wire decoder', () => {
     test('decrypts both directions and handles ISAAC and variable framing across arbitrary chunks', () => {

@@ -637,6 +637,16 @@ class ProxyConnection {
     }
 }
 
+export function archiveForRequest(url: URL): ArchiveName | null {
+    for (const archive of ARCHIVES) {
+        const prefix = `/${archive}`;
+        if (!url.pathname.startsWith(prefix)) continue;
+        const suffix = url.pathname.slice(prefix.length);
+        if (archive === 'crc' ? /^[A-Za-z0-9_-]*$/.test(suffix) : /^(?:-?[0-9]+)?$/.test(suffix)) return archive;
+    }
+    return null;
+}
+
 export async function startTap(options: TapOptions): Promise<TapSession> {
     let engineDirectory: string;
     let engineOrigin: URL;
@@ -713,15 +723,6 @@ export async function startTap(options: TapOptions): Promise<TapSession> {
         ondemand.set(key, bytes.slice());
     };
 
-    const archiveForRequest = (url: URL): ArchiveName | null => {
-        for (const archive of ARCHIVES) {
-            const prefix = `/${archive}`;
-            if (!url.pathname.startsWith(prefix)) continue;
-            const suffix = url.pathname.slice(prefix.length);
-            if (archive === 'crc' ? /^[A-Za-z0-9_-]*$/.test(suffix) : /^(?:[0-9]+)?$/.test(suffix)) return archive;
-        }
-        return null;
-    };
 
     const handleHttp = async (request: Request): Promise<Response> => {
         try {
