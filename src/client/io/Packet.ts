@@ -157,6 +157,192 @@ export default class Packet extends Linkable2 {
         return result;
     }
 
+    // --- 377 alternate encodings from Client-TS 377 ---
+
+    g1_alt1(): number {
+        return (this.data[this.pos++] - 128) & 0xff;
+    }
+
+    g1_alt2(): number {
+        return (-this.data[this.pos++]) & 0xff;
+    }
+
+    g1_alt3(): number {
+        return (128 - this.data[this.pos++]) & 0xff;
+    }
+
+    g1b_alt1(): number {
+        const value = (this.data[this.pos++] - 128) & 0xff;
+        return value > 127 ? value - 256 : value;
+    }
+
+    g1b_alt2(): number {
+        const value = (-this.data[this.pos++]) & 0xff;
+        return value > 127 ? value - 256 : value;
+    }
+
+    g1b_alt3(): number {
+        const value = (128 - this.data[this.pos++]) & 0xff;
+        return value > 127 ? value - 256 : value;
+    }
+
+    g2_alt1(): number {
+        this.pos += 2;
+        return ((this.data[this.pos - 1] & 0xff) << 8) + (this.data[this.pos - 2] & 0xff);
+    }
+
+    g2_alt2(): number {
+        this.pos += 2;
+        return ((this.data[this.pos - 2] & 0xff) << 8) + ((this.data[this.pos - 1] - 128) & 0xff);
+    }
+
+    g2_alt3(): number {
+        this.pos += 2;
+        return ((this.data[this.pos - 1] & 0xff) << 8) + ((this.data[this.pos - 2] - 128) & 0xff);
+    }
+
+    g2s_alt1(): number {
+        return this.g2b_alt1();
+    }
+
+    g2s_alt2(): number {
+        return this.g2b_alt2();
+    }
+
+    g2s_alt3(): number {
+        this.pos += 2;
+        const value = ((this.data[this.pos - 1] & 0xff) << 8) + ((this.data[this.pos - 2] - 128) & 0xff);
+        return value > 32767 ? value - 65536 : value;
+    }
+
+    g2b_alt1(): number {
+        this.pos += 2;
+        let value = ((this.data[this.pos - 1] & 0xff) << 8) + (this.data[this.pos - 2] & 0xff);
+        if (value > 32767) value -= 65536;
+        return value;
+    }
+
+    g2b_alt2(): number {
+        this.pos += 2;
+        let value = ((this.data[this.pos - 2] & 0xff) << 8) + ((this.data[this.pos - 1] - 128) & 0xff);
+        if (value > 32767) value -= 65536;
+        return value;
+    }
+
+    g3_alt1(): number {
+        this.pos += 3;
+        return (
+            ((this.data[this.pos - 1] & 0xff) << 16) +
+            ((this.data[this.pos - 2] & 0xff) << 8) +
+            (this.data[this.pos - 3] & 0xff)
+        );
+    }
+
+    g3_alt2(): number {
+        this.pos += 3;
+        return (
+            ((this.data[this.pos - 3] & 0xff) << 16) +
+            ((this.data[this.pos - 1] & 0xff) << 8) +
+            (this.data[this.pos - 2] & 0xff)
+        );
+    }
+
+    g3_alt3(): number {
+        this.pos += 3;
+        return (
+            (this.data[this.pos - 1] & 0xff) +
+            ((this.data[this.pos - 2] & 0xff) << 16) +
+            ((this.data[this.pos - 3] & 0xff) << 8)
+        );
+    }
+
+    g3s_alt1(): number {
+        this.pos += 3;
+        const value =
+            ((this.data[this.pos - 1] & 0xff) << 16) +
+            ((this.data[this.pos - 2] & 0xff) << 8) +
+            (this.data[this.pos - 3] & 0xff);
+        return value > 0xffffff ? value - 0x1000000 : value;
+    }
+
+    g3s_alt2(): number {
+        this.pos += 3;
+        const value =
+            ((this.data[this.pos - 3] & 0xff) << 16) +
+            ((this.data[this.pos - 1] & 0xff) << 8) +
+            (this.data[this.pos - 2] & 0xff);
+        return value > 0xffffff ? value - 0x1000000 : value;
+    }
+
+    g3s_alt3(): number {
+        this.pos += 3;
+        const value =
+            ((this.data[this.pos - 2] & 0xff) << 16) +
+            ((this.data[this.pos - 3] & 0xff) << 8) +
+            (this.data[this.pos - 1] & 0xff);
+        return value > 0xffffff ? value - 0x1000000 : value;
+    }
+
+    g4_alt1(): number {
+        this.pos += 4;
+        return (
+            (this.data[this.pos - 4] & 0xff) +
+            ((this.data[this.pos - 3] & 0xff) << 8) +
+            ((this.data[this.pos - 1] & 0xff) << 24) +
+            ((this.data[this.pos - 2] & 0xff) << 16)
+        );
+    }
+
+    g4_alt2(): number {
+        this.pos += 4;
+        return (
+            (this.data[this.pos - 3] & 0xff) +
+            ((this.data[this.pos - 4] & 0xff) << 8) +
+            ((this.data[this.pos - 2] & 0xff) << 24) +
+            ((this.data[this.pos - 1] & 0xff) << 16)
+        );
+    }
+
+    g4_alt3(): number {
+        this.pos += 4;
+        return (
+            (this.data[this.pos - 2] & 0xff) +
+            ((this.data[this.pos - 1] & 0xff) << 8) +
+            ((this.data[this.pos - 3] & 0xff) << 24) +
+            ((this.data[this.pos - 4] & 0xff) << 16)
+        );
+    }
+
+    g4s_alt1(): number {
+        this.pos += 4;
+        const value =
+            ((this.data[this.pos - 1] & 0xff) << 24) +
+            ((this.data[this.pos - 2] & 0xff) << 16) +
+            ((this.data[this.pos - 3] & 0xff) << 8) +
+            (this.data[this.pos - 4] & 0xff);
+        return value > 0x7fffffff ? value - 0x100000000 : value;
+    }
+
+    g4s_alt2(): number {
+        this.pos += 4;
+        const value =
+            ((this.data[this.pos - 2] & 0xff) << 24) +
+            ((this.data[this.pos - 1] & 0xff) << 16) +
+            ((this.data[this.pos - 4] & 0xff) << 8) +
+            (this.data[this.pos - 3] & 0xff);
+        return value > 0x7fffffff ? value - 0x100000000 : value;
+    }
+
+    g4s_alt3(): number {
+        this.pos += 4;
+        const value =
+            ((this.data[this.pos - 3] & 0xff) << 24) +
+            ((this.data[this.pos - 4] & 0xff) << 16) +
+            ((this.data[this.pos - 1] & 0xff) << 8) +
+            (this.data[this.pos - 2] & 0xff);
+        return value > 0x7fffffff ? value - 0x100000000 : value;
+    }
+
     g8(): bigint {
         const result: bigint = this.view.getBigInt64(this.pos);
         this.pos += 8;
@@ -182,9 +368,28 @@ export default class Packet extends Linkable2 {
         return str;
     }
 
+
     gdata(length: number, offset: number, dest: Uint8Array | Int8Array): void {
         dest.set(this.data.subarray(this.pos, this.pos + length), offset);
         this.pos += length;
+    }
+
+    gdata_alt1(dest: Uint8Array | Int8Array, offset: number, length: number): void {
+        for (let i = offset + length - 1; i >= offset; i--) {
+            dest[i] = this.data[this.pos++];
+        }
+    }
+
+    gdata_alt2(dest: Uint8Array | Int8Array, offset: number, length: number): void {
+        for (let i = offset; i < offset + length; i++) {
+            dest[i] = (this.data[this.pos++] - 128) & 0xff;
+        }
+    }
+
+    gdata_alt3(dest: Uint8Array | Int8Array, offset: number, length: number): void {
+        for (let i = offset + length - 1; i >= offset; i--) {
+            dest[i] = (this.data[this.pos++] - 128) & 0xff;
+        }
     }
 
     p1Enc(opcode: number): void {
@@ -195,6 +400,18 @@ export default class Packet extends Linkable2 {
         this.view.setUint8(this.pos++, value);
     }
 
+    p1_alt1(value: number): void {
+        this.view.setUint8(this.pos++, (value + 128) & 0xff);
+    }
+
+    p1_alt2(value: number): void {
+        this.view.setUint8(this.pos++, (-value) & 0xff);
+    }
+
+    p1_alt3(value: number): void {
+        this.view.setUint8(this.pos++, (128 - value) & 0xff);
+    }
+
     p2(value: number): void {
         this.view.setUint16(this.pos, value);
         this.pos += 2;
@@ -203,6 +420,21 @@ export default class Packet extends Linkable2 {
     ip2(value: number): void {
         this.view.setUint16(this.pos, value, true);
         this.pos += 2;
+    }
+
+    p2_alt1(value: number): void {
+        this.data[this.pos++] = value;
+        this.data[this.pos++] = value >> 8;
+    }
+
+    p2_alt2(value: number): void {
+        this.data[this.pos++] = value >> 8;
+        this.data[this.pos++] = value + 128;
+    }
+
+    p2_alt3(value: number): void {
+        this.data[this.pos++] = value + 128;
+        this.data[this.pos++] = value >> 8;
     }
 
     p3(value: number): void {
