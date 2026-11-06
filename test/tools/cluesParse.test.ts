@@ -304,3 +304,31 @@ describe('buildClueDb', () => {
         expect(Object.keys(built.db).map(Number).sort((a, b) => a - b)).toEqual([2677, 2694, 2697, 2711]);
     });
 });
+
+describe('buildClueDb — 377 search shape', () => {
+    // 377's trail.param dropped `trail_loc`; the same 58 search objs carry only trail_coord.
+    const OBJ_377 = `
+[trail_clue_easy_simple001]
+name=Clue scroll
+category=trail_clue_easy
+param=trail_desc,Search the chest in the|Duke of Lumbridge's bedroom.
+param=trail_coord,1_50_50_9_18
+tradeable=no
+`;
+
+    test('a coordinate without a casket or trail_loc is still a search row', () => {
+        const built = buildClueDb({
+            clueNames: ['trail_clue_easy_simple001'],
+            objs: parseClueObjs(OBJ_377),
+            objIds: new Map([['trail_clue_easy_simple001', 2677]]),
+            talk: [],
+            npcDisplay: new Map()
+        });
+        expect(built.db[2677]).toEqual({
+            obj: 'trail_clue_easy_simple001',
+            id: 2677,
+            type: 'search',
+            coord: decodeCoord('1_50_50_9_18')
+        });
+    });
+});
