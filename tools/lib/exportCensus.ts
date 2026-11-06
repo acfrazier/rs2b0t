@@ -492,6 +492,26 @@ function hiddenContractMember(sym: ts.Symbol): boolean {
     return false;
 }
 
+function addContractTypeMembers(pairs: Set<string>, checker: ts.TypeChecker, rootName: string, type: ts.Type): void {
+    const ctor = type.getConstructSignatures()[0];
+    if (ctor) {
+        for (const m of checker.getPropertiesOfType(ctor.getReturnType())) {
+            if (!hiddenContractMember(m)) {
+                pairs.add(`${rootName}.${m.getName()}`);
+            }
+        }
+        return;
+    }
+    if (type.getCallSignatures().length > 0 || checker.isArrayLikeType(type)) {
+        return;
+    }
+    for (const m of checker.getPropertiesOfType(type)) {
+        if (!hiddenContractMember(m)) {
+            pairs.add(`${rootName}.${m.getName()}`);
+        }
+    }
+}
+
 function loadContractPairs(root: string): Set<string> {
     const dtsPath = join(root, 'packages/rs2b0t-api/index.d.ts');
     if (!existsSync(dtsPath) || !existsSync(join(root, 'tsconfig.json'))) {
@@ -515,26 +535,31 @@ function loadContractPairs(root: string): Set<string> {
         if (!(resolved.flags & ts.SymbolFlags.Value)) {
             continue;
         }
-        const type = checker.getTypeOfSymbolAtLocation(resolved, source);
-        const ctor = type.getConstructSignatures()[0];
-        if (ctor) {
-            for (const m of checker.getPropertiesOfType(ctor.getReturnType())) {
-                if (!hiddenContractMember(m)) {
-                    pairs.add(`${exp.getName()}.${m.getName()}`);
-                }
-            }
-            continue;
-        }
-        if (type.getCallSignatures().length > 0 || checker.isArrayLikeType(type)) {
-            continue;
-        }
-        for (const m of checker.getPropertiesOfType(type)) {
-            if (!hiddenContractMember(m)) {
-                pairs.add(`${exp.getName()}.${m.getName()}`);
-            }
-        }
+        addContractTypeMembers(pairs, checker, exp.getName(), checker.getTypeOfSymbolAtLocation(resolved, source));
     }
     return pairs;
+}
+
+function addInstalledExtraRootPairs(pairs: Set<string>, checker: ts.TypeChecker, entries: ReadonlyArray<{ key: string; node: ts.Identifier | null }>, packageKeys: ReadonlySet<string>): void {
+    for (const entry of entries) {
+        if (packageKeys.has(entry.key) || !entry.node) {
+            continue;
+        }
+        let sym: ts.Symbol | undefined;
+        try {
+            if (entry.node.parent && ts.isShorthandPropertyAssignment(entry.node.parent)) {
+                sym = checker.getShorthandAssignmentValueSymbol(entry.node.parent);
+            } else {
+                sym = checker.getSymbolAtLocation(entry.node);
+            }
+        } catch {
+            continue;
+        }
+        if (!sym) {
+            continue;
+        }
+        addContractTypeMembers(pairs, checker, entry.key, checker.getTypeOfSymbolAtLocation(sym, entry.node));
+    }
 }
 
 function parseIndexJs(root: string): string[] {
@@ -1191,6 +1216,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
     };
     const ownerDynByType = new Set<string>();
     const contractPairs = loadContractPairs(ROOT);
+    addInstalledExtraRootPairs(contractPairs, checker, ABI_ENTRIES, P_JS_SET);
     interface MemberRow {
         owner: string;
         okind: 'class' | 'object' | 'instance';
@@ -1684,6 +1710,33 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
         }
     };
 
+    const leftmostIdentifier = (e: ts.Expression): ts.Identifier | null => {
+        let cur: ts.Expression = e;
+        while (ts.isPropertyAccessExpression(cur) || ts.isElementAccessExpression(cur)) {
+            cur = cur.expression;
+        }
+        return ts.isIdentifier(cur) ? cur : null;
+    };
+    const namespaceLocal = (file: string, id: ts.Identifier): boolean => {
+        if ((nsLocals.get(file) ?? new Set()).has(id.text)) {
+            return true;
+        }
+        try {
+            const resolved = resolveAlias(checker.getSymbolAtLocation(id));
+            return !!resolved && !!(resolved.flags & (ts.SymbolFlags.Module | ts.SymbolFlags.Namespace));
+        } catch {
+            return false;
+        }
+    };
+    const isNamespacePropertyName = (n: ts.Identifier, file: string): boolean => {
+        const parent = n.parent;
+        if (!parent || !ts.isPropertyAccessExpression(parent) || parent.name !== n) {
+            return false;
+        }
+        const left = leftmostIdentifier(parent.expression);
+        return !!left && namespaceLocal(file, left);
+    };
+
     for (const sf of program.getSourceFiles()) {
         if (!scopeSet.has(sf.fileName)) {
             continue;
@@ -1695,7 +1748,7 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
         const tflag = isTestFileName(f);
         const locals = importedLocals.get(f) ?? new Set<string>();
         const visit = (n: ts.Node): void => {
-            if (ts.isIdentifier(n) && (interest.has(n.text) || locals.has(n.text))) {
+            if (ts.isIdentifier(n) && (interest.has(n.text) || locals.has(n.text) || isNamespacePropertyName(n, f))) {
                 const p = n.parent;
                 let skip = false;
                 let heritage = false;
@@ -1718,19 +1771,12 @@ export function runExportCensus(options: CensusOptions): CensusArtifacts {
                     const isPropCall =
                         !!p && (ts.isPropertyAccessExpression(p) || ts.isElementAccessExpression(p)) && !!p.parent && ((ts.isCallExpression(p.parent) && p.parent.expression === p) || (ts.isNewExpression(p.parent) && p.parent.expression === p));
                     const isCall = isDirectCall || isPropCall;
-                    const leftmost = (e: ts.Expression): ts.Identifier | null => {
-                        let cur: ts.Expression = e;
-                        while (ts.isPropertyAccessExpression(cur) || ts.isElementAccessExpression(cur)) {
-                            cur = cur.expression;
-                        }
-                        return ts.isIdentifier(cur) ? cur : null;
-                    };
                     const isNs =
                         !!p &&
                         (ts.isPropertyAccessExpression(p) || ts.isElementAccessExpression(p)) &&
                         (() => {
-                            const l = leftmost(p.expression);
-                            return !!l && (nsLocals.get(f) ?? new Set()).has(l.text);
+                            const l = leftmostIdentifier(p.expression);
+                            return !!l && namespaceLocal(f, l);
                         })();
                     let sym: ts.Symbol | undefined;
                     let memberAttributed = false;

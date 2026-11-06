@@ -399,9 +399,81 @@ describe('runExportCensus fixtures', () => {
             expect(paint?.publishedVia).toBe('doc-held');
             expect(paint?.published).toBe(true);
 
-            const nsUse = byName('Renamed') ?? byName('Plain');
+            const nsUse = byName('Plain');
             expect(nsUse).toBeDefined();
             expect(nsUse!.group).toBe('G5-live');
+            expect(nsUse!.nsFiles).toContain('src/ns-user.ts');
+            expect(nsUse!.valueSrcFiles).toBeGreaterThan(0);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    test('extra ABI-installed members stay held; package-only unused members do not', () => {
+        const root = fixtureRoot();
+        try {
+            writeTree(root, {
+                'tsconfig.json': fixtureTsconfig,
+                'packages/rs2b0t-api/index.js': 'export const {\n    PackageRoot\n} = abi;\n',
+                'packages/rs2b0t-api/index.d.ts': 'export class PackageRoot {\n    declared(): void;\n}\n',
+                'src/bot/api/pkg.ts': 'export class PackageRoot {\n    declared(): void {}\n    unusedInternal(): void {}\n}\n',
+                'src/extra.ts': 'export class ExtraRoot {\n    installedMethod(): void {}\n}\n',
+                'src/bot/event/webwalk/essenceSession.ts': 'export const EssenceSession = {\n    noteEntry(): void {}\n    _resetForTests(): void {}\n};\n',
+                'src/bot/runtime/abi.ts': [
+                    "import { ExtraRoot } from '../../extra.js';",
+                    "import { PackageRoot } from '../api/pkg.js';",
+                    "import { EssenceSession } from '../event/webwalk/essenceSession.js';",
+                    'export const abi = Object.freeze({ ExtraRoot, PackageRoot, EssenceSession });',
+                    ''
+                ].join('\n'),
+                'test/essence.test.ts': "import { EssenceSession } from '../src/bot/event/webwalk/essenceSession.js';\nEssenceSession.noteEntry();\n"
+            });
+            const result = runExportCensus({ root, revision: 'fixture', writeArtifacts: false });
+
+            const extra = result.members.find(m => m.owner === 'ExtraRoot' && m.member === 'installedMethod');
+            expect(extra).toBeDefined();
+            expect(extra!.status).toBe('published');
+            expect(extra!.via).toBe('abi-installed');
+            expect(result.integrated.members.zeroLeaves.some(row => row.owner === 'ExtraRoot' && row.member === 'installedMethod')).toBe(false);
+
+            const note = result.members.find(m => m.owner === 'EssenceSession' && m.member === 'noteEntry');
+            expect(note).toBeDefined();
+            expect(note!.status).toBe('published');
+            expect(result.integrated.members.testOnlyObserved.some(row => row.owner === 'EssenceSession' && row.member === 'noteEntry')).toBe(false);
+
+            const reset = result.members.find(m => m.owner === 'EssenceSession' && m.member === '_resetForTests');
+            expect(reset).toBeDefined();
+            expect(reset!.status).toBe('candidate');
+
+            const unused = result.members.find(m => m.owner === 'PackageRoot' && m.member === 'unusedInternal');
+            expect(unused).toBeDefined();
+            expect(unused!.status).toBe('candidate');
+            expect(unused!.group).toBe('G0-noref');
+
+            const declared = result.members.find(m => m.owner === 'PackageRoot' && m.member === 'declared');
+            expect(declared?.status).toBe('published');
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    test('renamed namespace property calls attribute the declaration owner', () => {
+        const root = fixtureRoot();
+        try {
+            writeTree(root, {
+                'tsconfig.json': fixtureTsconfig,
+                'src/plain.ts': 'export function plainLeaf() { return 11; }\n',
+                'src/renamed.ts': "export { plainLeaf as renamedLeaf } from './plain.js';\n",
+                'src/barrel.ts': "export * from './renamed.js';\nexport * as nsAlias from './renamed.js';\n",
+                'src/consumer.ts': "import * as bridge from './barrel.js';\nimport { nsAlias } from './barrel.js';\nbridge.renamedLeaf();\nnsAlias.renamedLeaf();\n"
+            });
+            const result = runExportCensus({ root, revision: 'fixture', writeArtifacts: false });
+            const leaf = result.candidates.find(row => row.name === 'plainLeaf' && row.file === 'src/plain.ts');
+            expect(leaf).toBeDefined();
+            expect(leaf!.group).toBe('G5-live');
+            expect(leaf!.callsSrc).toBe(2);
+            expect(leaf!.nsFiles).toContain('src/consumer.ts');
+            expect(leaf!.valueSrcFiles).toBeGreaterThan(0);
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
