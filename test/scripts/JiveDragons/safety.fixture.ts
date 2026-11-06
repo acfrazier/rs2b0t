@@ -109,8 +109,6 @@ export async function safetyScenario(kind: 'dragons' | 'kbd' | 'demons', setting
 }
 
 export async function restoreSafety(): Promise<void> {
-    // Why: onStart with solveClues false leaves the module-level SOLVE_CLUES off,
-    // and mock.restore() alone would hand that state to the next file in this
-    // process, which paints no Clue rail.
+    // Why: mock.restore() alone would leave SOLVE_CLUES off for the next file.
     await restoreScenario();
 }

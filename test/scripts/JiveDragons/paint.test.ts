@@ -84,9 +84,7 @@ function paintSection(section: string, page = 'Statistics'): { drawn: Drawn[]; b
     return { drawn, boxes };
 }
 
-// Why: the rails and every widget label come from module-level settings that only
-// onStart writes, and a predecessor test file can leave SOLVE_CLUES off; the default
-// lifecycle makes this file's paint independent of what ran before it.
+// Why: rails come from module settings that a predecessor file can leave changed.
 beforeEach(async () => {
     await resetScenario();
 });

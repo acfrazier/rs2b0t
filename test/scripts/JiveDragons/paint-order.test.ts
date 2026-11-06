@@ -6,12 +6,7 @@ import { paintState, resolveDock } from '#/bot/paint/paintLogic.js';
 import JiveDragons from '#/bot/scripts/JiveDragons/JiveDragons.js';
 import { restoreSafety, safetyScenario } from './safety.fixture.js';
 
-/**
- * Ordering regression for the hosted-CI paint failures: a safety scenario starts
- * JiveDragons with solveClues off, which writes the module-level SOLVE_CLUES.
- * Teardown used to drop its stubs without resetting that global, so a paint later
- * in the same process had no Clue rail and its Clue section never rendered.
- */
+// Why: a safety scenario leaving SOLVE_CLUES off used to strip the Clue rail from a later paint.
 
 const CHAR_W = 7;
 const LINE = 16;
