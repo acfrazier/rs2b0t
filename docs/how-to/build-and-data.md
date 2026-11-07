@@ -44,6 +44,54 @@ cutover validates and moves that source. `build-collision.ts` defaults to
 `out/collision.lcnav` for every revision, and deploy/pack callers name that path explicitly,
 so a revision-specific build cannot overwrite a staged pack.
 
+### Generator output and staging
+
+`tools/lib/genout.ts` resolves where a data generator writes. `--stage <dir>` redirects
+every generated module to `<dir>/<repo path>`, and the matching `--check` follows the same
+resolution, so a staged check compares against the staged file. Without it a generator
+writes at its repo path. That indirection lets preparation slices land green on the 289
+branch while producing 377 artifacts, which cannot sit at their final paths before the
+cutover. `REVISION` selects the revision the generators decode for, defaulting to the
+committed `CLIENT_VERSION`; a generator branches on it only where the 289 and 377 pack
+formats differ.
+
+### The manifest writer
+
+`tools/gen-377-manifest.ts` updates `data/manifest.json` for a staged 377 data build: engine
+and content provenance, toolchain, generator script hashes, and artifact hashes. Scalar
+fields and the listed rows are replaced; artifact rows the run does not name (another
+slice's) are preserved untouched. A staged `out` row uses its final `out/` path and a
+`stagedPath` source under `data/377/`; artifacts are sorted by path.
+
+```sh
+bun tools/gen-377-manifest.ts --revision 377 \
+  --engine-dir <dir> --engine-commit <sha40> --content-commit <sha40> \
+  --node <version> --bun <version> \
+  [--generator <repo path>]… [--artifact <repo path>=<kind>[:<qualification>]]… \
+  [--out-dir <dir>] [--seed-manifest <previous generated manifest>]
+```
+
+A staged artifact is named by its `data/377/<repo path>` source; an `out` artifact there is
+recorded at its post-cutover `out/` path. `--seed-manifest` supplies the previous generated
+manifest only when the current file cannot be parsed, for merge-conflict regeneration.
+
+### Component ids
+
+`tools/gen-ifids.ts` writes `ifIds.ts` under the generated `src/bot/data/` tree: the
+component id for every pack name in `tools/ifids.list`, resolved from the content
+checkout's `pack/interface.pack`. The adapter and `src/bot/api` address components by
+number, and those numbers change per revision, while the Fairy Ring-authored pack names
+do not; the hand-maintained list carries names and the generator resolves them per
+revision.
+
+```sh
+bun tools/gen-ifids.ts [--check] [--stage <dir>]
+```
+
+`CONTENT_DIR` names the content checkout whose `pack/interface.pack` is read (default
+`~/code/rs2b2t-content`), and `REVISION` sets the revision label in the generated header
+comment (default `CLIENT_VERSION`).
+
 Until the cutover, `data/377/` is tracked but inert: `bunfig.toml` roots test discovery at
 `test/`, `tsconfig.json` excludes the tree and eslint ignores it.
 `test/repo/stagingInert.test.ts` keeps a throwing test and an unresolvable import there, so

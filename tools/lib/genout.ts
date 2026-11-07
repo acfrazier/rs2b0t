@@ -1,11 +1,4 @@
-/** Shared output and revision resolution for the data generators.
- *  Why: preparation slices must land green on the 289 branch while producing 377 artifacts, so
- *  377 data cannot sit at its final paths before the cutover (plan §3 "Staging"). `--stage <dir>`
- *  redirects every generated module to `<dir>/<repo path>`, and the `--check` target follows the
- *  same resolution, so a staged check compares against the staged file. `REVISION` selects the
- *  revision the generators decode for, defaulting to the committed `CLIENT_VERSION`; generators
- *  branch on it only where the 289 and 377 pack formats differ.
- */
+/** Why: `--stage <dir>` lets preparation slices land green on the 289 branch while producing 377 artifacts, and `REVISION` selects what the generators decode; see docs/how-to/build-and-data.md. */
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 

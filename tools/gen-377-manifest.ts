@@ -1,23 +1,4 @@
-/** Update `data/manifest.json` for staged 377 data builds: engine and content provenance, toolchain,
- *  generator script hashes, and artifact hashes.
- *  Why: the manifest is the only record tying an artifact to its generator, engine and content
- *  commit (pitfall 10/11); `tools/lib/manifest.ts verify` enforces it everywhere.
- *
- *  Merge semantics: scalar fields and the listed rows are replaced; artifact rows this run does
- *  not name (another slice's) are preserved untouched. Staged `out` rows use their final `out/`
- *  path and a `stagedPath` source under `data/377/`. Artifacts are sorted by path.
- *
- *  Usage:
- *    bun tools/gen-377-manifest.ts --revision 377 \
- *      --engine-dir <dir> --engine-commit <sha40> --content-commit <sha40> \
- *      --node <version> --bun <version> \
- *      [--generator <repo path>]… [--artifact <repo path>=<kind>[:<qualification>]]… \
- *      [--out-dir <dir>] [--seed-manifest <previous generated manifest>]
- *
- *  A staged artifact is named by its `data/377/<repo path>` source; an `out` artifact there is
- *  recorded at its post-cutover `out/` path. `--seed-manifest` supplies the previous generated
- *  manifest only when the current file cannot be parsed (for merge-conflict regeneration).
- */
+/** Why: the manifest is the only record tying an artifact to its generator, engine and content commit, and verify enforces it everywhere; usage in docs/how-to/build-and-data.md. */
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 

@@ -198,9 +198,7 @@ export function buildClueDb(input: BuildInput): ClueDb {
                 row.needsSextant = true;
             }
         } else if (parsed.loc === '^true' || (parsed.coord !== undefined && parsed.casket === undefined)) {
-            // Why: 377's trail.param has no `trail_loc` (all 58 search objs at 289 use it; at 377
-            // the same 58 carry only `trail_coord`), so a coordinate without a casket is the
-            // revision-neutral search marker; dig clues always name a casket.
+            // Why: 377's trail.param has no `trail_loc`, so a coordinate without a casket is the revision-neutral search marker; dig clues always name a casket.
             row.type = 'search';
             if (parsed.coord) {
                 row.coord = decodeCoord(parsed.coord);

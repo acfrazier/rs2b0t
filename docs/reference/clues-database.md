@@ -47,6 +47,13 @@ params, so the generator passes them in by hand: `map001` (the Gertrude crate at
 3309,3503, from `quest_fluffs.rs2`) and `riddle022` (the bookcase at 2702,3409,1,
 from `bookcases.rs2`).
 
+At 377, `trail.param` has no `trail_loc`: the same 58 search objects that carry it at
+289 carry only `trail_coord` at 377, so a coordinate without a casket is the
+revision-neutral search marker. The generator reads every `.obj` under the content
+`scripts/` tree the way the engine packer does, taking `game_trail/configs/trail*.obj`
+at 289 and `scripts/_unpack/377/all.obj` at 377, requiring names unique across the tree
+and resolving ids through `pack/obj.pack`.
+
 `data/digAnchors.ts` selects exact dig tiles where the solver needs a specific
 position within the server's accepted dig area. Hard `sextant012` (2745) uses
 `(3054,3696,0)`, one tile west of its generated coordinate. The solver stands on

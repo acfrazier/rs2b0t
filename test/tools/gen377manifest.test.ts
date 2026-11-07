@@ -1,8 +1,4 @@
-/** The P4a manifest writer: rows named by a run are replaced, other slices' rows survive, and an
- *  `out/` row hashes the file in the chosen output dir while keeping the repo's `out/` path.
- *  Why: a byte-identity run bakes the basemap into a scratch dir, so the hash source and the
- *  recorded path must not be the same string (a bug this test keeps from returning).
- */
+/** Why: a byte-identity run bakes the basemap into a scratch dir, so an `out/` row hashes the bake file while recording the repo's `out/` path. */
 import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
