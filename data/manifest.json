@@ -27,7 +27,7 @@
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/gen-scriptdocs.ts": "9b65974cf3e5f22a4d7010869e9182ddd5068c3e8e081962ce15183c31e6ddc5",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
-    "tools/items/gen-namecollisions.ts": "490bd4d603830b3b4ead8719d428f47edc53155c655c9a6031341514d5347f65",
+    "tools/items/gen-namecollisions.ts": "32b1680a3ffa286fa8ae8ab74e22af36f1f07b13d6f2cf3bd89bbb763cb874ee",
     "tools/items/gen-untradeable.ts": "2f97f8ba7a122d367d40ce016cf8a259f01d69442ba5f50e8718f395f8f270bb",
     "tools/items/parse.ts": "1e0f0cb50afdc4edd7519d158967095d2433cdd1e49f3e725b9f373780f57549",
     "tools/lib/content.ts": "ebd229b1ffe38c9e5162eb15a06f89171747db84ca1152724e118c586f5220c4",

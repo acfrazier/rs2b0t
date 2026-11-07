@@ -704,3 +704,32 @@ test('reply 21 counts down from the server byte plus three, 1200 ms apart, then 
     expect(shown).toEqual([4, 3, 2, 1, 0].map(n => `Your profile will be transferred in: ${n}`));
     expect(opens).toBe(2);
 });
+
+test('the CRC fetch sends the Java 377 cache buster, /crc<random>-377, and reads nine checks plus the sum', async () => {
+    const checks = [5, 10, 15, 20, 25, 30, 35, 40, 45];
+    let sum = 1234;
+    for (const value of checks) sum = ((sum << 1) + value) | 0;
+    const block = new Packet(new Uint8Array(40));
+    for (const value of checks) block.p4(value);
+    block.p4(sum);
+
+    const urls: string[] = [];
+    const fetchBefore = globalThis.fetch;
+    globalThis.fetch = Object.assign(async (input: string | URL | Request): Promise<Response> => {
+        urls.push(String(input));
+        return new Response(block.data.slice(0, 40));
+    }, { preconnect: fetchBefore.preconnect });
+    const random = spyOn(Math, 'random').mockReturnValue(0.123456789);
+    try {
+        const client = Object.create(Client.prototype) as { jagChecksum: number[]; drawProgress(): Promise<void>; getJagChecksums(): Promise<void> };
+        client.jagChecksum = [];
+        client.drawProgress = async (): Promise<void> => {};
+        await client.getJagChecksums();
+        expect(client.jagChecksum.slice(0, 9)).toEqual(checks);
+    } finally {
+        random.mockRestore();
+        globalThis.fetch = fetchBefore;
+    }
+    expect(urls).toHaveLength(1);
+    expect(urls[0].endsWith(`/crc${Math.floor(0.123456789 * 99999999)}-377`)).toBe(true);
+});

@@ -1,5 +1,5 @@
 import { filesUnder } from '../lib/content.js';
-import { resolveOut } from '../lib/genout.js';
+import { resolveOut, resolveRevision } from '../lib/genout.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -50,7 +50,7 @@ function usable(word: string): boolean {
 }
 
 // Words a group already says can narrow nothing; --name-echo-filter drops them (377 debugnames echo whole
-// display names, which poisons resolveAliased) while default off keeps the 289 table byte-identical.
+// display names, which poisons resolveAliased); it is on by default at revision 377 and off at 289, which keeps that table byte-identical.
 const STOPWORDS = new Set(['of', 'a', 'the', 'and']);
 
 /** Debugname tokens minus inter-member shares; with the echo filter, minus the name's own tokens too. */
@@ -128,7 +128,7 @@ function generate(echoFilter: boolean): string {
     ].join('\n');
 }
 
-const echoFilter = process.argv.includes('--name-echo-filter');
+const echoFilter = process.argv.includes('--name-echo-filter') || resolveRevision() === 377;
 const fresh = generate(echoFilter);
 if (process.argv.includes('--check')) {
     let current = '';
