@@ -245,7 +245,7 @@ for gen in \
     tools/lib/content.ts tools/lib/genout.ts \
     tools/gen-377-manifest.ts tools/gen-377-data.sh tools/patches/worldmap-377.patch \
     tools/nav/build-collision.ts tools/nav/derive-doors.ts tools/nav/derive-stairs.ts \
-    tools/nav/derive-ladders.py tools/nav/enrich-transports.py tools/nav/derive-transports.sh \
+    tools/nav/derive-ladders.py tools/nav/enrich-transports.py tools/nav/derive-transports.sh
 do
     GEN_ARGS+=(--generator "$gen")
 done

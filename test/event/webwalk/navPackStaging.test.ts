@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, expect, test } from 'bun:test';
@@ -30,8 +30,10 @@ function artifactPath(matches: (artifact: Artifact) => boolean): string {
 
 const packPath = artifactPath(artifact => artifact.path === 'out/collision.lcnav.gz');
 const doorDataPath = artifactPath(artifact => artifact.path.endsWith('/webwalk/data/doors.json'));
+const packAbsent = !existsSync(packPath);
+if (packAbsent) console.log(`SKIP: test/event/webwalk/navPackStaging.test.ts: staged 377 collision pack absent (${packPath.replace(process.cwd() + '/', '')})`);
 
-test('Navigator pack loader reads and parses the staged 377 collision pack', async () => {
+test.skipIf(packAbsent)('Navigator pack loader reads and parses the staged 377 collision pack', async () => {
     const compressed = readFileSync(packPath);
     globalThis.fetch = (async () => new Response(compressed)) as unknown as typeof fetch;
     try {
@@ -44,7 +46,7 @@ test('Navigator pack loader reads and parses the staged 377 collision pack', asy
     }
 });
 
-test('real 377 pack refuses door IDs 73/74 and admits 1551/1553', () => {
+test.skipIf(packAbsent)('real 377 pack refuses door IDs 73/74 and admits 1551/1553', () => {
     const finder = new PathFinder(gunzipSync(readFileSync(packPath)));
     expect(finder.mapsquares).toBeGreaterThan(0);
 

@@ -212,7 +212,17 @@ describe('manifest verify', () => {
         put(root, staged, 'different staged pack\n');
         expect(verifyManifest(root)).toEqual([expect.stringContaining("artifact 'out/collision.lcnav.gz' changed")]);
     });
-
+    test('a missing staged out artifact is a printed skip, not a failure', () => {
+        const root = tempDir();
+        mkdirSync(join(root, 'data/377'), { recursive: true });
+        writeManifest(root, {
+            ...empty(),
+            artifacts: [{ path: 'out/collision.lcnav.gz', sha256: 'a'.repeat(64), kind: 'out', qualification: 'pending', stagedPath: 'data/377/out/collision.lcnav.gz' }]
+        });
+        const report = verifyManifestReport(root);
+        expect(report.problems).toEqual([]);
+        expect(report.skipped).toEqual([expect.stringContaining('staged at data/377/out/collision.lcnav.gz')]);
+    });
 
     test('the staging tree must agree with cutover', () => {
         const root = tempDir();

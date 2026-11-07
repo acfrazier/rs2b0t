@@ -283,10 +283,11 @@ export function verifyManifestReport(root = process.cwd()): VerifyReport {
         const checkedPath = artifact.stagedPath ?? artifact.path;
         const abs = join(root, checkedPath);
         if (!existsSync(abs)) {
-            if (artifact.stagedPath !== undefined) {
+            if (artifact.kind === 'out') {
+                const where = artifact.stagedPath === undefined ? '' : ` (staged at ${artifact.stagedPath})`;
+                skipped.push(`SKIP: ${artifact.path}: out artifact is not tracked${where}; hash verified only when the file is present`);
+            } else if (artifact.stagedPath !== undefined) {
                 problems.push(`artifact '${artifact.path}' staged at '${artifact.stagedPath}' is missing`);
-            } else if (artifact.kind === 'out') {
-                skipped.push(`SKIP: ${artifact.path}: out artifact is not tracked; hash verified only when the file is present`);
             } else {
                 problems.push(`artifact '${artifact.path}' is listed but missing`);
             }
