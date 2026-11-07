@@ -39,7 +39,10 @@ export default class SeqType {
     maxloops: number = 99;
     preanim_move: number = -1;
     postanim_move: number = -1;
-    duplicatebehaviour: number = -1;
+    /** Java field789 default 2 (RestartMode.RESETLOOP) */
+    duplicatebehaviour: number = RestartMode.RESETLOOP;
+    /** Java field790 — opcode 12 stores g4 */
+    unused12: number = 0;
 
     static init(config: JagFile): void {
         const dat: Packet = new Packet(config.read('seq.dat'));
@@ -54,6 +57,10 @@ export default class SeqType {
 
             this.list[id].id = id;
             this.list[id].decode(dat);
+        }
+
+        if (SeqType.STRICT && dat.pos !== dat.length) {
+            throw new Error(`SeqType: trailing config bytes (pos ${dat.pos}, end ${dat.length})`);
         }
     }
 
@@ -128,6 +135,8 @@ export default class SeqType {
                 this.postanim_move = dat.g1();
             } else if (code === 11) {
                 this.duplicatebehaviour = dat.g1();
+            } else if (code === 12) {
+                this.unused12 = dat.g4();
             } else if (SeqType.STRICT) {
                 throw new Error(`SeqType ${this.id}: unknown config opcode ${code}`);
             }

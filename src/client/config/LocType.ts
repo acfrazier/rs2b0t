@@ -58,9 +58,12 @@ export default class LocType {
     breakroutefinding: boolean = false;
     raiseobject: number = 0;
     multivarbit: number = -1;
+    /** 377 Java field1635 — varp selector when multivarbit is −1. */
+    multivar: number = -1;
     multiloc: number[] = [];
 
     static readonly STRICT: boolean = process.env.STRICT_CONFIG === '1';
+    static datEnd: number = 0;
 
     static init(config: JagFile): void {
         this.dat = new Packet(config.read('loc.dat'));
@@ -74,6 +77,7 @@ export default class LocType {
             this.idx[id] = offset;
             offset += idx.g2();
         }
+        this.datEnd = offset;
 
         this.recent = new TypedArray1d(10, null);
         for (let id: number = 0; id < 10; id++) {
@@ -100,6 +104,12 @@ export default class LocType {
         loc.id = id;
         loc.reset();
         loc.decode(this.dat);
+        if (LocType.STRICT) {
+            const end = id + 1 < this.numDefinitions ? this.idx[id + 1] : this.datEnd;
+            if (this.dat.pos !== end) {
+                throw new Error(`LocType ${id}: trailing config bytes (pos ${this.dat.pos}, end ${end})`);
+            }
+        }
 
         return loc;
     }
@@ -139,6 +149,7 @@ export default class LocType {
         this.breakroutefinding = false;
         this.raiseobject = -1;
         this.multivarbit = -1;
+        this.multivar = -1;
         this.multiloc = [];
     }
 
@@ -249,8 +260,15 @@ export default class LocType {
             } else if (code === 75) {
                 this.raiseobject = dat.g1();
             } else if (code === 77) {
+                // 377 Java LocType.method568: g2 varbit, g2 varp, g1 count, (count+1)×g2
                 this.multivarbit = dat.g2();
-
+                if (this.multivarbit === 65535) {
+                    this.multivarbit = -1;
+                }
+                this.multivar = dat.g2();
+                if (this.multivar === 65535) {
+                    this.multivar = -1;
+                }
                 const count = dat.g1();
                 this.multiloc = new Array(count + 1);
                 for (let i = 0; i <= count; i++) {
@@ -294,7 +312,7 @@ export default class LocType {
         if (this.shape !== null) {
             for (let i = 0; i < this.shape.length; i++) {
                 if (this.shape[i] === shape) {
-                    return Model.requestDownload(this.model[i] & 0xFFFF);
+                    return Model.requestDownload(this.model[i] & 0xffff);
                 }
             }
             return true;
@@ -302,7 +320,7 @@ export default class LocType {
             let ready = true;
             for (let i = 0; i < this.model.length; i++) {
                 const model = this.model[i];
-                if (!Model.requestDownload(model & 0xFFFF)) {
+                if (!Model.requestDownload(model & 0xffff)) {
                     ready = false;
                 }
             }
@@ -320,7 +338,7 @@ export default class LocType {
         let ready = true;
         for (let i = 0; i < this.model.length; i++) {
             const model = this.model[i];
-            if (!Model.requestDownload(model & 0xFFFF)) {
+            if (!Model.requestDownload(model & 0xffff)) {
                 ready = false;
             }
         }
@@ -335,7 +353,7 @@ export default class LocType {
         }
 
         for (let i = 0; i < this.model.length; i++) {
-            out.add(this.model[i] & 0xFFFF);
+            out.add(this.model[i] & 0xffff);
         }
     }
 
@@ -347,7 +365,7 @@ export default class LocType {
         for (let i = 0; i < this.model.length; i++) {
             const model = this.model[i];
             if (model != -1) {
-                od.prefetch(0, model & 0xFFFF);
+                od.prefetch(0, model & 0xffff);
             }
         }
     }

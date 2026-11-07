@@ -62,6 +62,10 @@ export default class ObjType {
     ambient: number = 0;
     contrast: number = 0;
     team: number = 0;
+    /** Java field854 — opcode 10 stores g2 (not skip) */
+    unused10: number = -1;
+
+    static datEnd: number = 0;
 
     static init(config: JagFile, members: boolean): void {
         this.memServer = members;
@@ -77,6 +81,7 @@ export default class ObjType {
             this.idx[id] = offset;
             offset += idx.g2();
         }
+        this.datEnd = offset;
 
         this.recent = new TypedArray1d(10, null);
         for (let id: number = 0; id < 10; id++) {
@@ -103,6 +108,12 @@ export default class ObjType {
         obj.id = id;
         obj.reset();
         obj.decode(this.dat);
+        if (ObjType.STRICT) {
+            const end = id + 1 < this.numDefinitions ? this.idx[id + 1] : this.datEnd;
+            if (this.dat.pos !== end) {
+                throw new Error(`ObjType ${id}: trailing config bytes (pos ${this.dat.pos}, end ${end})`);
+            }
+        }
 
         if (obj.certtemplate !== -1) {
             obj.genCert();
@@ -157,6 +168,7 @@ export default class ObjType {
         this.ambient = 0;
         this.contrast = 0;
         this.team = 0;
+        this.unused10 = -1;
     }
 
     decode(dat: Packet): void {
@@ -189,7 +201,7 @@ export default class ObjType {
                     this.yof2d -= 65536;
                 }
             } else if (code === 10) {
-                dat.pos += 2;
+                this.unused10 = dat.g2();
             } else if (code === 11) {
                 this.stackable = true;
             } else if (code === 12) {

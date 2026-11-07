@@ -12,6 +12,8 @@ const { default: Model } = await import('#/client/dash3d/Model.js');
 const { BotHost } = await import('#/bot/runtime/BotHost.js');
 const { ServerProt } = await import('#/client/io/ServerProt.js');
 const { attach, detach, invalidateLocSnapshots, reader } = await import('#/bot/adapter/ClientAdapter.js');
+const { resolveMultiloc, resolveMultiNpc } = await import('#/client/config/resolveMultiloc.js');
+const { default: NpcType } = await import('#/client/config/NpcType.js');
 
 type Loc = InstanceType<typeof LocType>;
 const rawId = 5;
@@ -31,7 +33,10 @@ function loc(id: number, name: string, op: string[], multiloc: number[] = []): L
     result.name = name;
     result.op = [op[0], null, null, null, null];
     result.multivarbit = multiloc.length ? 0 : -1;
+    result.multivar = -1;
     result.multiloc = multiloc;
+    result.width = 1;
+    result.length = 1;
     result.anim = -1;
     result.getModel = (shape, angle) => ({ id, shape, angle }) as never;
     return result;
@@ -41,7 +46,7 @@ function scene(varValue: number) {
     return {
         world: {
             wallType: () => 0,
-            sceneType: (_level: number, x: number, z: number) => x === 1 && z === 2 ? typecode : 0,
+            sceneType: (_level: number, x: number, z: number) => (x === 1 && z === 2 ? typecode : 0),
             gdType: () => 0,
             decorType: () => 0,
             typeCode2: () => 0
@@ -164,7 +169,11 @@ describe('multiloc placement', () => {
             const groundh = [[Int32Array.of(0, 0), Int32Array.of(0, 0)]];
             const builder = Object.assign(Object.create(ClientBuild.prototype), { groundh });
             let built: unknown;
-            const world = { setGroundDecor: (model: unknown) => { built = model; } };
+            const world = {
+                setGroundDecor: (model: unknown) => {
+                    built = model;
+                }
+            };
             if (path === 'add') {
                 builder.addLoc(0, 0, 0, rawId, 22, angle, world, null);
             } else {
@@ -182,7 +191,9 @@ describe('multiloc placement', () => {
         locs.get(transformedId)!.desc = description;
         const client = menu(0);
         const messages: string[] = [];
-        client.addChat = (_type, text) => { messages.push(text); };
+        client.addChat = (_type, text) => {
+            messages.push(text);
+        };
         client.doAction(client.menuNumEntries - 1);
         expect(messages).toEqual([description ?? "It's a Secret passage."]);
     });
@@ -190,7 +201,9 @@ describe('multiloc placement', () => {
     test.each([2, 4])('examine ignores a menu entry whose child is now hidden at state %i', state => {
         const client = menu(0);
         const messages: string[] = [];
-        client.addChat = (_type, text) => { messages.push(text); };
+        client.addChat = (_type, text) => {
+            messages.push(text);
+        };
         client.var[0] = state;
         client.doAction(client.menuNumEntries - 1);
         expect(messages).toEqual([]);
@@ -201,7 +214,9 @@ describe('multiloc placement', () => {
         locs.get(rawId)!.desc = 'An ordinary door.';
         const client = menu(0);
         const messages: string[] = [];
-        client.addChat = (_type, text) => { messages.push(text); };
+        client.addChat = (_type, text) => {
+            messages.push(text);
+        };
         client.doAction(client.menuNumEntries - 1);
         expect(messages).toEqual(['An ordinary door.']);
     });
@@ -216,5 +231,72 @@ describe('multiloc placement', () => {
     test('ordinary loc with no transform still renders', () => {
         const model = new ClientLocAnim(transformedId, 10, 0, 0, 0, 0, 0, -1, true);
         expect((model.getTempModel() as unknown as { id: number }).id).toBe(transformedId);
+    });
+
+    test('varp-selected form uses multivar when multivarbit is -1', () => {
+        const base = locs.get(rawId)!;
+        base.multivarbit = -1;
+        base.multivar = 0;
+        expect(menu(0).menuOption).toContain('Enter @cya@Secret passage');
+        expect(menu(1).menuOption).toEqual(['Walk here']);
+        attach(scene(0) as never);
+        expect(reader.locs()[0]).toMatchObject({ id: rawId, name: 'Secret passage' });
+        attach(scene(1) as never);
+        expect(reader.locs()).toEqual([]);
+    });
+
+    test('resolved child keeps its name while the base keeps geometry', () => {
+        const base = locs.get(rawId)!;
+        const child = locs.get(transformedId)!;
+        base.width = 2;
+        base.length = 3;
+        child.width = 1;
+        child.length = 1;
+        const resolved = resolveMultiloc(base, [0]);
+        expect(resolved?.name).toBe('Secret passage');
+        expect(resolved?.width).toBe(1);
+        expect(base.width).toBe(2);
+        expect(base.length).toBe(3);
+    });
+
+    test('varp-only change re-resolves without rebuilding the scene', () => {
+        const base = locs.get(rawId)!;
+        base.multivarbit = -1;
+        base.multivar = 0;
+        const client = scene(0);
+        attach(client as never);
+        expect(reader.locs()[0].name).toBe('Secret passage');
+        client.var[0] = 1;
+        (BotHost as unknown as { handlePacket(ptype: number): void }).handlePacket(ServerProt.VARP_SMALL);
+        expect(reader.locs()).toEqual([]);
+    });
+});
+
+describe('multinpc resolve', () => {
+    test('resolveMultiNpc follows varbit then varp and hides -1 slots', () => {
+        const child = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        child.id = 9;
+        child.name = 'Guard';
+        child.multinpc = [];
+        child.multivarbit = -1;
+        child.multivar = -1;
+        const base = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        base.id = 3;
+        base.name = 'Door man';
+        base.multivarbit = 0;
+        base.multivar = -1;
+        base.multinpc = [9, -1];
+        const orig = NpcType.list;
+        NpcType.list = (id: number) => (id === 9 ? child : base);
+        try {
+            expect(resolveMultiNpc(base, [0])?.name).toBe('Guard');
+            expect(resolveMultiNpc(base, [2])).toBeNull();
+            base.multivarbit = -1;
+            base.multivar = 1;
+            expect(resolveMultiNpc(base, [0, 0])?.name).toBe('Guard');
+            expect(resolveMultiNpc(base, [0, 1])).toBeNull();
+        } finally {
+            NpcType.list = orig;
+        }
     });
 });

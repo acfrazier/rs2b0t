@@ -24,7 +24,9 @@ export const enum ComponentType {
     TYPE_GRAPHIC = 5,
     TYPE_MODEL = 6,
     TYPE_INV_TEXT = 7,
-};
+    /** Tooltip / static text string — 377 Java Component.decode */
+    TYPE_TEXT_STATIC = 8
+}
 
 export const enum ButtonType {
     BUTTON_OK = 1,
@@ -32,13 +34,20 @@ export const enum ButtonType {
     BUTTON_CLOSE = 3,
     BUTTON_TOGGLE = 4,
     BUTTON_SELECT = 5,
-    BUTTON_CONTINUE = 6,
-};
+    BUTTON_CONTINUE = 6
+}
 
 export default class IfType {
     static list: IfType[] = [];
     static modelCache: LruCache<Model> = new LruCache(30);
     static spriteCache: LruCache<Pix32> | null = null;
+    static readonly STRICT: boolean = process.env.STRICT_CONFIG === '1';
+    /** Java Component.field728 — clientCode 600 layer (report abuse). */
+    static reportAbuseLayer: number = -1;
+    /** Java Component.field737 — clientCode 650 layer. */
+    static clientCode650Layer: number = -1;
+    /** Java Component.field759 — clientCode 655 layer. */
+    static clientCode655Layer: number = -1;
 
     animFrame: number = 0;
     animCycle: number = 0;
@@ -99,9 +108,15 @@ export default class IfType {
     targetBase: string | null = null;
     targetMask: number = -1;
     buttonText: string | null = null;
+    /** Java field707 / field715 — type 1 unused payload */
+    type1Word: number = 0;
+    type1Flag: boolean = false;
 
     static init(interfaces: JagFile, media: JagFile | null, fonts: PixFont[]): void {
         this.spriteCache = new LruCache(50000);
+        this.reportAbuseLayer = -1;
+        this.clientCode650Layer = -1;
+        this.clientCode655Layer = -1;
 
         const data: Packet = new Packet(interfaces.read('data'));
         let layer: number = -1;
@@ -132,6 +147,14 @@ export default class IfType {
                 com.overLayerId = -1;
             } else {
                 com.overLayerId = ((com.overLayerId - 1) << 8) + data.g1();
+            }
+
+            if (com.clientCode === 600) {
+                this.reportAbuseLayer = layer;
+            } else if (com.clientCode === 650) {
+                this.clientCode650Layer = layer;
+            } else if (com.clientCode === 655) {
+                this.clientCode655Layer = layer;
             }
 
             const scriptStackCount: number = data.g1();
@@ -177,7 +200,8 @@ export default class IfType {
             }
 
             if (com.type === ComponentType.TYPE_UNUSED) {
-                data.pos += 3;
+                com.type1Word = data.g2();
+                com.type1Flag = data.g1() === 1;
             }
 
             if (com.type === ComponentType.TYPE_INV) {
@@ -294,6 +318,10 @@ export default class IfType {
                 com.modelYAn = data.g2();
             }
 
+            if (com.type === ComponentType.TYPE_TEXT_STATIC) {
+                com.text = data.gjstr();
+            }
+
             if (com.type === ComponentType.TYPE_INV_TEXT) {
                 com.linkObjType = new Int32Array(com.width * com.height);
                 com.linkObjNumber = new Int32Array(com.width * com.height);
@@ -342,6 +370,10 @@ export default class IfType {
                     }
                 }
             }
+        }
+
+        if (IfType.STRICT && data.pos !== data.length) {
+            throw new Error(`IfType: trailing config bytes (pos ${data.pos}, end ${data.length})`);
         }
 
         this.spriteCache = null;

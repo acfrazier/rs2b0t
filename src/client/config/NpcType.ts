@@ -41,6 +41,18 @@ export default class NpcType {
     contrast: number = 0;
     headicon: number = -1;
     turnspeed: number = 32;
+    /** 377 Java field1457 / field1462 / field1425 */
+    multivarbit: number = -1;
+    multivar: number = -1;
+    multinpc: number[] = [];
+    /** Java field1434; opcode 107 clears */
+    active: boolean = true;
+    /** Java opcodes 90–92 store g2 (not skip) */
+    unused90: number = -1;
+    unused91: number = -1;
+    unused92: number = -1;
+
+    static datEnd: number = 0;
 
     static init(config: JagFile): void {
         this.dat = new Packet(config.read('npc.dat'));
@@ -54,6 +66,7 @@ export default class NpcType {
             this.idx[id] = offset;
             offset += idx.g2();
         }
+        this.datEnd = offset;
 
         this.recent = new TypedArray1d(20, null);
         for (let id: number = 0; id < 20; id++) {
@@ -79,6 +92,12 @@ export default class NpcType {
         this.dat.pos = this.idx[id];
         npc.id = id;
         npc.decode(this.dat);
+        if (NpcType.STRICT) {
+            const end = id + 1 < this.numDefinitions ? this.idx[id + 1] : this.datEnd;
+            if (this.dat.pos !== end) {
+                throw new Error(`NpcType ${id}: trailing config bytes (pos ${this.dat.pos}, end ${end})`);
+            }
+        }
 
         return npc;
     }
@@ -138,11 +157,11 @@ export default class NpcType {
                     this.head[i] = dat.g2();
                 }
             } else if (code === 90) {
-                dat.pos += 2;
+                this.unused90 = dat.g2();
             } else if (code === 91) {
-                dat.pos += 2;
+                this.unused91 = dat.g2();
             } else if (code === 92) {
-                dat.pos += 2;
+                this.unused92 = dat.g2();
             } else if (code === 93) {
                 this.minimap = false;
             } else if (code === 95) {
@@ -161,6 +180,25 @@ export default class NpcType {
                 this.headicon = dat.g2();
             } else if (code === 103) {
                 this.turnspeed = dat.g2();
+            } else if (code === 106) {
+                this.multivarbit = dat.g2();
+                if (this.multivarbit === 65535) {
+                    this.multivarbit = -1;
+                }
+                this.multivar = dat.g2();
+                if (this.multivar === 65535) {
+                    this.multivar = -1;
+                }
+                const count = dat.g1();
+                this.multinpc = new Array(count + 1);
+                for (let i = 0; i <= count; i++) {
+                    this.multinpc[i] = dat.g2();
+                    if (this.multinpc[i] === 65535) {
+                        this.multinpc[i] = -1;
+                    }
+                }
+            } else if (code === 107) {
+                this.active = false;
             } else if (NpcType.STRICT) {
                 throw new Error(`NpcType ${this.id}: unknown config opcode ${code}`);
             }
