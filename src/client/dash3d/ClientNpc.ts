@@ -7,15 +7,16 @@ import ClientEntity from '#/client/dash3d/ClientEntity.js';
 import AnimFrame from '#/client/dash3d/AnimFrame.js';
 import Model from '#/client/dash3d/Model.js';
 
+/** 377 mask bits — oracle Client-Java getNpcPosExtended / rsbuf NpcInfoProt */
 export const enum NpcUpdate {
-    HITMARK2 = 0x1,
+    CHANGETYPE = 0x1,
     ANIM = 0x2,
-    FACEENTITY = 0x4,
-    SAY = 0x8,
-    HITMARK = 0x10,
-    CHANGETYPE = 0x20,
-    SPOTANIM = 0x40,
-    FACESQUARE = 0x80
+    SPOTANIM = 0x4,
+    FACESQUARE = 0x8,
+    HITMARK2 = 0x10,
+    SAY = 0x20,
+    FACEENTITY = 0x40,
+    HITMARK = 0x80
 }
 
 export default class ClientNpc extends ClientEntity {
@@ -59,6 +60,7 @@ export default class ClientNpc extends ClientEntity {
             }
         }
 
+        // Java ClientNpc.method239: base type field1445 (size), not multi-resolved
         if (this.type.size == 1) {
             model.useAABBMouseCheck = true;
         }

@@ -4819,15 +4819,18 @@ export class Client extends GameShell {
                 let y: number = 30;
 
                 const player: ClientPlayer = entity as ClientPlayer;
-                if (player.headicons !== 0) {
+                // 377 stores two signed indices; SC-i must load headicons_pk / headicons_prayer.
+                if (player.headiconPk !== -1 || player.headiconPrayer !== -1) {
                     this.getOverlayPosEntity(entity, entity.height + 15);
 
                     if (this.projectX > -1) {
-                        for (let icon: number = 0; icon < 8; icon++) {
-                            if ((player.headicons & (0x1 << icon)) !== 0) {
-                                this.headicons[icon]?.plotSprite(this.projectX - 12, this.projectY - y);
-                                y -= 25;
-                            }
+                        if (player.headiconPk !== -1) {
+                            this.headicons[player.headiconPk]?.plotSprite(this.projectX - 12, this.projectY - y);
+                            y -= 25;
+                        }
+                        if (player.headiconPrayer !== -1) {
+                            this.headicons[player.headiconPrayer]?.plotSprite(this.projectX - 12, this.projectY - y);
+                            y -= 25;
                         }
                     }
                 }
@@ -7984,17 +7987,18 @@ export class Client extends GameShell {
                     this.entityUpdateIds[this.entityUpdateCount++] = LOCAL_PLAYER_INDEX;
                 }
             } else if (op === 3) {
-                this.minusedlevel = buf.gBit(2);
-                const localX: number = buf.gBit(7);
-                const localZ: number = buf.gBit(7);
+                // 377 Java: jump, level, z, x, then extended (order differs from 289)
                 const jump: number = buf.gBit(1);
-
-                this.localPlayer?.teleport(jump === 1, localX, localZ);
+                this.minusedlevel = buf.gBit(2);
+                const localZ: number = buf.gBit(7);
+                const localX: number = buf.gBit(7);
 
                 const extendedInfo: number = buf.gBit(1);
                 if (extendedInfo === 1) {
                     this.entityUpdateIds[this.entityUpdateCount++] = LOCAL_PLAYER_INDEX;
                 }
+
+                this.localPlayer?.teleport(jump === 1, localX, localZ);
             }
         }
     }
@@ -8091,42 +8095,49 @@ export class Client extends GameShell {
                 player.cycle = Client.loopCycle;
             }
 
+            // 377 Java: dx(5), extended(1), jump(1), dz(5) — not dx/dz/jump/extended
             let dx: number = buf.gBit(5);
             if (dx > 15) {
                 dx -= 32;
-            }
-
-            let dz: number = buf.gBit(5);
-            if (dz > 15) {
-                dz -= 32;
-            }
-
-            const jump: number = buf.gBit(1);
-
-            if (this.localPlayer) {
-                player?.teleport(jump === 1, this.localPlayer.routeX[0] + dx, this.localPlayer.routeZ[0] + dz);
             }
 
             const extendedInfo: number = buf.gBit(1);
             if (extendedInfo === 1) {
                 this.entityUpdateIds[this.entityUpdateCount++] = index;
             }
+
+            const jump: number = buf.gBit(1);
+
+            let dz: number = buf.gBit(5);
+            if (dz > 15) {
+                dz -= 32;
+            }
+
+            if (this.localPlayer) {
+                player?.teleport(jump === 1, this.localPlayer.routeX[0] + dx, this.localPlayer.routeZ[0] + dz);
+            }
         }
 
         buf.gBitEnd();
+        // Java getPlayerNewVis sets ptype=-1 after accessBytes; handler also clears.
+        this.ptype = -1;
     }
 
     private getPlayerPosExtended(buf: Packet, _size: number): void {
+        // Java getPlayerExtended: always g1 mask (+ BIG high byte) before body.
+        // Never skip a slot — null continue would desync the stream.
         for (let i: number = 0; i < this.entityUpdateCount; i++) {
             const index: number = this.entityUpdateIds[i];
             const player: ClientPlayer | null = this.players[index];
-            if (!player) {
-                continue;
-            }
 
+            // 377 Java: BIG flag is 0x20 (not 0x80 as in 289)
             let mask: number = buf.g1();
             if ((mask & PlayerUpdate.BIG_UPDATE) !== 0) {
                 mask += buf.g1() << 8;
+            }
+
+            if (!player) {
+                throw new Error(`null player in getPlayerExtended index=${index}`);
             }
 
             this.getPlayerPosDecodeExtended(player, index, mask, buf);
@@ -8134,31 +8145,15 @@ export class Client extends GameShell {
     }
 
     private getPlayerPosDecodeExtended(player: ClientPlayer, index: number, mask: number, buf: Packet): void {
-        if ((mask & PlayerUpdate.APPEARANCE) !== 0) {
-            const length: number = buf.g1();
-
-            const data: Uint8Array = new Uint8Array(length);
-            const appearance: Packet = new Packet(data);
-            buf.gdata(length, 0, data);
-
-            this.playerAppearanceBuffer[index] = appearance;
-            player.setAppearance(appearance);
-        }
-
+        // Process order + alts match Client-Java getPlayerExtended (377)
         if ((mask & PlayerUpdate.ANIM) !== 0) {
             let seqId: number = buf.g2();
             if (seqId === 65535) {
                 seqId = -1;
             }
-
-            if (seqId === player.primaryAnim) {
-                player.primaryAnimLoop = 0;
-            }
-
-            const delay: number = buf.g1();
+            const delay: number = buf.g1_alt3();
             if (player.primaryAnim === seqId && seqId !== -1) {
                 const restartMode = SeqType.list[seqId].duplicatebehaviour;
-
                 if (restartMode == RestartMode.RESET) {
                     player.primaryAnimFrame = 0;
                     player.primaryAnimCycle = 0;
@@ -8178,32 +8173,37 @@ export class Client extends GameShell {
             }
         }
 
-        if ((mask & PlayerUpdate.FACEENTITY) !== 0) {
-            player.faceEntity = buf.g2();
-            if (player.faceEntity === 65535) {
-                player.faceEntity = -1;
-            }
-        }
-
         if ((mask & PlayerUpdate.SAY) !== 0) {
             player.chatMessage = buf.gjstr();
+            if (player.chatMessage.charAt(0) === '~') {
+                player.chatMessage = player.chatMessage.substring(1);
+                if (player.name) {
+                    this.addChat(2, player.chatMessage, player.name);
+                }
+            } else if (this.localPlayer === player && player.name) {
+                this.addChat(2, player.chatMessage, player.name);
+            }
             player.chatColour = 0;
             player.chatEffect = 0;
             player.chatTimer = 150;
-
-            if (player.name) {
-                this.addChat(2, player.chatMessage, player.name);
-            }
         }
 
-        if ((mask & PlayerUpdate.HITMARK) !== 0) {
-            const damage = buf.g1();
-            const damageType = buf.g1();
+        if ((mask & PlayerUpdate.EXACTMOVE) !== 0) {
+            player.exactStartX = buf.g1_alt1();
+            player.exactStartZ = buf.g1_alt2();
+            player.exactEndX = buf.g1_alt3();
+            player.exactEndZ = buf.g1();
+            player.exactMoveEnd = buf.g2() + Client.loopCycle;
+            player.exactMoveStart = buf.g2_alt2() + Client.loopCycle;
+            player.exactMoveFacing = buf.g1();
+            player.abortRoute();
+        }
 
-            player.addHitmark(Client.loopCycle, damageType, damage);
-            player.combatCycle = Client.loopCycle + 400;
-            player.health = buf.g1();
-            player.totalHealth = buf.g1();
+        if ((mask & PlayerUpdate.FACEENTITY) !== 0) {
+            player.faceEntity = buf.g2_alt2();
+            if (player.faceEntity === 65535) {
+                player.faceEntity = -1;
+            }
         }
 
         if ((mask & PlayerUpdate.FACESQUARE) !== 0) {
@@ -8211,16 +8211,49 @@ export class Client extends GameShell {
             player.faceSquareZ = buf.g2();
         }
 
+        if ((mask & PlayerUpdate.SPOTANIM) !== 0) {
+            player.spotanimId = buf.g2_alt2();
+            const heightDelay: number = buf.g4_alt2();
+            player.spotanimHeight = heightDelay >> 16;
+            player.spotanimLastCycle = Client.loopCycle + (heightDelay & 0xffff);
+            player.spotanimFrame = 0;
+            player.spotanimCycle = 0;
+            if (player.spotanimLastCycle > Client.loopCycle) {
+                player.spotanimFrame = -1;
+            }
+            if (player.spotanimId === 65535) {
+                player.spotanimId = -1;
+            }
+        }
+
+        if ((mask & PlayerUpdate.APPEARANCE) !== 0) {
+            const length: number = buf.g1();
+            const data: Uint8Array = new Uint8Array(length);
+            const appearance: Packet = new Packet(data);
+            buf.gdata_alt1(data, 0, length);
+            this.playerAppearanceBuffer[index] = appearance;
+            player.setAppearance(appearance);
+        }
+
+        if ((mask & PlayerUpdate.HITMARK) !== 0) {
+            // DAMAGE: g1_alt1 value, g1_alt3 type, g1_alt2 health, g1 total
+            const damage = buf.g1_alt1();
+            const damageType = buf.g1_alt3();
+            player.addHitmark(Client.loopCycle, damageType, damage);
+            player.combatCycle = Client.loopCycle + 300;
+            player.health = buf.g1_alt2();
+            player.totalHealth = buf.g1();
+        }
+
         if ((mask & PlayerUpdate.CHAT) !== 0) {
             const colourEffect: number = buf.g2();
-            const type: number = buf.g1();
-            const length: number = buf.g1();
+            const type: number = buf.g1_alt2();
+            const length: number = buf.g1_alt1();
             const start: number = buf.pos;
 
             if (player.name && player.ready) {
                 const username: bigint = JString.toUserhash(player.name);
                 let ignored: boolean = false;
-
                 if (type <= 1) {
                     for (let i: number = 0; i < this.ignoreCount; i++) {
                         if (this.ignoreUserhash[i] === username) {
@@ -8229,16 +8262,17 @@ export class Client extends GameShell {
                         }
                     }
                 }
-
                 if (!ignored && this.chatDisabled === 0) {
                     try {
-                        const uncompressed: string = WordPack.unpack(buf, length);
+                        const packed = new Uint8Array(length);
+                        buf.gdata_alt2(packed, 0, length);
+                        const chatBuf = new Packet(packed);
+                        const uncompressed: string = WordPack.unpack(chatBuf, length);
                         const filtered: string = WordFilter.filter(uncompressed);
                         player.chatMessage = filtered;
                         player.chatColour = colourEffect >> 8;
                         player.chatEffect = colourEffect & 0xff;
                         player.chatTimer = 150;
-
                         if (type === 2 || type === 3) {
                             this.addChat(1, filtered, '@cr2@' + player.name);
                         } else if (type === 1) {
@@ -8246,51 +8280,21 @@ export class Client extends GameShell {
                         } else {
                             this.addChat(2, filtered, player.name);
                         }
-                    } catch (_e) {
+                    } catch {
+                        // signlink.reporterror('cde2');
                     }
                 }
             }
-
             buf.pos = start + length;
         }
 
-        if ((mask & PlayerUpdate.SPOTANIM) !== 0) {
-            player.spotanimId = buf.g2();
-            const heightDelay: number = buf.g4();
-
-            player.spotanimHeight = heightDelay >> 16;
-            player.spotanimLastCycle = Client.loopCycle + (heightDelay & 0xffff);
-            player.spotanimFrame = 0;
-            player.spotanimCycle = 0;
-
-            if (player.spotanimLastCycle > Client.loopCycle) {
-                player.spotanimFrame = -1;
-            }
-
-            if (player.spotanimId === 65535) {
-                player.spotanimId = -1;
-            }
-        }
-
-        if ((mask & PlayerUpdate.EXACTMOVE) !== 0) {
-            player.exactStartX = buf.g1();
-            player.exactStartZ = buf.g1();
-            player.exactEndX = buf.g1();
-            player.exactEndZ = buf.g1();
-            player.exactMoveEnd = buf.g2() + Client.loopCycle;
-            player.exactMoveStart = buf.g2() + Client.loopCycle;
-            player.exactMoveFacing = buf.g1();
-
-            player.abortRoute();
-        }
-
         if ((mask & PlayerUpdate.HITMARK2) !== 0) {
-            const damage = buf.g1();
-            const damageType = buf.g1();
-
+            // DAMAGE2: g1_alt3 value, g1_alt2 type, g1_alt3 health, g1 total
+            const damage = buf.g1_alt3();
+            const damageType = buf.g1_alt2();
             player.addHitmark(Client.loopCycle, damageType, damage);
-            player.combatCycle = Client.loopCycle + 400;
-            player.health = buf.g1();
+            player.combatCycle = Client.loopCycle + 300;
+            player.health = buf.g1_alt3();
             player.totalHealth = buf.g1();
         }
     }
@@ -8401,6 +8405,7 @@ export class Client extends GameShell {
     }
 
     private getNpcPosNewVis(buf: Packet, size: number): void {
+        // 377 Java: index(14), extended(1), dz(5), dx(5), jump(1), type(13)
         while (buf.bitPos + 21 < size * 8) {
             const index: number = buf.gBit(14);
             if (index === 16383) {
@@ -8416,21 +8421,11 @@ export class Client extends GameShell {
 
             if (npc) {
                 npc.cycle = Client.loopCycle;
-                npc.type = NpcType.list(buf.gBit(11));
-                npc.size = npc.type.size;
-                npc.turnspeed = npc.type.turnspeed;
-                npc.walkanim = npc.type.walkanim;
-                npc.walkanim_b = npc.type.walkanim_b;
-                npc.walkanim_l = npc.type.walkanim_r;
-                npc.walkanim_r = npc.type.walkanim_l;
-                npc.readyanim = npc.type.readyanim;
-            } else {
-                buf.gBit(11);
             }
 
-            let dx: number = buf.gBit(5);
-            if (dx > 15) {
-                dx -= 32;
+            const extendedInfo: number = buf.gBit(1);
+            if (extendedInfo === 1) {
+                this.entityUpdateIds[this.entityUpdateCount++] = index;
             }
 
             let dz: number = buf.gBit(5);
@@ -8438,14 +8433,27 @@ export class Client extends GameShell {
                 dz -= 32;
             }
 
-            const jump = buf.gBit(1);
-            if (this.localPlayer) {
-                npc?.teleport(jump === 1, this.localPlayer.routeX[0] + dx, this.localPlayer.routeZ[0] + dz);
+            let dx: number = buf.gBit(5);
+            if (dx > 15) {
+                dx -= 32;
             }
 
-            const extendedInfo: number = buf.gBit(1);
-            if (extendedInfo === 1) {
-                this.entityUpdateIds[this.entityUpdateCount++] = index;
+            const jump = buf.gBit(1);
+            const typeId: number = buf.gBit(13);
+
+            if (npc) {
+                npc.type = NpcType.list(typeId);
+                npc.size = npc.type.size;
+                npc.turnspeed = npc.type.turnspeed;
+                npc.walkanim = npc.type.walkanim;
+                npc.walkanim_b = npc.type.walkanim_b;
+                npc.walkanim_l = npc.type.walkanim_r;
+                npc.walkanim_r = npc.type.walkanim_l;
+                npc.readyanim = npc.type.readyanim;
+
+                if (this.localPlayer) {
+                    npc.teleport(jump === 1, this.localPlayer.routeX[0] + dx, this.localPlayer.routeZ[0] + dz);
+                }
             }
         }
 
@@ -8453,23 +8461,68 @@ export class Client extends GameShell {
     }
 
     private getNpcPosExtended(buf: Packet, _size: number): void {
+        // Process order + alts match Client-Java getNpcPosExtended (377).
+        // Always consume mask first — never continue on null (stream desync).
         for (let i: number = 0; i < this.entityUpdateCount; i++) {
             const id: number = this.entityUpdateIds[i];
             const npc: ClientNpc | null = this.npc[id];
-            if (!npc) {
-                continue;
-            }
-
             const mask: number = buf.g1();
 
-            if ((mask & NpcUpdate.HITMARK2) !== 0) {
-                const damage = buf.g1();
-                const damageType = buf.g1();
+            if (!npc) {
+                throw new Error(`null npc in getNpcPosExtended id=${id}`);
+            }
 
+            if ((mask & NpcUpdate.CHANGETYPE) !== 0) {
+                npc.type = NpcType.list(buf.g2_alt2());
+                npc.size = npc.type.size;
+                npc.turnspeed = npc.type.turnspeed;
+                npc.walkanim = npc.type.walkanim;
+                npc.walkanim_b = npc.type.walkanim_b;
+                npc.walkanim_l = npc.type.walkanim_r;
+                npc.walkanim_r = npc.type.walkanim_l;
+                npc.readyanim = npc.type.readyanim;
+            }
+
+            if ((mask & NpcUpdate.FACEENTITY) !== 0) {
+                npc.faceEntity = buf.g2_alt1();
+                if (npc.faceEntity === 65535) {
+                    npc.faceEntity = -1;
+                }
+            }
+
+            if ((mask & NpcUpdate.HITMARK) !== 0) {
+                // DAMAGE: g1_alt1 value, g1_alt1 type, g1 health, g1_alt3 total
+                const damage = buf.g1_alt1();
+                const damageType = buf.g1_alt1();
                 npc.addHitmark(Client.loopCycle, damageType, damage);
-                npc.combatCycle = Client.loopCycle + 400;
+                npc.combatCycle = Client.loopCycle + 300;
                 npc.health = buf.g1();
-                npc.totalHealth = buf.g1();
+                npc.totalHealth = buf.g1_alt3();
+            }
+
+            if ((mask & NpcUpdate.SPOTANIM) !== 0) {
+                npc.spotanimId = buf.g2();
+                const info: number = buf.g4_alt2();
+                npc.spotanimHeight = info >> 16;
+                npc.spotanimLastCycle = Client.loopCycle + (info & 0xffff);
+                npc.spotanimFrame = 0;
+                npc.spotanimCycle = 0;
+                if (npc.spotanimLastCycle > Client.loopCycle) {
+                    npc.spotanimFrame = -1;
+                }
+                if (npc.spotanimId === 65535) {
+                    npc.spotanimId = -1;
+                }
+            }
+
+            if ((mask & NpcUpdate.SAY) !== 0) {
+                npc.chatMessage = buf.gjstr();
+                npc.chatTimer = 100;
+            }
+
+            if ((mask & NpcUpdate.FACESQUARE) !== 0) {
+                npc.faceSquareX = buf.g2_alt3();
+                npc.faceSquareZ = buf.g2_alt1();
             }
 
             if ((mask & NpcUpdate.ANIM) !== 0) {
@@ -8477,15 +8530,9 @@ export class Client extends GameShell {
                 if (anim === 65535) {
                     anim = -1;
                 }
-
-                if (anim === npc.primaryAnim) {
-                    npc.primaryAnimLoop = 0;
-                }
-
-                const delay: number = buf.g1();
+                const delay: number = buf.g1_alt3();
                 if (npc.primaryAnim === anim && anim !== -1) {
                     const restartMode = SeqType.list[anim].duplicatebehaviour;
-
                     if (restartMode == RestartMode.RESET) {
                         npc.primaryAnimFrame = 0;
                         npc.primaryAnimCycle = 0;
@@ -8504,60 +8551,14 @@ export class Client extends GameShell {
                 }
             }
 
-            if ((mask & NpcUpdate.FACEENTITY) !== 0) {
-                npc.faceEntity = buf.g2();
-                if (npc.faceEntity === 65535) {
-                    npc.faceEntity = -1;
-                }
-            }
-
-            if ((mask & NpcUpdate.SAY) !== 0) {
-                npc.chatMessage = buf.gjstr();
-                npc.chatTimer = 100;
-            }
-
-            if ((mask & NpcUpdate.HITMARK) !== 0) {
-                const damage = buf.g1();
-                const damageType = buf.g1();
-
+            if ((mask & NpcUpdate.HITMARK2) !== 0) {
+                // DAMAGE2: g1_alt3 value, g1_alt3 type, g1 health, g1_alt2 total
+                const damage = buf.g1_alt3();
+                const damageType = buf.g1_alt3();
                 npc.addHitmark(Client.loopCycle, damageType, damage);
-                npc.combatCycle = Client.loopCycle + 400;
+                npc.combatCycle = Client.loopCycle + 300;
                 npc.health = buf.g1();
-                npc.totalHealth = buf.g1();
-            }
-
-            if ((mask & NpcUpdate.CHANGETYPE) !== 0) {
-                npc.type = NpcType.list(buf.g2());
-                npc.size = npc.type.size;
-                npc.turnspeed = npc.type.turnspeed;
-                npc.walkanim = npc.type.walkanim;
-                npc.walkanim_b = npc.type.walkanim_b;
-                npc.walkanim_l = npc.type.walkanim_r;
-                npc.walkanim_r = npc.type.walkanim_l;
-                npc.readyanim = npc.type.readyanim;
-            }
-
-            if ((mask & NpcUpdate.SPOTANIM) !== 0) {
-                npc.spotanimId = buf.g2();
-                const info: number = buf.g4();
-
-                npc.spotanimHeight = info >> 16;
-                npc.spotanimLastCycle = Client.loopCycle + (info & 0xffff);
-                npc.spotanimFrame = 0;
-                npc.spotanimCycle = 0;
-
-                if (npc.spotanimLastCycle > Client.loopCycle) {
-                    npc.spotanimFrame = -1;
-                }
-
-                if (npc.spotanimId === 65535) {
-                    npc.spotanimId = -1;
-                }
-            }
-
-            if ((mask & NpcUpdate.FACESQUARE) !== 0) {
-                npc.faceSquareX = buf.g2();
-                npc.faceSquareZ = buf.g2();
+                npc.totalHealth = buf.g1_alt2();
             }
         }
     }
