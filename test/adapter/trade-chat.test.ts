@@ -80,8 +80,9 @@ describe('actions.sayPublic', () => {
         const bytes = raw.out.data.slice(0, raw.out.pos);
         expect(bytes[0]).toBe(ClientProt.MESSAGE_PUBLIC & 0xff);
         expect(bytes[1]).toBe(bytes.length - 2);
+        // Java p1_alt2(0) is 0; p1_alt1(0) is 128. Client-TS recordings use plain 0, 0.
         expect(bytes[2]).toBe(0);
-        expect(bytes[3]).toBe(0);
+        expect(bytes[3]).toBe(128);
     });
 
     // Why: pack lowercases and nibble-pads, unpack sentence-cases for display, so the round trip is only faithful after trim + lowercase.
@@ -93,7 +94,11 @@ describe('actions.sayPublic', () => {
 
         const size = raw.out.data[1];
         const body = new Packet(raw.out.data.slice(4, 2 + size));
-        expect(WordPack.unpack(body, size - 2).trim().toLowerCase()).toBe('buy 100 iron ore');
+        expect(
+            WordPack.unpack(body, size - 2)
+                .trim()
+                .toLowerCase()
+        ).toBe('buy 100 iron ore');
     });
 
     test('refuses an empty message and a detached client', () => {

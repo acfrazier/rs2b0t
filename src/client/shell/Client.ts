@@ -66,6 +66,43 @@ import Isaac from '#/client/io/Isaac.js';
 import JagFile from '#/client/io/JagFile.js';
 import Packet from '#/client/io/Packet.js';
 import OnDemand from '#/client/io/OnDemand.js';
+import {
+    placedLocId,
+    PROT_377_ONLY,
+    publicChatEffect,
+    writeAnticheatCycleLogic1,
+    writeAnticheatCycleLogic2,
+    writeAnticheatCycleLogic3,
+    writeAnticheatCycleLogic4,
+    writeAnticheatCycleLogic5,
+    writeAnticheatCycleLogic6,
+    writeAnticheatOpLogic1,
+    writeAnticheatOpLogic2,
+    writeAnticheatOpLogic3,
+    writeAnticheatOpLogic4,
+    writeAnticheatOpLogic5,
+    writeEventCameraPosition,
+    writeEventSynthError,
+    writeHeldOp,
+    writeHeldT,
+    writeHeldU,
+    writeInvButton,
+    writeInvButtonD,
+    writeLocOp,
+    writeLocT,
+    writeLocU,
+    writeMessagePublic,
+    writeMoveClick,
+    writeNpcOp,
+    writeNpcT,
+    writeNpcU,
+    writeObjOp,
+    writeObjT,
+    writeObjU,
+    writePlayerOp,
+    writePlayerT,
+    writePlayerU
+} from '#/client/io/gameOutbound.js';
 import { assertPacketConsumed } from '#/client/io/packetGuard.js';
 import { ServerProt, ServerProtSizes } from '#/client/io/ServerProt.js';
 import * as ServerProtTable from '#/client/io/ServerProt.js';
@@ -511,13 +548,7 @@ export class Client extends GameShell {
     private overMainComId: number = 0;
     private overSideComId: number = 0;
     private activeIcon: number = 3;
-    private sideIcon: number[] = [
-        -1, -1, -1,
-        -1, -1, -1,
-        -1, -1, -1,
-        -1, -1, -1,
-        -1, -1, -1
-    ];
+    private sideIcon: number[] = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
     private tutComId: number = -1;
     private tutComMessage: string | null = null;
     private tutFlashIcon: number = -1;
@@ -794,7 +825,6 @@ export class Client extends GameShell {
                 if (wait > 60) {
                     wait = 60;
                 }
-
             }
         }
     }
@@ -1927,12 +1957,7 @@ export class Client extends GameShell {
                 this.in.pos = 0;
 
                 this.loginSeed = this.in.g8();
-                const seed: Int32Array = new Int32Array([
-                    Math.floor(Math.random() * 99999999),
-                    Math.floor(Math.random() * 99999999),
-                    Number(this.loginSeed >> 32n),
-                    Number(this.loginSeed & BigInt(0xffffffff))
-                ]);
+                const seed: Int32Array = new Int32Array([Math.floor(Math.random() * 99999999), Math.floor(Math.random() * 99999999), Number(this.loginSeed >> 32n), Number(this.loginSeed & BigInt(0xffffffff))]);
 
                 this.out.pos = 0;
                 this.out.p1(10);
@@ -2392,9 +2417,7 @@ export class Client extends GameShell {
         if (this.sendCamera && this.sendCameraDelay <= 0) {
             this.sendCameraDelay = 20;
             this.sendCamera = false;
-            this.out.p1Enc(ClientProt.EVENT_CAMERA_POSITION);
-            this.out.p2(this.orbitCameraPitch);
-            this.out.p2(this.orbitCameraYaw);
+            writeEventCameraPosition(this.out, ClientProt.EVENT_CAMERA_POSITION, this.orbitCameraPitch, this.orbitCameraYaw);
         }
 
         if (this.focus && !this.focusIn) {
@@ -2506,11 +2529,7 @@ export class Client extends GameShell {
                             com.swapSlots(this.objDragSlot, this.hoveredSlot);
                         }
 
-                        this.out.p1Enc(ClientProt.INV_BUTTOND);
-                        this.out.p2(this.objDragComId);
-                        this.out.p2(this.objDragSlot);
-                        this.out.p2(this.hoveredSlot);
-                        this.out.p1(mode);
+                        writeInvButtonD(this.out, ClientProt.INV_BUTTOND, this.hoveredSlot, mode, this.objDragComId, this.objDragSlot);
                     }
                 } else if ((this.oneMouseButton === 1 || this.isAddFriendOption(this.menuNumEntries - 1)) && this.menuNumEntries > 2) {
                     this.openMenu();
@@ -2523,11 +2542,10 @@ export class Client extends GameShell {
             }
         }
 
+        // Java 377 has CYCLELOGIC1–6 only. Incrementing the unused counter keeps the field, but opcode 255 must not be sent.
         Client.cyclelogic7++;
         if (Client.cyclelogic7 > 62) {
             Client.cyclelogic7 = 0;
-
-            this.out.p1Enc(ClientProt.ANTICHEAT_CYCLELOGIC7);
         }
 
         if (World.groundX !== -1) {
@@ -3069,6 +3087,12 @@ export class Client extends GameShell {
     }
 
     private chatModeLoop(): void {
+        Client.cyclelogic6++;
+        if (Client.cyclelogic6 > 161) {
+            Client.cyclelogic6 = 0;
+            writeAnticheatCycleLogic6(this.out, ClientProt.ANTICHEAT_CYCLELOGIC6);
+        }
+
         if (this.mouseClickButton !== 1) {
             return;
         }
@@ -3153,14 +3177,6 @@ export class Client extends GameShell {
     }
 
     private async handleInputKey(): Promise<void> {
-        Client.cyclelogic4++;
-        if (Client.cyclelogic4 > 192) {
-            Client.cyclelogic4 = 0;
-
-            this.out.p1Enc(ClientProt.ANTICHEAT_CYCLELOGIC4);
-            this.out.p1(232);
-        }
-
         while (true) {
             let key: number;
             do {
@@ -3354,24 +3370,11 @@ export class Client extends GameShell {
                                     this.chatInput = this.chatInput.substring(6);
                                 }
 
-                                let effect: number = 0;
-                                if (this.chatInput.startsWith('wave:')) {
-                                    effect = 1;
-                                    this.chatInput = this.chatInput.substring(5);
-                                }
-                                if (this.chatInput.startsWith('scroll:')) {
-                                    effect = 2;
-                                    this.chatInput = this.chatInput.substring(7);
-                                }
+                                const effectParsed = publicChatEffect(this.chatInput);
+                                const effect = effectParsed.effect;
+                                this.chatInput = effectParsed.rest;
 
-                                this.out.p1Enc(ClientProt.MESSAGE_PUBLIC);
-                                this.out.p1(0);
-                                const start: number = this.out.pos;
-
-                                this.out.p1(colour);
-                                this.out.p1(effect);
-                                WordPack.pack(this.out, this.chatInput);
-                                this.out.psize1(this.out.pos - start);
+                                writeMessagePublic(this.out, ClientProt.MESSAGE_PUBLIC, colour, effect, packed => WordPack.pack(packed, this.chatInput));
 
                                 this.chatInput = JString.toSentenceCase(this.chatInput);
                                 this.chatInput = WordFilter.filter(this.chatInput);
@@ -3635,7 +3638,9 @@ export class Client extends GameShell {
                         this.lastWaveLoops = this.waveLoops[wave];
                         await playWave(buf.data.slice(0, buf.pos));
                     }
-                } catch (_e) {
+                } catch {
+                    // Java sends the wave id only when signlink.reporterror; a browser takes the else branch.
+                    writeEventSynthError(this.out, PROT_377_ONLY.EVENT_SYNTH_ERROR, -1);
                 }
 
                 this.waveCount--;
@@ -4121,6 +4126,12 @@ export class Client extends GameShell {
                 this.areaGame?.draw(4, 4);
                 this.areaMap?.draw(550, 4);
             }
+
+            Client.cyclelogic2++;
+            if (Client.cyclelogic2 > 85) {
+                Client.cyclelogic2 = 0;
+                writeAnticheatCycleLogic2(this.out, ClientProt.ANTICHEAT_CYCLELOGIC2);
+            }
         }
 
         if (this.sceneState === 2) {
@@ -4474,14 +4485,6 @@ export class Client extends GameShell {
 
         if (this.localPlayer.x >> 7 === this.minimapFlagX && this.localPlayer.z >> 7 === this.minimapFlagZ) {
             this.minimapFlagX = 0;
-
-            Client.cyclelogic6++;
-            if (Client.cyclelogic6 > 122) {
-                Client.cyclelogic6 = 0;
-
-                this.out.p1Enc(ClientProt.ANTICHEAT_CYCLELOGIC6);
-                this.out.p1(62);
-            }
         }
 
         let count = this.playerCount;
@@ -4594,32 +4597,10 @@ export class Client extends GameShell {
             }
         }
 
-        Client.cyclelogic1++;
-        if (Client.cyclelogic1 > 1174) {
-            Client.cyclelogic1 = 0;
-
-            this.out.p1Enc(ClientProt.ANTICHEAT_CYCLELOGIC1);
-            this.out.p1(0);
-            const start = this.out.pos;
-            if (((Math.random() * 2.0) | 0) === 0) {
-                this.out.p2(11499);
-            }
-            this.out.p2(10548);
-            if (((Math.random() * 2.0) | 0) == 0) {
-                this.out.p1(139);
-            }
-            if (((Math.random() * 2.0) | 0) == 0) {
-                this.out.p1(94);
-            }
-            this.out.p2(51693);
-            this.out.p1(16);
-            this.out.p2(15036);
-            if (((Math.random() * 2.0) | 0) == 0) {
-                this.out.p1(65);
-            }
-            this.out.p1((Math.random() * 256.0) | 0);
-            this.out.p2(22990);
-            this.out.psize1(this.out.pos - start);
+        Client.cyclelogic5++;
+        if (Client.cyclelogic5 > 51) {
+            Client.cyclelogic5 = 0;
+            writeAnticheatCycleLogic5(this.out, ClientProt.ANTICHEAT_CYCLELOGIC5);
         }
     }
 
@@ -4687,6 +4668,17 @@ export class Client extends GameShell {
         let top: number = 3;
 
         if (this.camPitch < 310 && this.localPlayer) {
+            Client.cyclelogic1++;
+            if (Client.cyclelogic1 > 1457) {
+                Client.cyclelogic1 = 0;
+                writeAnticheatCycleLogic1(this.out, ClientProt.ANTICHEAT_CYCLELOGIC1, {
+                    word: (Math.random() * 65536) | 0,
+                    byte1: (Math.random() * 256) | 0,
+                    extra: ((Math.random() * 2) | 0) === 0,
+                    byte2: (Math.random() * 256) | 0
+                });
+            }
+
             let cameraLocalTileX: number = this.camX >> 7;
             let cameraLocalTileZ: number = this.camZ >> 7;
             const playerLocalTileX: number = this.localPlayer.x >> 7;
@@ -5050,13 +5042,6 @@ export class Client extends GameShell {
             this.cross[(this.crossCycle / 100) | 0]?.plotSprite(this.crossX - 8 - 4, this.crossY - 8 - 4);
         } else if (this.crossMode === 2) {
             this.cross[((this.crossCycle / 100) | 0) + 4]?.plotSprite(this.crossX - 8 - 4, this.crossY - 8 - 4);
-
-            Client.cyclelogic5++;
-            if (Client.cyclelogic5 > 57) {
-                Client.cyclelogic5 = 0;
-
-                this.out.p1Enc(ClientProt.ANTICHEAT_CYCLELOGIC5);
-            }
         }
 
         if (this.mainOverlayId !== -1) {
@@ -5115,6 +5100,12 @@ export class Client extends GameShell {
                 this.p12?.drawString('System update in: ' + minutes + ':0' + seconds, 4, 329, Colour.YELLOW);
             } else {
                 this.p12?.drawString('System update in: ' + minutes + ':' + seconds, 4, 329, Colour.YELLOW);
+            }
+
+            Client.cyclelogic3++;
+            if (Client.cyclelogic3 > 112) {
+                Client.cyclelogic3 = 0;
+                writeAnticheatCycleLogic3(this.out, ClientProt.ANTICHEAT_CYCLELOGIC3);
             }
         }
     }
@@ -5618,12 +5609,10 @@ export class Client extends GameShell {
             }
         }
 
-        Client.cyclelogic3++;
-        if (Client.cyclelogic3 > 112) {
-            Client.cyclelogic3 = 0;
-
-            this.out.p1Enc(ClientProt.ANTICHEAT_CYCLELOGIC3);
-            this.out.p1(50);
+        Client.cyclelogic4++;
+        if (Client.cyclelogic4 > 177) {
+            Client.cyclelogic4 = 0;
+            writeAnticheatCycleLogic4(this.out, ClientProt.ANTICHEAT_CYCLELOGIC4);
         }
     }
 
@@ -5773,7 +5762,8 @@ export class Client extends GameShell {
         }
     }
 
-    private interactWithLoc(x: number, z: number, typecode: number, opcode: number): boolean {
+    /** Pathfind and cross only. Java 377 writes the packet in useMenuOption, and tryNearest is true. */
+    private interactWithLoc(x: number, z: number, typecode: number): boolean {
         if (!this.localPlayer || !this.world) {
             return false;
         }
@@ -5786,30 +5776,6 @@ export class Client extends GameShell {
 
         const shape: number = info & 0x1f;
         const angle: number = (info >> 6) & 0x3;
-
-        Client.cyclelogic2++;
-        if (Client.cyclelogic2 > 1086) {
-            Client.cyclelogic2 = 0;
-
-            this.out.p1Enc(ClientProt.ANTICHEAT_CYCLELOGIC2);
-            this.out.p1(0);
-            const start = this.out.pos;
-            if (((Math.random() * 2.0) | 0) == 0) {
-                this.out.p2(16791);
-            }
-            this.out.p1(254);
-            this.out.p2((Math.random() * 65536.0) | 0);
-            this.out.p2(16128);
-            this.out.p2(52610);
-            this.out.p2((Math.random() * 65536.0) | 0);
-            this.out.p2(55420);
-            if (((Math.random() * 2.0) | 0) == 0) {
-                this.out.p2(35025);
-            }
-            this.out.p2(46628);
-            this.out.p1((Math.random() * 256.0) | 0);
-            this.out.psize1(this.out.pos - start);
-        }
 
         if (shape === LocShape.CENTREPIECE_STRAIGHT || shape === LocShape.CENTREPIECE_DIAGONAL || shape === LocShape.GROUND_DECOR) {
             const loc: LocType = LocType.list(locId);
@@ -5829,20 +5795,15 @@ export class Client extends GameShell {
                 forceapproach = ((forceapproach << angle) & 0xf) + (forceapproach >> (4 - angle));
             }
 
-            this.tryMove(this.localPlayer.routeX[0], this.localPlayer.routeZ[0], x, z, false, width, height, 0, 0, forceapproach, 2);
+            this.tryMove(this.localPlayer.routeX[0], this.localPlayer.routeZ[0], x, z, true, width, height, 0, 0, forceapproach, 2);
         } else {
-            this.tryMove(this.localPlayer.routeX[0], this.localPlayer.routeZ[0], x, z, false, 0, 0, angle, shape + 1, 0, 2);
+            this.tryMove(this.localPlayer.routeX[0], this.localPlayer.routeZ[0], x, z, true, 0, 0, angle, shape + 1, 0, 2);
         }
 
         this.crossX = this.mouseClickX;
         this.crossY = this.mouseClickY;
         this.crossMode = 2;
         this.crossCycle = 0;
-
-        this.out.p1Enc(opcode);
-        this.out.p2(x + this.mapBuildBaseX);
-        this.out.p2(z + this.mapBuildBaseZ);
-        this.out.p2(locId);
         return true;
     }
 
@@ -6013,31 +5974,55 @@ export class Client extends GameShell {
         this.tryMoveNearest = 0;
 
         if (!arrived) {
-            if (tryNearest) {
-                let min: number = 100;
-                for (let padding: number = 1; padding < 2; padding++) {
-                    for (let px: number = dx - padding; px <= dx + padding; px++) {
-                        for (let pz: number = dz - padding; pz <= dz + padding; pz++) {
-                            const index: number = CollisionMap.index(px, pz);
-                            if (px >= 0 && pz >= 0 && px < BuildArea.SIZE && pz < BuildArea.SIZE && this.distMap[index] < min) {
-                                min = this.distMap[index];
-                                x = px;
-                                z = pz;
-                                this.tryMoveNearest = 1;
-                                arrived = true;
-                            }
-                        }
+            if (!tryNearest) {
+                return false;
+            }
+
+            // Java 377: 10-tile window, distance squared to the loc box, cost as the tiebreak.
+            let bestDistSq: number = 1000;
+            let bestCost: number = 100;
+            const pad: number = 10;
+            for (let px: number = dx - pad; px <= dx + pad; px++) {
+                for (let pz: number = dz - pad; pz <= dz + pad; pz++) {
+                    if (px < 0 || pz < 0 || px >= BuildArea.SIZE || pz >= BuildArea.SIZE) {
+                        continue;
+                    }
+                    const cost: number = this.distMap[CollisionMap.index(px, pz)];
+                    if (cost >= 100) {
+                        continue;
                     }
 
-                    if (arrived) {
-                        break;
+                    let distX: number = 0;
+                    if (px < dx) {
+                        distX = dx - px;
+                    } else if (px > locWidth + dx - 1) {
+                        distX = px - (locWidth + dx - 1);
+                    }
+
+                    let distZ: number = 0;
+                    if (pz < dz) {
+                        distZ = dz - pz;
+                    } else if (pz > dz + locLength - 1) {
+                        distZ = pz - (dz + locLength - 1);
+                    }
+
+                    const distSq: number = distX * distX + distZ * distZ;
+                    if (distSq < bestDistSq || (bestDistSq === distSq && cost < bestCost)) {
+                        bestDistSq = distSq;
+                        bestCost = cost;
+                        x = px;
+                        z = pz;
                     }
                 }
             }
 
-            if (!arrived) {
+            if (bestDistSq === 1000) {
                 return false;
             }
+            if (srcX === x && srcZ === z) {
+                return false;
+            }
+            this.tryMoveNearest = 1;
         }
 
         length = 0;
@@ -6079,34 +6064,17 @@ export class Client extends GameShell {
             const startX: number = this.routeX[length];
             const startZ: number = this.routeZ[length];
 
-            if (type === 0) {
-                this.out.p1Enc(ClientProt.MOVE_GAMECLICK);
-                this.out.p1(bufferSize + bufferSize + 3);
-            } else if (type === 1) {
-                this.out.p1Enc(ClientProt.MOVE_MINIMAPCLICK);
-                this.out.p1(bufferSize + bufferSize + 3 + 14);
-            } else if (type === 2) {
-                this.out.p1Enc(ClientProt.MOVE_OPCLICK);
-                this.out.p1(bufferSize + bufferSize + 3);
+            const steps: { dx: number; dz: number }[] = [];
+            for (let i: number = 1; i < bufferSize; i++) {
+                length--;
+                steps.push({ dx: this.routeX[length] - startX, dz: this.routeZ[length] - startZ });
             }
 
-            if (this.keyHeld[5] === 1) {
-                this.out.p1(1);
-            } else {
-                this.out.p1(0);
-            }
-
-            this.out.p2(startX + this.mapBuildBaseX);
-            this.out.p2(startZ + this.mapBuildBaseZ);
+            const moveOpcode = type === 1 ? ClientProt.MOVE_MINIMAPCLICK : type === 2 ? ClientProt.MOVE_OPCLICK : ClientProt.MOVE_GAMECLICK;
+            writeMoveClick(this.out, moveOpcode, startX + this.mapBuildBaseX, this.keyHeld[5] === 1 ? 1 : 0, startZ + this.mapBuildBaseZ, steps, type === 1 ? 14 : 0);
 
             this.minimapFlagX = this.routeX[0];
             this.minimapFlagZ = this.routeZ[0];
-
-            for (let i: number = 1; i < bufferSize; i++) {
-                length--;
-                this.out.p1(this.routeX[length] - startX);
-                this.out.p1(this.routeZ[length] - startZ);
-            }
 
             // src→dest inclusive (fullRev is dest→src and already ends at src)
             this.lastWalkPathLocal = fullRev.slice().reverse();
@@ -8647,9 +8615,18 @@ export class Client extends GameShell {
                 const action: number = this.menuAction[this.menuNumEntries - 1];
 
                 if (
-                    action == MiniMenuAction.INV_BUTTON1 || action == MiniMenuAction.INV_BUTTON2 || action == MiniMenuAction.INV_BUTTON3 || action == MiniMenuAction.INV_BUTTON4 || action == MiniMenuAction.INV_BUTTON5 ||
-                    action == MiniMenuAction.OP_HELD1 || action == MiniMenuAction.OP_HELD2 || action == MiniMenuAction.OP_HELD3 || action == MiniMenuAction.OP_HELD4 || action == MiniMenuAction.OP_HELD5 ||
-                    action == MiniMenuAction.USEHELD_START || action === MiniMenuAction.OP_HELD6
+                    action == MiniMenuAction.INV_BUTTON1 ||
+                    action == MiniMenuAction.INV_BUTTON2 ||
+                    action == MiniMenuAction.INV_BUTTON3 ||
+                    action == MiniMenuAction.INV_BUTTON4 ||
+                    action == MiniMenuAction.INV_BUTTON5 ||
+                    action == MiniMenuAction.OP_HELD1 ||
+                    action == MiniMenuAction.OP_HELD2 ||
+                    action == MiniMenuAction.OP_HELD3 ||
+                    action == MiniMenuAction.OP_HELD4 ||
+                    action == MiniMenuAction.OP_HELD5 ||
+                    action == MiniMenuAction.USEHELD_START ||
+                    action === MiniMenuAction.OP_HELD6
                 ) {
                     const slot: number = this.menuParamB[this.menuNumEntries - 1];
                     const comId: number = this.menuParamC[this.menuNumEntries - 1];
@@ -8883,49 +8860,40 @@ export class Client extends GameShell {
                 this.crossMode = 2;
                 this.crossCycle = 0;
 
+                const worldX = b + this.mapBuildBaseX;
+                const worldZ = c + this.mapBuildBaseZ;
+                // Java 377: OPOBJ1 has no anticheat. OPOBJ2 increments oplogic1.
                 if (action === MiniMenuAction.OP_OBJ1) {
-                    if ((b & 0x3) == 0) {
-                        Client.oplogic7++;
-                    }
-                    if (Client.oplogic7 >= 123) {
-                        this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC7);
-                        this.out.p4(0);
-                    }
-
-                    this.out.p1Enc(ClientProt.OPOBJ1);
+                    writeObjOp(this.out, ClientProt.OPOBJ1, 1, worldX, worldZ, a);
                 }
 
                 if (action === MiniMenuAction.OP_OBJ2) {
-                    this.out.p1Enc(ClientProt.OPOBJ2);
+                    Client.oplogic1++;
+                    if (Client.oplogic1 >= 120) {
+                        writeAnticheatOpLogic1(this.out, ClientProt.ANTICHEAT_OPLOGIC1);
+                        Client.oplogic1 = 0;
+                    }
+                    writeObjOp(this.out, ClientProt.OPOBJ2, 2, worldX, worldZ, a);
                 }
 
                 if (action === MiniMenuAction.OP_OBJ3) {
-                    this.out.p1Enc(ClientProt.OPOBJ3);
+                    if ((a & 0x3) === 0) {
+                        Client.oplogic4++;
+                    }
+                    if (Client.oplogic4 >= 84) {
+                        writeAnticheatOpLogic4(this.out, ClientProt.ANTICHEAT_OPLOGIC4);
+                        Client.oplogic4 = 0;
+                    }
+                    writeObjOp(this.out, ClientProt.OPOBJ3, 3, worldX, worldZ, a);
                 }
 
                 if (action === MiniMenuAction.OP_OBJ4) {
-                    Client.oplogic8 += c;
-                    if (Client.oplogic8 >= 75) {
-                        this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC8);
-                        this.out.p1(19);
-                    }
-
-                    this.out.p1Enc(ClientProt.OPOBJ4);
+                    writeObjOp(this.out, ClientProt.OPOBJ4, 4, worldX, worldZ, a);
                 }
 
                 if (action === MiniMenuAction.OP_OBJ5) {
-                    Client.oplogic3 += this.mapBuildBaseZ;
-                    if (Client.oplogic3 >= 118) {
-                        this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC3);
-                        this.out.p4(0);
-                    }
-
-                    this.out.p1Enc(ClientProt.OPOBJ5);
+                    writeObjOp(this.out, ClientProt.OPOBJ5, 5, worldX, worldZ, a);
                 }
-
-                this.out.p2(b + this.mapBuildBaseX);
-                this.out.p2(c + this.mapBuildBaseZ);
-                this.out.p2(a);
             }
         }
 
@@ -8954,11 +8922,7 @@ export class Client extends GameShell {
                 this.crossMode = 2;
                 this.crossCycle = 0;
 
-                this.out.p1Enc(ClientProt.OPOBJT);
-                this.out.p2(b + this.mapBuildBaseX);
-                this.out.p2(c + this.mapBuildBaseZ);
-                this.out.p2(a);
-                this.out.p2(this.targetComId);
+                writeObjT(this.out, ClientProt.OPOBJT, a, c + this.mapBuildBaseZ, this.targetComId, b + this.mapBuildBaseX);
             }
         }
 
@@ -8974,13 +8938,7 @@ export class Client extends GameShell {
                 this.crossMode = 2;
                 this.crossCycle = 0;
 
-                this.out.p1Enc(ClientProt.OPOBJU);
-                this.out.p2(b + this.mapBuildBaseX);
-                this.out.p2(c + this.mapBuildBaseZ);
-                this.out.p2(a);
-                this.out.p2(this.objComId);
-                this.out.p2(this.objSelectedSlot);
-                this.out.p2(this.objSelectedComId);
+                writeObjU(this.out, ClientProt.OPOBJU, this.objSelectedSlot, this.objComId, c + this.mapBuildBaseZ, b + this.mapBuildBaseX, this.objSelectedComId, a);
             }
         }
 
@@ -8995,26 +8953,29 @@ export class Client extends GameShell {
                 this.crossCycle = 0;
 
                 if (action === MiniMenuAction.OP_NPC1) {
-                    this.out.p1Enc(ClientProt.OPNPC1);
+                    writeNpcOp(this.out, ClientProt.OPNPC1, 1, a);
                 }
 
                 if (action === MiniMenuAction.OP_NPC2) {
-                    this.out.p1Enc(ClientProt.OPNPC2);
+                    writeNpcOp(this.out, ClientProt.OPNPC2, 2, a);
                 }
 
                 if (action === MiniMenuAction.OP_NPC3) {
-                    this.out.p1Enc(ClientProt.OPNPC3);
+                    Client.oplogic3 += a;
+                    if (Client.oplogic3 >= 143) {
+                        writeAnticheatOpLogic3(this.out, ClientProt.ANTICHEAT_OPLOGIC3);
+                        Client.oplogic3 = 0;
+                    }
+                    writeNpcOp(this.out, ClientProt.OPNPC3, 3, a);
                 }
 
                 if (action === MiniMenuAction.OP_NPC4) {
-                    this.out.p1Enc(ClientProt.OPNPC4);
+                    writeNpcOp(this.out, ClientProt.OPNPC4, 4, a);
                 }
 
                 if (action === MiniMenuAction.OP_NPC5) {
-                    this.out.p1Enc(ClientProt.OPNPC5);
+                    writeNpcOp(this.out, ClientProt.OPNPC5, 5, a);
                 }
-
-                this.out.p2(a);
             }
         }
 
@@ -9043,9 +9004,7 @@ export class Client extends GameShell {
                 this.crossMode = 2;
                 this.crossCycle = 0;
 
-                this.out.p1Enc(ClientProt.OPNPCT);
-                this.out.p2(a);
-                this.out.p2(this.targetComId);
+                writeNpcT(this.out, ClientProt.OPNPCT, this.targetComId, a);
             }
         }
 
@@ -9060,44 +9019,34 @@ export class Client extends GameShell {
                 this.crossMode = 2;
                 this.crossCycle = 0;
 
-                this.out.p1Enc(ClientProt.OPNPCU);
-                this.out.p2(a);
-                this.out.p2(this.objComId);
-                this.out.p2(this.objSelectedSlot);
-                this.out.p2(this.objSelectedComId);
+                writeNpcU(this.out, ClientProt.OPNPCU, a, this.objComId, this.objSelectedComId, this.objSelectedSlot);
             }
         }
 
+        // Java writes OPLOC1–5 after interactWithLoc even when the path fails. The id is the placed typecode, not a morph leaf.
         if (action === MiniMenuAction.OP_LOC1) {
-            this.interactWithLoc(b, c, a, ClientProt.OPLOC1);
+            this.interactWithLoc(b, c, a);
+            writeLocOp(this.out, ClientProt.OPLOC1, 1, b + this.mapBuildBaseX, c + this.mapBuildBaseZ, placedLocId(a));
         }
 
         if (action === MiniMenuAction.OP_LOC2) {
-            Client.oplogic1 += c;
-            if (Client.oplogic1 >= 139) {
-                this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC1);
-                this.out.p4(0);
-            }
-
-            this.interactWithLoc(b, c, a, ClientProt.OPLOC2);
+            this.interactWithLoc(b, c, a);
+            writeLocOp(this.out, ClientProt.OPLOC2, 2, b + this.mapBuildBaseX, c + this.mapBuildBaseZ, placedLocId(a));
         }
 
         if (action === MiniMenuAction.OP_LOC3) {
-            Client.oplogic2++;
-            if (Client.oplogic2 >= 124) {
-                this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC2);
-                this.out.p2(37954);
-            }
-
-            this.interactWithLoc(b, c, a, ClientProt.OPLOC3);
+            this.interactWithLoc(b, c, a);
+            writeLocOp(this.out, ClientProt.OPLOC3, 3, b + this.mapBuildBaseX, c + this.mapBuildBaseZ, placedLocId(a));
         }
 
         if (action === MiniMenuAction.OP_LOC4) {
-            this.interactWithLoc(b, c, a, ClientProt.OPLOC4);
+            this.interactWithLoc(b, c, a);
+            writeLocOp(this.out, ClientProt.OPLOC4, 4, b + this.mapBuildBaseX, c + this.mapBuildBaseZ, placedLocId(a));
         }
 
         if (action === MiniMenuAction.OP_LOC5) {
-            this.interactWithLoc(b, c, a, ClientProt.OPLOC5);
+            this.interactWithLoc(b, c, a);
+            writeLocOp(this.out, ClientProt.OPLOC5, 5, b + this.mapBuildBaseX, c + this.mapBuildBaseZ, placedLocId(a));
         }
 
         if (action === MiniMenuAction.OP_LOC6) {
@@ -9109,16 +9058,14 @@ export class Client extends GameShell {
         }
 
         if (action === MiniMenuAction.TGT_LOC) {
-            if (this.interactWithLoc(b, c, a, ClientProt.OPLOCT)) {
-                this.out.p2(this.targetComId);
+            if (this.interactWithLoc(b, c, a)) {
+                writeLocT(this.out, ClientProt.OPLOCT, this.targetComId, placedLocId(a), b + this.mapBuildBaseX, c + this.mapBuildBaseZ);
             }
         }
 
         if (action === MiniMenuAction.USEHELD_ONLOC) {
-            if (this.interactWithLoc(b, c, a, ClientProt.OPLOCU)) {
-                this.out.p2(this.objComId);
-                this.out.p2(this.objSelectedSlot);
-                this.out.p2(this.objSelectedComId);
+            if (this.interactWithLoc(b, c, a)) {
+                writeLocU(this.out, ClientProt.OPLOCU, placedLocId(a), this.objSelectedComId, this.objComId, c + this.mapBuildBaseZ, this.objSelectedSlot, b + this.mapBuildBaseX);
             }
         }
 
@@ -9133,38 +9080,24 @@ export class Client extends GameShell {
                 this.crossCycle = 0;
 
                 if (action === MiniMenuAction.OP_PLAYER1) {
-                    Client.oplogic4++;
-                    if (Client.oplogic4 >= 52) {
-                        this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC4);
-                        this.out.p1(131);
-                    }
-
-                    this.out.p1Enc(ClientProt.OPPLAYER1);
+                    writePlayerOp(this.out, ClientProt.OPPLAYER1, 1, a);
                 }
 
                 if (action === MiniMenuAction.OP_PLAYER2) {
-                    this.out.p1Enc(ClientProt.OPPLAYER2);
+                    writePlayerOp(this.out, ClientProt.OPPLAYER2, 2, a);
                 }
 
                 if (action === MiniMenuAction.OP_PLAYER3) {
-                    this.out.p1Enc(ClientProt.OPPLAYER3);
+                    writePlayerOp(this.out, ClientProt.OPPLAYER3, 3, a);
                 }
 
                 if (action === MiniMenuAction.OP_PLAYER4) {
-                    Client.oplogic5 += a;
-                    if (Client.oplogic5 >= 66) {
-                        this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC5);
-                        this.out.p1(154);
-                    }
-
-                    this.out.p1Enc(ClientProt.OPPLAYER4);
+                    writePlayerOp(this.out, ClientProt.OPPLAYER4, 4, a);
                 }
 
                 if (action === MiniMenuAction.OP_PLAYER5) {
-                    this.out.p1Enc(ClientProt.OPPLAYER5);
+                    writePlayerOp(this.out, ClientProt.OPPLAYER5, 5, a);
                 }
-
-                this.out.p2(a);
             }
         }
 
@@ -9184,26 +9117,12 @@ export class Client extends GameShell {
                         this.tryMove(this.localPlayer.routeX[0], this.localPlayer.routeZ[0], player.routeX[0], player.routeZ[0], false, 1, 1, 0, 0, 0, 2);
 
                         if (action === MiniMenuAction.ACCEPT_TRADEREQ) {
-                            Client.oplogic5 += a;
-                            if (Client.oplogic5 >= 66) {
-                                this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC5);
-                                this.out.p1(154);
-                            }
-
-                            this.out.p1Enc(ClientProt.OPPLAYER4);
+                            writePlayerOp(this.out, ClientProt.OPPLAYER4, 4, this.playerIds[i]);
                         }
 
                         if (action === MiniMenuAction.ACCEPT_DUELREQ) {
-                            Client.oplogic4++;
-                            if (Client.oplogic4 >= 52) {
-                                this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC4);
-                                this.out.p1(131);
-                            }
-
-                            this.out.p1Enc(ClientProt.OPPLAYER1);
+                            writePlayerOp(this.out, ClientProt.OPPLAYER1, 1, this.playerIds[i]);
                         }
-
-                        this.out.p2(this.playerIds[i]);
                         found = true;
                         break;
                     }
@@ -9226,9 +9145,7 @@ export class Client extends GameShell {
                 this.crossMode = 2;
                 this.crossCycle = 0;
 
-                this.out.p1Enc(ClientProt.OPPLAYERT);
-                this.out.p2(a);
-                this.out.p2(this.targetComId);
+                writePlayerT(this.out, ClientProt.OPPLAYERT, a, this.targetComId);
             }
         }
 
@@ -9242,44 +9159,40 @@ export class Client extends GameShell {
                 this.crossMode = 2;
                 this.crossCycle = 0;
 
-                this.out.p1Enc(ClientProt.OPPLAYERU);
-                this.out.p2(a);
-                this.out.p2(this.objComId);
-                this.out.p2(this.objSelectedSlot);
-                this.out.p2(this.objSelectedComId);
+                writePlayerU(this.out, ClientProt.OPPLAYERU, this.objComId, this.objSelectedSlot, this.objSelectedComId, a);
             }
         }
 
         if (action === MiniMenuAction.OP_HELD1 || action === MiniMenuAction.OP_HELD2 || action === MiniMenuAction.OP_HELD3 || action === MiniMenuAction.OP_HELD4 || action === MiniMenuAction.OP_HELD5) {
             if (action === MiniMenuAction.OP_HELD1) {
-                this.out.p1Enc(ClientProt.OPHELD1);
+                Client.oplogic5 += a;
+                if (Client.oplogic5 >= 115) {
+                    writeAnticheatOpLogic5(this.out, ClientProt.ANTICHEAT_OPLOGIC5);
+                    Client.oplogic5 = 0;
+                }
+                writeHeldOp(this.out, ClientProt.OPHELD1, 1, a, b, c);
             }
 
             if (action === MiniMenuAction.OP_HELD2) {
-                this.out.p1Enc(ClientProt.OPHELD2);
+                writeHeldOp(this.out, ClientProt.OPHELD2, 2, a, b, c);
             }
 
             if (action === MiniMenuAction.OP_HELD3) {
-                this.out.p1Enc(ClientProt.OPHELD3);
+                writeHeldOp(this.out, ClientProt.OPHELD3, 3, a, b, c);
             }
 
             if (action === MiniMenuAction.OP_HELD4) {
-                Client.oplogic9++;
-                if (Client.oplogic9 >= 116) {
-                    this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC9);
-                    this.out.p3(13018169);
+                Client.oplogic2++;
+                if (Client.oplogic2 >= 62) {
+                    writeAnticheatOpLogic2(this.out, ClientProt.ANTICHEAT_OPLOGIC2);
+                    Client.oplogic2 = 0;
                 }
-
-                this.out.p1Enc(ClientProt.OPHELD4);
+                writeHeldOp(this.out, ClientProt.OPHELD4, 4, a, b, c);
             }
 
             if (action === MiniMenuAction.OP_HELD5) {
-                this.out.p1Enc(ClientProt.OPHELD5);
+                writeHeldOp(this.out, ClientProt.OPHELD5, 5, a, b, c);
             }
-
-            this.out.p2(a);
-            this.out.p2(b);
-            this.out.p2(c);
 
             this.selectedCycle = 0;
             this.selectedComId = c;
@@ -9352,11 +9265,7 @@ export class Client extends GameShell {
         }
 
         if (action === MiniMenuAction.TGT_HELD) {
-            this.out.p1Enc(ClientProt.OPHELDT);
-            this.out.p2(a);
-            this.out.p2(b);
-            this.out.p2(c);
-            this.out.p2(this.targetComId);
+            writeHeldT(this.out, ClientProt.OPHELDT, this.targetComId, c, b, a);
 
             this.selectedCycle = 0;
             this.selectedComId = c;
@@ -9373,13 +9282,7 @@ export class Client extends GameShell {
         }
 
         if (action === MiniMenuAction.USEHELD_ONHELD) {
-            this.out.p1Enc(ClientProt.OPHELDU);
-            this.out.p2(a);
-            this.out.p2(b);
-            this.out.p2(c);
-            this.out.p2(this.objComId);
-            this.out.p2(this.objSelectedSlot);
-            this.out.p2(this.objSelectedComId);
+            writeHeldU(this.out, ClientProt.OPHELDU, a, this.objSelectedSlot, this.objComId, this.objSelectedComId, b, c);
 
             this.selectedCycle = 0;
             this.selectedComId = c;
@@ -9397,36 +9300,24 @@ export class Client extends GameShell {
 
         if (action === MiniMenuAction.INV_BUTTON1 || action === MiniMenuAction.INV_BUTTON2 || action === MiniMenuAction.INV_BUTTON3 || action === MiniMenuAction.INV_BUTTON4 || action === MiniMenuAction.INV_BUTTON5) {
             if (action === MiniMenuAction.INV_BUTTON1) {
-                if ((a & 0x3) == 0) {
-                    Client.oplogic6++;
-                }
-                if (Client.oplogic6 >= 133) {
-                    this.out.p1Enc(ClientProt.ANTICHEAT_OPLOGIC6);
-                    this.out.p2(6118);
-                }
-
-                this.out.p1Enc(ClientProt.INV_BUTTON1);
+                writeInvButton(this.out, ClientProt.INV_BUTTON1, 1, a, b, c);
             }
 
             if (action === MiniMenuAction.INV_BUTTON2) {
-                this.out.p1Enc(ClientProt.INV_BUTTON2);
+                writeInvButton(this.out, ClientProt.INV_BUTTON2, 2, a, b, c);
             }
 
             if (action === MiniMenuAction.INV_BUTTON3) {
-                this.out.p1Enc(ClientProt.INV_BUTTON3);
+                writeInvButton(this.out, ClientProt.INV_BUTTON3, 3, a, b, c);
             }
 
             if (action === MiniMenuAction.INV_BUTTON4) {
-                this.out.p1Enc(ClientProt.INV_BUTTON4);
+                writeInvButton(this.out, ClientProt.INV_BUTTON4, 4, a, b, c);
             }
 
             if (action === MiniMenuAction.INV_BUTTON5) {
-                this.out.p1Enc(ClientProt.INV_BUTTON5);
+                writeInvButton(this.out, ClientProt.INV_BUTTON5, 5, a, b, c);
             }
-
-            this.out.p2(a);
-            this.out.p2(b);
-            this.out.p2(c);
 
             this.selectedCycle = 0;
             this.selectedComId = c;
@@ -11908,7 +11799,6 @@ export class Client extends GameShell {
         }
 
         if (e.pointerType !== 'mouse') {
-
             this.idleTimer = performance.now();
             this.nextMouseClickX = -1;
             this.nextMouseClickY = -1;
@@ -11942,7 +11832,6 @@ export class Client extends GameShell {
         }
 
         if (e.pointerType !== 'mouse') {
-
             this.idleTimer = performance.now();
             this.mouseX = x;
             this.mouseY = y;
@@ -11995,7 +11884,6 @@ export class Client extends GameShell {
             this.mouseX = x;
             this.mouseY = y;
         } else {
-
             this.idleTimer = performance.now();
             this.nextMouseClickX = -1;
             this.nextMouseClickY = -1;

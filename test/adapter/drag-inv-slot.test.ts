@@ -49,10 +49,14 @@ describe('dragInvSlot', () => {
         expect(slots(com).slice(0, 4)).toEqual([30, 20, 10, 40]);
 
         const bytes = sent(client);
+        // Java INV_BUTTOND: p2_alt3(to) p1_alt1(mode) p2_alt2(com) p2_alt1(from)
         expect(bytes[0]).toBe(ClientProt.INV_BUTTOND & 0xff);
-        expect((bytes[1] << 8) | bytes[2]).toBe(5382);
-        expect((bytes[3] << 8) | bytes[4]).toBe(0);
-        expect((bytes[5] << 8) | bytes[6]).toBe(2);
+        expect(bytes[1]).toBe((2 + 128) & 0xff);
+        expect(bytes[2]).toBe(0);
+        expect(bytes[3]).toBe(128);
+        expect(bytes[4]).toBe(5382 >> 8);
+        expect(bytes[5]).toBe((5382 + 128) & 0xff);
+        expect(bytes[6]).toBe(0);
         expect(bytes[7]).toBe(0);
     });
 
@@ -63,7 +67,7 @@ describe('dragInvSlot', () => {
 
         expect(actions.dragInvSlot(5382, 3, 0, 1)).toBe(true);
         expect(slots(com).slice(0, 4)).toEqual([40, 10, 20, 30]);
-        expect(sent(client)[7]).toBe(1);
+        expect(sent(client)[3]).toBe((1 + 128) & 0xff);
     });
 
     test('mode 1 shifts left to right as well', () => {
