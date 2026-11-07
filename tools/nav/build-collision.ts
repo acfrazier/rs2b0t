@@ -380,8 +380,9 @@ function verify(baked: BakedMapsquare[], collision: CollisionEngine, locs: { con
 function parseArgs(): { engine: string; members: boolean; out: string; verify: boolean; revision: number } {
     const args = process.argv.slice(2);
     let engine = process.env.ENGINE_DIR ?? path.join(homedir(), 'code', 'rs2b2t-engine');
+    const revision = process.env.REVISION === undefined ? CLIENT_VERSION : Number(process.env.REVISION);
     let members = true;
-    let out = 'out/collision.lcnav';
+    let out = revision === 377 ? 'data/377/out/collision.lcnav' : 'out/collision.lcnav';
     let verifyFlag = true;
 
     for (let i = 0; i < args.length; i++) {
@@ -400,7 +401,9 @@ function parseArgs(): { engine: string; members: boolean; out: string; verify: b
             process.exit(2);
         }
     }
-    const revision = process.env.REVISION === undefined ? CLIENT_VERSION : Number(process.env.REVISION);
+    if (revision === 377 && path.resolve(out) === path.resolve('out/collision.lcnav')) {
+        throw new Error('REVISION=377 collision pack must be staged, not written to out/collision.lcnav.gz');
+    }
     return { engine, members, out, verify: verifyFlag, revision };
 }
 

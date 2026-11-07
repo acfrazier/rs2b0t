@@ -501,7 +501,7 @@ function main(): void {
         if (failures > 0) {
             process.exitCode = 1;
         }
-}
+    }
 }
 
 main();
