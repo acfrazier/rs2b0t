@@ -102,6 +102,8 @@ async function client(): Promise<{ probe: Reach; restore: () => void }> {
     const { Client } = await import('#/client/shell/Client.js');
     const created = new Client(undefined as never, undefined as never, undefined as never) as unknown as Reach;
     created.collision[0] = new CollisionMap();
+    // A fresh 377 map marks every interior tile UNLOADED (Java 377 CollisionMap.reset); these cases need loaded, open tiles.
+    created.collision[0]!.flags.fill(0);
     created.mapBuildBaseX = 3200;
     created.mapBuildBaseZ = 3200;
     created.keyHeld[5] = 1;
@@ -172,7 +174,7 @@ describe('377 outbound census', () => {
     test('does not export writers the browser never calls', () => {
         const source = readFileSync('src/client/io/gameOutbound.ts', 'utf8');
         expect(source.includes('export function writeEventHasWindow')).toBe(false);
-        expect(source.includes('export function writeResumePNameDialog')).toBe(false);
+        expect(source.includes('export function writeResumePNameDialog')).toBe(true);
         expect(source.includes('chatbackInputOpen')).toBe(true);
     });
 });

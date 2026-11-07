@@ -158,7 +158,7 @@ export async function startLiveProxy(options: LiveProxyOptions = {}) {
                     return f ? localFile(f, executableAsset) : new Response('not found', { status: 404 });
                 }
 
-                if (!/^\/(?:crc(?:-?\d+)?|(?:title|config|interface|media|versionlist|textures|wordenc|sounds)-?\d+|loginkey|client\/client\.js)$/.test(gamePath)) {
+                if (!/^\/(?:crc(?:-?\d+)*|(?:title|config|interface|media|versionlist|textures|wordenc|sounds)-?\d+|loginkey|client\/client\.js)$/.test(gamePath)) {
                     return new Response('not found', { status: 404 });
                 }
                 let upstream: Response;

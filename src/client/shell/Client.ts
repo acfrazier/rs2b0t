@@ -13,7 +13,7 @@ import TitleFlames from '#/client/shell/TitleFlames.js';
 import FloType from '#/client/config/FloType.js';
 import SeqType, { PostanimMove, PreanimMove, RestartMode } from '#/client/config/SeqType.js';
 import LocType from '#/client/config/LocType.js';
-import { resolveMultiloc } from '#/client/config/resolveMultiloc.js';
+import { resolveMultiloc, resolveMultiNpc } from '#/client/config/resolveMultiloc.js';
 import ObjType from '#/client/config/ObjType.js';
 import NpcType from '#/client/config/NpcType.js';
 import IdkType from '#/client/config/IdkType.js';
@@ -70,7 +70,6 @@ import OnDemand from '#/client/io/OnDemand.js';
 import {
     parsePublicChat,
     placedLocId,
-    PROT_377_ONLY,
     writeAnticheatCycleLogic1,
     writeAnticheatCycleLogic2,
     writeAnticheatCycleLogic3,
@@ -121,6 +120,7 @@ import {
     writePlayerT,
     writePlayerU,
     writeResumePCountDialog,
+    writeResumePNameDialog,
     writeResumePauseButton,
     writeSendSnapshot,
     writeTutClickSide
@@ -278,6 +278,7 @@ export class Client extends GameShell {
     private onDemand: OnDemand | null = null;
     public db: Database | null = null;
     private jagChecksum: number[] = [];
+    private loginRetryCount: number = 0;
 
     private npc: (ClientNpc | null)[] = new TypedArray1d(16384, null);
     private npcCount: number = 0;
@@ -365,7 +366,10 @@ export class Client extends GameShell {
     private mapscene: (Pix8 | null)[] = new TypedArray1d(50, null);
     private mapfunction: (Pix32 | null)[] = new TypedArray1d(50, null);
     private hitmarks: (Pix32 | null)[] = new TypedArray1d(20, null);
-    private headicons: (Pix32 | null)[] = new TypedArray1d(20, null);
+    private headiconsPk: (Pix32 | null)[] = new TypedArray1d(32, null);
+    private headiconsPrayer: (Pix32 | null)[] = new TypedArray1d(32, null);
+    private headiconsHint: (Pix32 | null)[] = new TypedArray1d(32, null);
+    private overlayMultiway: Pix32 | null = null;
     private mapmarker1: Pix32 | null = null;
     private mapmarker2: Pix32 | null = null;
     private cross: (Pix32 | null)[] = new TypedArray1d(8, null);
@@ -420,6 +424,7 @@ export class Client extends GameShell {
     private areaBackvmid2: PixMap | null = null;
     private areaBackvmid3: PixMap | null = null;
     private areaBackhmid2: PixMap | null = null;
+    private fullscreenScanline: Int32Array | null = null;
     private chatScanline: Int32Array | null = null;
     private sideScanline: Int32Array | null = null;
     private gameScanline: Int32Array | null = null;
@@ -821,7 +826,7 @@ export class Client extends GameShell {
             await this.drawProgress('Connecting to web server', 10);
 
             try {
-                const checksums: Packet = new Packet(await downloadUrl(gameHttpUrl('/crc')));
+                const checksums: Packet = new Packet(await downloadUrl(gameHttpUrl(`/crc${Math.floor(Math.random() * 99999999)}-${CLIENT_VERSION}`)));
                 for (let i: number = 0; i < 9; i++) {
                     this.jagChecksum[i] = checksums.g4();
                 }
@@ -1151,9 +1156,28 @@ export class Client extends GameShell {
             }
 
             try {
-                for (let i: number = 0; i < 20; i++) {
-                    this.headicons[i] = Pix32.depack(media, 'headicons', i);
+                for (let i: number = 0; i < 6; i++) {
+                    this.headiconsPk[i] = Pix32.depack(media, 'headicons_pk', i);
                 }
+            } catch (_e) {
+            }
+
+            try {
+                for (let i: number = 0; i < 9; i++) {
+                    this.headiconsPrayer[i] = Pix32.depack(media, 'headicons_prayer', i);
+                }
+            } catch (_e) {
+            }
+
+            try {
+                for (let i: number = 0; i < 6; i++) {
+                    this.headiconsHint[i] = Pix32.depack(media, 'headicons_hint', i);
+                }
+            } catch (_e) {
+            }
+
+            try {
+                this.overlayMultiway = Pix32.depack(media, 'overlay_multiway', 0);
             } catch (_e) {
             }
 
@@ -1322,6 +1346,10 @@ export class Client extends GameShell {
                 this.minimapMaskLineOffsets[y - 5] = left - 25;
                 this.minimapMaskLineLengths[y - 5] = right - left;
             }
+
+            // Java load(): init3D(503, 765) fullscreen first, the 512x334 viewport last, so the projection centre stays on the viewport.
+            Pix3D.setClipping(765, 503);
+            this.fullscreenScanline = Pix3D.scanline;
 
             Pix3D.setClipping(479, 96);
             this.chatScanline = Pix3D.scanline;
@@ -1862,6 +1890,7 @@ export class Client extends GameShell {
         }
 
         this.logoutRequested = false;
+        this.loginRetryCount = 0;
 
         // Stat arrays intentionally survive logout for the title/UI. Give every
         // accepted login its own generation so consumers can distinguish that
@@ -1978,7 +2007,9 @@ export class Client extends GameShell {
                 return;
             }
 
-            let response: number = await stream.read();
+            // Java 377 keeps the handshake byte (`var9`) to tell a silent server from a refused login.
+            const handshake: number = await stream.read();
+            let response: number = handshake;
             if (!this.isLoginAttemptActive(attempt)) {
                 return;
             }
@@ -2132,6 +2163,10 @@ export class Client extends GameShell {
                 this.resumedPauseButton = false;
                 this.activeIcon = 3;
                 this.dialogInputOpen = false;
+                const loginState = getClient377State(this);
+                loginState.fullscreenInterfaceId0 = -1;
+                loginState.fullscreenInterfaceId1 = -1;
+                loginState.chatbackInputOpen = 0;
                 this.isMenuOpen = false;
                 this.socialInputOpen = false;
                 this.tutComMessage = null;
@@ -2194,9 +2229,6 @@ export class Client extends GameShell {
             } else if (response === 10) {
                 this.loginMes1 = 'Unable to connect.';
                 this.loginMes2 = 'Bad session id.';
-            } else if (response === 11) {
-                this.loginMes1 = 'Login server rejected session.';
-                this.loginMes2 = 'Please try again.';
             } else if (response === 12) {
                 this.loginMes1 = 'You need a members account to login to this world.';
                 this.loginMes2 = 'Please subscribe, or use a different world.';
@@ -2226,19 +2258,23 @@ export class Client extends GameShell {
             } else if (response === 17) {
                 this.loginMes1 = 'You are standing in a members-only area.';
                 this.loginMes2 = 'To play on this world move to a free area first';
+            } else if (response === 18) {
+                this.loginMes1 = 'Account locked as we suspect it has been stolen.';
+                this.loginMes2 = "Press 'recover a locked account' on front page.";
             } else if (response === 20) {
                 this.loginMes1 = 'Invalid loginserver requested';
                 this.loginMes2 = 'Please try using a different world.';
             } else if (response === 21) {
-                for (let remaining = await stream.read(); remaining >= 0; remaining--) {
+                // Java 377: the countdown starts at the server byte plus three and ticks every 1200 ms.
+                for (let remaining = (await stream.read()) + 3; remaining >= 0; remaining--) {
                     if (!this.isLoginAttemptActive(attempt)) {
                         return;
                     }
                     this.loginMes1 = 'You have only just left another world';
-                    this.loginMes2 = 'Your profile will be transferred in: ' + remaining + ' seconds';
+                    this.loginMes2 = 'Your profile will be transferred in: ' + remaining;
                     await this.titleScreenDraw();
 
-                    await this.loginSleep(1000);
+                    await this.loginSleep(1200);
                 }
 
                 this.closeLoginStream(attempt);
@@ -2246,10 +2282,39 @@ export class Client extends GameShell {
                     return;
                 }
                 await this.performLogin(username, password, reconnect, attempt);
-            } else {
+            } else if (response === 22) {
+                this.loginMes1 = 'Malformed login packet.';
+                this.loginMes2 = 'Please try again.';
+            } else if (response === 23) {
+                this.loginMes1 = 'No reply from loginserver.';
+                this.loginMes2 = 'Please try again.';
+            } else if (response === 24) {
+                this.loginMes1 = 'Error loading your profile.';
+                this.loginMes2 = 'Please contact customer support.';
+            } else if (response === 25) {
+                this.loginMes1 = 'Unexpected loginserver response.';
+                this.loginMes2 = 'Please try using a different world.';
+            } else if (response === 26) {
+                this.loginMes1 = 'This computers address has been blocked';
+                this.loginMes2 = 'as it was used to break our rules';
+            } else if (response !== -1) {
                 console.log('response:' + response);
                 this.loginMes1 = 'Unexpected server response';
                 this.loginMes2 = 'Please try using a different world.';
+            } else if (handshake !== 0) {
+                this.loginMes1 = 'No response from server';
+                this.loginMes2 = 'Please try using a different world.';
+            } else if (this.loginRetryCount < 2) {
+                this.closeLoginStream(attempt);
+                await this.loginSleep(2000);
+                if (!this.isLoginAttemptActive(attempt)) {
+                    return;
+                }
+                this.loginRetryCount++;
+                await this.performLogin(username, password, reconnect, attempt);
+            } else {
+                this.loginMes1 = 'No response from loginserver';
+                this.loginMes2 = 'Please wait 1 minute and try again.';
             }
 
             if (!this.ingame && this.isLoginAttemptActive(attempt)) {
@@ -2312,6 +2377,41 @@ export class Client extends GameShell {
         this.areaBackhmid1 = new PixMap(249, 45);
 
         this.redrawFrame = true;
+
+        // Java prepareGame ends with areaViewport.bind(); Pix3D.lineOffset = areaViewportOffset.
+        this.areaGame.setPixels();
+        if (this.gameScanline) {
+            Pix3D.scanline = this.gameScanline;
+        }
+    }
+
+    /** Java `prepareFullGame`: the 765x503 surface IF_OPENFULL draws on; the chrome surfaces are dropped so `prepareGame` rebuilds them on close. */
+    private prepareFullGame(): void {
+        if (this.drawArea) {
+            return;
+        }
+
+        this.unloadTitle();
+
+        this.imageTitle2 = null;
+        this.imageTitle3 = null;
+        this.imageTitle4 = null;
+        this.imageTitle0 = null;
+        this.imageTitle1 = null;
+        this.imageTitle5 = null;
+        this.imageTitle6 = null;
+        this.imageTitle7 = null;
+        this.imageTitle8 = null;
+
+        this.areaChat = null;
+        this.areaMap = null;
+        this.areaSide = null;
+        this.areaGame = null;
+        this.areaBackbase1 = null;
+        this.areaBackbase2 = null;
+        this.areaBackhmid1 = null;
+
+        this.drawArea = new PixMap(765, 503);
     }
 
     private async gameLoop(): Promise<void> {
@@ -2607,9 +2707,12 @@ export class Client extends GameShell {
 
         if (checkClickInput) {
             this.mouseLoop();
-            this.minimapLoop();
-            this.iconLoop();
-            this.chatModeLoop();
+            // Java: minimap, tab and chat-mode input stay off while a fullscreen layer is open.
+            if (getClient377State(this).fullscreenInterfaceId0 === -1) {
+                this.minimapLoop();
+                this.iconLoop();
+                this.chatModeLoop();
+            }
         }
 
         if (this.mouseButton === 1 || this.mouseClickButton === 1) {
@@ -2795,6 +2898,17 @@ export class Client extends GameShell {
         this.menuAction[0] = MiniMenuAction.CANCEL;
         this.menuNumEntries = 1;
 
+        // Java handleInput: a fullscreen layer takes all input.
+        const fullscreenId: number = getClient377State(this).fullscreenInterfaceId0;
+        if (fullscreenId !== -1) {
+            this.lastOverComId = 0;
+            this.addComponentOptions(IfType.list[fullscreenId], this.mouseX, this.mouseY, 0, 0, 0);
+            if (this.lastOverComId !== this.overMainComId) {
+                this.overMainComId = this.lastOverComId;
+            }
+            return;
+        }
+
         this.addPrivateChatOptions();
         this.lastOverComId = 0;
 
@@ -2830,7 +2944,7 @@ export class Client extends GameShell {
         if (this.mouseX > 17 && this.mouseY > 357 && this.mouseX < 496 && this.mouseY < 453) {
             if (this.chatModalId !== -1) {
                 this.addComponentOptions(IfType.list[this.chatModalId], this.mouseX, this.mouseY, 17, 357, 0);
-            } else if (this.mouseY < 434 && this.mouseX < 426) {
+            } else if (this.mouseY < 434 && this.mouseX < 426 && getClient377State(this).chatbackInputOpen === 0) {
                 this.addChatOptions(this.mouseX - 17, this.mouseY - 357);
             }
         }
@@ -3283,9 +3397,30 @@ export class Client extends GameShell {
                             }
 
                             this.dialogInputOpen = false;
+                            getClient377State(this).chatbackInputOpen = 0;
                             this.redrawChat = true;
                         }
-                    } else if (this.chatModalId === -1) {
+                    } else if (getClient377State(this).chatbackInputOpen === 2) {
+                        // Java 377 P_NAMEDIALOG: up to 12 characters, base37 name on Enter.
+                        if (key >= 32 && key <= 122 && this.dialogInput.length < 12) {
+                            this.dialogInput = this.dialogInput + String.fromCharCode(key);
+                            this.redrawChat = true;
+                        }
+
+                        if (key === 8 && this.dialogInput.length > 0) {
+                            this.dialogInput = this.dialogInput.substring(0, this.dialogInput.length - 1);
+                            this.redrawChat = true;
+                        }
+
+                        if (key === 13 || key === 10) {
+                            if (this.dialogInput.length > 0) {
+                                writeResumePNameDialog(this.out, ClientProt.RESUME_P_NAMEDIALOG, JString.toUserhash(this.dialogInput));
+                            }
+
+                            getClient377State(this).chatbackInputOpen = 0;
+                            this.redrawChat = true;
+                        }
+                    } else if (this.chatModalId === -1 && getClient377State(this).fullscreenInterfaceId0 === -1) {
                         if (key >= 32 && (key <= 122 || (this.chatInput.startsWith('::') && key <= 126)) && this.chatInput.length < 80) {
                             this.chatInput = this.chatInput + String.fromCharCode(key);
                             this.redrawChat = true;
@@ -3596,7 +3731,7 @@ export class Client extends GameShell {
                         }
                     }
                 } catch {
-                    writeEventSynthError(this.out, PROT_377_ONLY.EVENT_SYNTH_ERROR, this.waveIds[wave] & 0x7fff);
+                    writeEventSynthError(this.out, ClientProt.EVENT_SYNTH_ERROR, this.waveIds[wave] & 0x7fff);
                 }
 
                 this.waveCount--;
@@ -4060,7 +4195,53 @@ export class Client extends GameShell {
             return;
         }
 
+        const state = getClient377State(this);
+
+        // Java drawGame: an IF_OPENFULL layer takes the whole 765x503 surface.
+        if (state.fullscreenInterfaceId0 !== -1 && (this.sceneState === 2 || this.drawArea !== null)) {
+            if (this.sceneState === 2) {
+                this.animateInterface(state.fullscreenInterfaceId0, this.worldUpdateNum);
+                if (state.fullscreenInterfaceId1 !== -1) {
+                    this.animateInterface(state.fullscreenInterfaceId1, this.worldUpdateNum);
+                }
+                this.worldUpdateNum = 0;
+
+                this.prepareFullGame();
+                this.drawArea?.setPixels();
+                if (this.fullscreenScanline) {
+                    Pix3D.scanline = this.fullscreenScanline;
+                }
+                Pix2D.cls();
+                this.redrawFrame = true;
+
+                for (const id of [state.fullscreenInterfaceId0, state.fullscreenInterfaceId1]) {
+                    if (id === -1) {
+                        continue;
+                    }
+                    const layer: IfType | undefined = IfType.list[id];
+                    if (!layer) {
+                        continue;
+                    }
+                    if (layer.width === 512 && layer.height === 334 && layer.type === ComponentType.TYPE_LAYER) {
+                        layer.width = 765;
+                        layer.height = 503;
+                    }
+                    this.drawInterface(layer, 0, 0, 0);
+                }
+
+                if (this.isMenuOpen) {
+                    this.drawMinimenu();
+                } else {
+                    this.buildMinimenu();
+                    this.drawFeedback();
+                }
+            }
+            this.drawArea?.draw(0, 0);
+            return;
+        }
+
         if (this.redrawFrame) {
+            this.prepareGame();
             this.redrawFrame = false;
 
             this.areaBackleft1?.draw(0, 4);
@@ -4118,7 +4299,7 @@ export class Client extends GameShell {
             this.redrawSide = false;
         }
 
-        if (this.chatModalId === -1) {
+        if (this.chatModalId === -1 && getClient377State(this).chatbackInputOpen === 0) {
             this.chatInterface.scrollPos = this.chatScrollHeight - this.chatScrollPos - 77;
 
             if (this.mouseX > 448 && this.mouseX < 560 && this.mouseY > 332) {
@@ -4747,11 +4928,16 @@ export class Client extends GameShell {
             if (index >= this.playerCount) {
                 const npc = (entity as ClientNpc).type;
 
-                if (npc && npc.headicon >= 0 && npc.headicon < this.headicons.length) {
+                // Java skips every overlay of an NPC whose multinpc form resolves to nothing.
+                if (npc && resolveMultiNpc(npc, this.var) === null) {
+                    continue;
+                }
+
+                if (npc && npc.headicon >= 0 && npc.headicon < this.headiconsPrayer.length) {
                     this.getOverlayPosEntity(entity, entity.height + 15);
 
                     if (this.projectX > -1) {
-                        this.headicons[npc.headicon]?.plotSprite(this.projectX - 12, this.projectY - 30);
+                        this.headiconsPrayer[npc.headicon]?.plotSprite(this.projectX - 12, this.projectY - 30);
                     }
                 }
 
@@ -4759,24 +4945,23 @@ export class Client extends GameShell {
                     this.getOverlayPosEntity(entity, entity.height + 15);
 
                     if (this.projectX > -1) {
-                        this.headicons[2]?.plotSprite(this.projectX - 12, this.projectY - 28);
+                        this.headiconsHint[0]?.plotSprite(this.projectX - 12, this.projectY - 28);
                     }
                 }
             } else {
                 let y: number = 30;
 
                 const player: ClientPlayer = entity as ClientPlayer;
-                // 377 stores two signed indices; SC-i must load headicons_pk / headicons_prayer.
                 if (player.headiconPk !== -1 || player.headiconPrayer !== -1) {
                     this.getOverlayPosEntity(entity, entity.height + 15);
 
                     if (this.projectX > -1) {
                         if (player.headiconPk !== -1) {
-                            this.headicons[player.headiconPk]?.plotSprite(this.projectX - 12, this.projectY - y);
+                            this.headiconsPk[player.headiconPk]?.plotSprite(this.projectX - 12, this.projectY - y);
                             y += 25;
                         }
                         if (player.headiconPrayer !== -1) {
-                            this.headicons[player.headiconPrayer]?.plotSprite(this.projectX - 12, this.projectY - y);
+                            this.headiconsPrayer[player.headiconPrayer]?.plotSprite(this.projectX - 12, this.projectY - y);
                             y += 25;
                         }
                     }
@@ -4786,7 +4971,7 @@ export class Client extends GameShell {
                     this.getOverlayPosEntity(entity, entity.height + 15);
 
                     if (this.projectX > -1) {
-                        this.headicons[7]?.plotSprite(this.projectX - 12, this.projectY - y);
+                        this.headiconsHint[1]?.plotSprite(this.projectX - 12, this.projectY - y);
                     }
                 }
             }
@@ -4957,14 +5142,14 @@ export class Client extends GameShell {
     }
 
     private coordArrow(): void {
-        if (this.hintType !== 2 || !this.headicons[2]) {
+        if (this.hintType !== 2 || !this.headiconsHint[0]) {
             return;
         }
 
         this.getOverlayPos(((this.hintTileX - this.mapBuildBaseX) << 7) + this.hintOffsetX, ((this.hintTileZ - this.mapBuildBaseZ) << 7) + this.hintOffsetZ, this.hintHeight * 2);
 
         if (this.projectX > -1 && Client.loopCycle % 20 < 10) {
-            this.headicons[2].plotSprite(this.projectX - 12, this.projectY - 28);
+            this.headiconsHint[0].plotSprite(this.projectX - 12, this.projectY - 28);
         }
     }
 
@@ -5040,7 +5225,7 @@ export class Client extends GameShell {
         }
 
         if (this.inMultizone === 1) {
-            this.headicons[1]?.plotSprite(472, 296);
+            this.overlayMultiway?.plotSprite(472, 296);
         }
 
         if (this.showFps) {
@@ -8330,11 +8515,6 @@ export class Client extends GameShell {
             return;
         }
 
-        if (this.dialogInputOpen) {
-            this.dialogInputOpen = false;
-            this.redrawChat = true;
-        }
-
         let action: number = this.menuAction[optionId];
         const a: number = this.menuParamA[optionId];
         const b: number = this.menuParamB[optionId];
@@ -8342,6 +8522,14 @@ export class Client extends GameShell {
 
         if (action >= MiniMenuAction._PRIORITY) {
             action -= MiniMenuAction._PRIORITY;
+        }
+
+        // Java useMenuOption: any option but Cancel closes an open chatback input.
+        const state = getClient377State(this);
+        if ((this.dialogInputOpen || state.chatbackInputOpen !== 0) && action !== MiniMenuAction.CANCEL) {
+            this.dialogInputOpen = false;
+            state.chatbackInputOpen = 0;
+            this.redrawChat = true;
         }
 
         if (action === MiniMenuAction.OP_OBJ1 || action === MiniMenuAction.OP_OBJ2 || action === MiniMenuAction.OP_OBJ3 || action === MiniMenuAction.OP_OBJ4 || action === MiniMenuAction.OP_OBJ5) {
@@ -11851,6 +12039,9 @@ export class Client extends GameShell {
             this.b12?.centreString(this.socialInput + '*', 239, 60, Colour.DARKBLUE);
         } else if (this.dialogInputOpen) {
             this.b12?.centreString('Enter amount:', 239, 40, Colour.BLACK);
+            this.b12?.centreString(this.dialogInput + '*', 239, 60, Colour.DARKBLUE);
+        } else if (getClient377State(this).chatbackInputOpen === 2) {
+            this.b12?.centreString('Enter name:', 239, 40, Colour.BLACK);
             this.b12?.centreString(this.dialogInput + '*', 239, 60, Colour.DARKBLUE);
         } else if (this.tutComMessage) {
             this.b12?.centreString(this.tutComMessage, 239, 40, Colour.BLACK);

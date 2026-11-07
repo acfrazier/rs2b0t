@@ -2,26 +2,16 @@ import Packet from '#/client/io/Packet.js';
 
 /**
  * Revision 377 outbound layouts. Java `Client.java` is the oracle (line cites
- * below). The opcode is an argument so SC-i can regenerate `ClientProt` without
- * rewriting field order. Engine decoders are the independent check; where they
- * disagree with Java the writer still follows Java and the census records it.
- *
- * Integration: methods touched and fields SC-i must add are listed on
- * `OUTBOUND_CENSUS` and in the slice evidence note. Do not reference the dropped
- * 289 names `ANTICHEAT_OPLOGIC6..9` or `ANTICHEAT_CYCLELOGIC7`.
+ * below). The opcode is an argument so a caller passes the generated `ClientProt`
+ * value. Engine decoders are the independent check; where they disagree with
+ * Java the writer still follows Java and the census records it. The dropped 289
+ * names `ANTICHEAT_OPLOGIC6..9` and `ANTICHEAT_CYCLELOGIC7` are never written.
  */
 
 export interface WaypointStep {
     dx: number;
     dz: number;
 }
-
-/** Names the 289 `ClientProt` does not have. SC-i switches call sites to `ClientProt` after regeneration. */
-export const PROT_377_ONLY = {
-    EVENT_HAS_WINDOW: 78,
-    EVENT_SYNTH_ERROR: 80,
-    RESUME_P_NAMEDIALOG: 206
-} as const;
 
 /** Placed loc id from a scene typecode. Morph resolution must not replace this. Java `var6 >> 14 & 0x7FFF`. */
 export function placedLocId(typecode: number): number {
@@ -33,8 +23,8 @@ export interface OutboundSpec {
     id: number;
     length: number;
     javaLine: number;
-    /** emitted: a call site writes it. platform-absent: Java's condition is false in the browser. needs-field: writer exists, SC-i must add the field before the call site. */
-    disposition: 'emitted' | 'platform-absent' | 'needs-field';
+    /** emitted: a call site writes it. platform-absent: Java's condition is false in the browser. */
+    disposition: 'emitted' | 'platform-absent';
     note: string;
 }
 
@@ -103,7 +93,7 @@ export const OUTBOUND_CENSUS: readonly OutboundSpec[] = [
     { name: 'CLOSE_MODAL', id: 110, length: 0, javaLine: 4569, disposition: 'emitted', note: 'opcode only' },
     { name: 'RESUME_P_COUNTDIALOG', id: 75, length: 4, javaLine: 4896, disposition: 'emitted', note: 'p4; engine reads g4s' },
     { name: 'TUT_CLICKSIDE', id: 119, length: 1, javaLine: 5841, disposition: 'emitted', note: 'p1 tab' },
-    { name: 'RESUME_P_NAMEDIALOG', id: 206, length: 8, javaLine: 4917, disposition: 'needs-field', note: 'p8 userhash (Client.java:4917). SC-i must add chatbackInputOpen: === 2 sends this and clears the field; === 1 is the count dialog already on dialogInputOpen; === 3 edits text and sends nothing (Client.java:4924-4933). Not exported until that field exists' },
+    { name: 'RESUME_P_NAMEDIALOG', id: 206, length: 8, javaLine: 4917, disposition: 'emitted', note: 'p8 userhash (Client.java:4917). chatbackInputOpen === 2 sends this and clears the field; === 1 is the count dialog on dialogInputOpen; === 3 is never set by Java 377 (no assignment in Client.java), so rs2b0t has no state 3' },
     { name: 'MAP_BUILD_COMPLETE', id: 6, length: 0, javaLine: 3500, disposition: 'emitted', note: 'opcode only' },
     { name: 'MOVE_OPCLICK', id: 247, length: -1, javaLine: 7194, disposition: 'emitted', note: 'p2_alt3 x, p1 ctrl, p2_alt3 z, then p1 dx p1_alt3 dz' },
     { name: 'SEND_SNAPSHOT', id: 184, length: 10, javaLine: 12049, disposition: 'emitted', note: 'p8 name, p1 reason, p1 mute' },
@@ -500,6 +490,12 @@ export function writeResumePauseButton(out: Packet, opcode: number, com: number)
 export function writeResumePCountDialog(out: Packet, opcode: number, value: number): void {
     out.p1Enc(opcode);
     out.p4(value);
+}
+
+/** Java `RESUME_P_NAMEDIALOG` (Client.java:4917): p8 base37 userhash. */
+export function writeResumePNameDialog(out: Packet, opcode: number, userhash: bigint): void {
+    out.p1Enc(opcode);
+    out.p8(userhash);
 }
 
 export function writeTutClickSide(out: Packet, opcode: number, tab: number): void {

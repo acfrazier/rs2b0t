@@ -68,12 +68,15 @@ class BotHostImpl {
         // Why: bounding the memo to one server tick keeps that impossible and still collapses the roughly 24 per-frame rebuilds within a tick to one.
         if (
             ptype === ServerProt.PLAYER_INFO ||
+            ptype === ServerProt.REBUILD_NORMAL ||
+            ptype === ServerProt.REBUILD_REGION ||
             ptype === ServerProt.UPDATE_ZONE_PARTIAL_ENCLOSED ||
             ptype === ServerProt.UPDATE_ZONE_PARTIAL_FOLLOWS ||
             ptype === ServerProt.UPDATE_ZONE_FULL_FOLLOWS ||
             ptype === ServerProt.LOC_ADD_CHANGE ||
             ptype === ServerProt.LOC_DEL ||
             ptype === ServerProt.LOC_ANIM ||
+            ptype === ServerProt.P_LOCMERGE ||
             ptype === ServerProt.VARP_SMALL ||
             ptype === ServerProt.VARP_LARGE ||
             ptype === ServerProt.VARP_SYNC

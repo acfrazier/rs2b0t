@@ -1,9 +1,10 @@
-import { expect, mock, test } from 'bun:test';
+import { expect, mock, spyOn, test } from 'bun:test';
 
 import { MiniMenuAction } from '#/client/shell/MiniMenuAction.js';
 import { ClientProt } from '#/client/io/ClientProt.js';
 import LinkList from '#/client/datastruct/LinkList.js';
 import type ClientStream from '#/client/io/ClientStream.js';
+import Packet from '#/client/io/Packet.js';
 import { resetLoginKey } from '#/client/config/loginKey.js';
 
 mock.module('#/client/3rdparty/audio.js', () => ({
@@ -62,8 +63,8 @@ class FakeLoginStream {
     readCount = 0;
     private readonly reads: number[];
 
-    constructor(response: number) {
-        this.reads = [...new Array<number>(8).fill(0), response];
+    constructor(response: number, trailing: number[] = []) {
+        this.reads = [...new Array<number>(8).fill(0), response, ...trailing];
     }
 
     write(_src: Uint8Array, _len: number): void {}
@@ -386,7 +387,7 @@ test('a cancelled read cannot consume bytes from the replacement login stream', 
 });
 
 test('transport failures release the gate and show native connection feedback', async () => {
-    const resultStream = new FakeLoginStream(11);
+    const resultStream = new FakeLoginStream(22);
     let opens = 0;
     const client = bareClient(async () => {
         opens++;
@@ -406,7 +407,7 @@ test('transport failures release the gate and show native connection feedback', 
 
         expect(client.startLogin('alice', 'secret')).toBe(true);
         await client.loginAttempt!.done;
-        expect(client.loginMes1).toBe('Login server rejected session.');
+        expect(client.loginMes1).toBe('Malformed login packet.');
         expect(client.loginMes2).toBe('Please try again.');
     } finally {
         console.error = originalError;
@@ -523,4 +524,183 @@ test('an intentional logout never enters native reconnect after the logout timer
     await client.lostCon();
     expect(logouts).toBe(1);
     expect(attempts).toBe(0);
+});
+
+// Java 377 `login()` (Client.java:2676-2730): the block a fixed seed, fixed credentials and a synthetic public key must produce.
+// The key is two Mersenne primes, so the test decrypts the RSA block with its own d instead of trusting the production encoder.
+const SYNTHETIC_P = (1n << 521n) - 1n;
+const SYNTHETIC_Q = (1n << 607n) - 1n;
+const SYNTHETIC_N = SYNTHETIC_P * SYNTHETIC_Q;
+const SYNTHETIC_E = 65537n;
+
+function modPow(base: bigint, exponent: bigint, modulus: bigint): bigint {
+    let result = 1n;
+    let b = base % modulus;
+    for (let e = exponent; e > 0n; e >>= 1n) {
+        if (e & 1n) result = (result * b) % modulus;
+        b = (b * b) % modulus;
+    }
+    return result;
+}
+
+function modInverse(a: bigint, m: bigint): bigint {
+    let [r0, r1, t0, t1] = [m, a % m, 0n, 1n];
+    while (r1 !== 0n) {
+        const q = r0 / r1;
+        [r0, r1] = [r1, r0 - q * r1];
+        [t0, t1] = [t1, t0 - q * t1];
+    }
+    return ((t0 % m) + m) % m;
+}
+
+
+/** Installs the synthetic public modulus for the duration of `run`, through the production refresh path. */
+async function withSyntheticLoginKey<T>(run: () => Promise<T>): Promise<T> {
+    const fetchBefore = globalThis.fetch;
+    resetLoginKey();
+    globalThis.fetch = Object.assign(async () => new Response(SYNTHETIC_N.toString()), { preconnect: fetchBefore.preconnect });
+    try {
+        const { refreshLoginKey } = await import('#/client/config/loginKey.js');
+        expect(await refreshLoginKey()).toBe(true);
+        return await run();
+    } finally {
+        globalThis.fetch = fetchBefore;
+        resetLoginKey();
+    }
+}
+
+function realPackets(client: LoginClientView, checksums: number[]): void {
+    Object.assign(client, {
+        out: new Packet(new Uint8Array(512)),
+        in: new Packet(new Uint8Array(512)),
+        loginout: new Packet(new Uint8Array(512)),
+        jagChecksum: checksums
+    });
+}
+
+class BlockCaptureStream {
+    readonly writes: number[][] = [];
+    private readonly reads = [0, 0, 0, 0, 0, 0, 0, 0, 0, 5];
+    closed = false;
+    available = 0;
+    msSinceData = 0;
+
+    constructor(private readonly serverSeed: number[]) {}
+
+    write(src: Uint8Array, len: number): void {
+        this.writes.push([...src.subarray(0, len)]);
+    }
+
+    async read(): Promise<number> {
+        const value = this.reads.shift();
+        if (value === undefined) throw new Error('block capture stream ran out of bytes');
+        return value;
+    }
+
+    async readBytes(dst: Uint8Array, off: number, len: number): Promise<void> {
+        dst.set(this.serverSeed.slice(0, len), off);
+    }
+
+    close(): void {
+        this.closed = true;
+    }
+}
+
+test('login writes the Java 377 block: wrapper, nine CRCs and a decryptable RSA block for fixed seeds', async () => {
+    const serverSeed = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+    const stream = new BlockCaptureStream(serverSeed);
+    const client = bareClient(async () => stream as unknown as ClientStream);
+    const checksums = [11, 22, 33, 44, 55, 66, 77, 88, 99];
+    realPackets(client, checksums);
+    const randoms = [0.123456789, 0.987654321];
+    const random = spyOn(Math, 'random').mockImplementation(() => randoms.shift() ?? 0);
+    try {
+        await withSyntheticLoginKey(async () => {
+            expect(client.startLogin('alice', 'secret')).toBe(true);
+            await client.loginAttempt!.done;
+        });
+    } finally {
+        random.mockRestore();
+    }
+
+    // First write: opcode 14 and (base37('alice') >> 16) & 0x1f; base37('alice') is 2494434.
+    expect(stream.writes).toHaveLength(2);
+    expect(stream.writes[0]).toEqual([14, (2494434 >> 16) & 0x1f]);
+
+    const block = stream.writes[1];
+    const rsaLength = block[42];
+    // Java: out.pos (length byte plus RSA bytes) + 36 + 1 + 1 + 2.
+    expect(block.slice(0, 2)).toEqual([16, rsaLength + 1 + 36 + 1 + 1 + 2]);
+    expect(block.slice(2, 6)).toEqual([255, 377 >> 8, 377 & 255, 0]);
+    const crcBytes = checksums.flatMap(value => [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255]);
+    expect(block.slice(6, 42)).toEqual(crcBytes);
+    expect(block).toHaveLength(43 + rsaLength);
+
+    const seedA = Math.floor(0.123456789 * 99999999);
+    const seedB = Math.floor(0.987654321 * 99999999);
+    const serverHigh = (0x01020304) | 0;
+    const serverLow = (0x05060708) | 0;
+    const word = (value: number): number[] => [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
+    const text = (value: string): number[] => [...Buffer.from(value, 'latin1'), 10];
+    const expected = [10, ...word(seedA), ...word(seedB), ...word(serverHigh), ...word(serverLow), ...word(1337), ...text('alice'), ...text('secret')];
+
+    const d = modInverse(SYNTHETIC_E, (SYNTHETIC_P - 1n) * (SYNTHETIC_Q - 1n));
+    const encrypted = BigInt(`0x${Buffer.from(block.slice(43)).toString('hex')}`);
+    const decrypted = modPow(encrypted, d, SYNTHETIC_N).toString(16);
+    expect(modPow(BigInt(`0x${Buffer.from(expected).toString('hex')}`), SYNTHETIC_E, SYNTHETIC_N)).toBe(encrypted);
+    expect(decrypted.padStart(expected.length * 2, '0')).toBe(Buffer.from(expected).toString('hex'));
+});
+
+test.each([
+    [18, 'Account locked as we suspect it has been stolen.', "Press 'recover a locked account' on front page."],
+    [22, 'Malformed login packet.', 'Please try again.'],
+    [23, 'No reply from loginserver.', 'Please try again.'],
+    [24, 'Error loading your profile.', 'Please contact customer support.'],
+    [25, 'Unexpected loginserver response.', 'Please try using a different world.'],
+    [26, 'This computers address has been blocked', 'as it was used to break our rules'],
+    [11, 'Unexpected server response', 'Please try using a different world.']
+])('Java 377 login reply %i shows its own message (11 is no longer a code)', async (reply, first, second) => {
+    const client = bareClient(async () => asClientStream(new FakeLoginStream(reply)));
+    const log = spyOn(console, 'log').mockImplementation(() => {});
+    try {
+        expect(client.startLogin('alice', 'secret')).toBe(true);
+        await client.loginAttempt!.done;
+    } finally {
+        log.mockRestore();
+    }
+    expect([client.loginMes1, client.loginMes2]).toEqual([first, second]);
+});
+
+test('a silent login server is retried twice with a delay, then reported (Java 377 loginRetryCount)', async () => {
+    const delays: number[] = [];
+    let opens = 0;
+    const client = bareClient(async () => {
+        opens++;
+        // The handshake byte is 0 (the server answered), the block goes out, and the stream then ends.
+        return asClientStream(new FakeLoginStream(0, [-1]));
+    });
+    client.loginSleep = async (ms: number): Promise<void> => { delays.push(ms); };
+    realPackets(client, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    await withSyntheticLoginKey(async () => {
+        expect(client.startLogin('alice', 'secret')).toBe(true);
+        await client.loginAttempt!.done;
+    });
+    expect(opens).toBe(3);
+    expect(delays).toEqual([2000, 2000]);
+    expect(client.loginMes1).toBe('No response from loginserver');
+    expect(client.loginMes2).toBe('Please wait 1 minute and try again.');
+});
+
+test('reply 21 counts down from the server byte plus three, 1200 ms apart, then logs in again', async () => {
+    const streams = [new FakeLoginStream(21, [1]), new FakeLoginStream(5)];
+    const delays: number[] = [];
+    const shown: string[] = [];
+    let opens = 0;
+    const client = bareClient(async () => asClientStream(streams[opens++]));
+    client.loginSleep = async (ms: number): Promise<void> => { delays.push(ms); shown.push(client.loginMes2); };
+    expect(client.startLogin('alice', 'secret')).toBe(true);
+    await client.loginAttempt!.done;
+    expect(delays).toEqual([1200, 1200, 1200, 1200, 1200]);
+    expect(shown).toEqual([4, 3, 2, 1, 0].map(n => `Your profile will be transferred in: ${n}`));
+    expect(opens).toBe(2);
 });

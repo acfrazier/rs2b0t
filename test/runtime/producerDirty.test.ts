@@ -27,6 +27,11 @@ describe('dirtyFamiliesForPacket', () => {
         expect(dirtyFamiliesForPacket(ServerProt.LOGOUT)).toBe('reset');
     });
 
+    test('both scene rebuilds reseed every family, so an instanced scene is not missed', () => {
+        expect(dirtyFamiliesForPacket(ServerProt.REBUILD_NORMAL)).toEqual(['skills', 'inventory', 'varps', 'chat']);
+        expect(dirtyFamiliesForPacket(ServerProt.REBUILD_REGION)).toEqual(['skills', 'inventory', 'varps', 'chat']);
+    });
+
     test('unrelated packets do not dirty producers', () => {
         expect(dirtyFamiliesForPacket(ServerProt.PLAYER_INFO)).toBeNull();
         expect(dirtyFamiliesForPacket(ServerProt.NPC_INFO)).toBeNull();

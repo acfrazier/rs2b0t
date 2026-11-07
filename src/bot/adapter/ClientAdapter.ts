@@ -15,6 +15,7 @@ import { ServerProt } from '#/client/io/ServerProt.js';
 import WordFilter from '#/client/wordfilter/WordFilter.js';
 import WordPack from '#/client/wordfilter/WordPack.js';
 import JString from '#/client/datastruct/JString.js';
+import { IF_IDS } from '#/bot/data/ifIds.js';
 
 import { SELF_TEST, type RawClient } from './RawClient.js';
 
@@ -347,12 +348,12 @@ const PUBLIC_CHAT_TYPE = 2;
 const CHAT_BUBBLE_TICKS = 150;
 
 // tradeconfirm inv components; the engine picks the *_LARGE pair once a side offers 14 or more items.
-const TRADE_CONFIRM_MINE_SMALL = 3542; // tradeconfirm:inv1
-const TRADE_CONFIRM_MINE_LARGE = 3538; // tradeconfirm:inv2
-const TRADE_CONFIRM_THEIRS_SMALL = 3532; // tradeconfirm:otherinv1
-const TRADE_CONFIRM_THEIRS_LARGE = 3539; // tradeconfirm:otherinv2
-const TRADE_CONFIRM_MINE_NOTHING = 3557; // tradeconfirm:inv_nothing
-const TRADE_CONFIRM_THEIRS_NOTHING = 3558; // tradeconfirm:otherinv_nothing
+const TRADE_CONFIRM_MINE_SMALL = IF_IDS.TRADECONFIRM_INV1;
+const TRADE_CONFIRM_MINE_LARGE = IF_IDS.TRADECONFIRM_INV2;
+const TRADE_CONFIRM_THEIRS_SMALL = IF_IDS.TRADECONFIRM_OTHERINV1;
+const TRADE_CONFIRM_THEIRS_LARGE = IF_IDS.TRADECONFIRM_OTHERINV2;
+const TRADE_CONFIRM_MINE_NOTHING = IF_IDS.TRADECONFIRM_INV_NOTHING;
+const TRADE_CONFIRM_THEIRS_NOTHING = IF_IDS.TRADECONFIRM_OTHERINV_NOTHING;
 
 /** One obj definition, flattened for bot code that may not import client internals. */
 export interface ObjRecord {
@@ -1423,42 +1424,44 @@ export const reader = {
 
     duelOffers(): { ready: boolean; mine: InvItemSnapshot[]; theirs: InvItemSnapshot[] } {
         const main = raw?.mainModalId;
-        const ids = main === 6575 ? [6669, 6670] : main === 6412 ? [6507, 6508] : [];
+        const ids = main === IF_IDS.DUEL_SELECT_TYPE
+            ? [IF_IDS.DUEL_SELECT_TYPE_INV, IF_IDS.DUEL_SELECT_TYPE_OTHERINV]
+            : main === IF_IDS.DUEL_CONFIRM ? [IF_IDS.DUEL_CONFIRM_INV, IF_IDS.DUEL_CONFIRM_OTHERINV] : [];
         const read = (id: number): InvItemSnapshot[] => readInvComponent(id, () => []);
         const mine = ids.length ? read(ids[0]) : [];
         const theirs = ids.length ? read(ids[1]) : [];
-        const ready = main === 6575
+        const ready = main === IF_IDS.DUEL_SELECT_TYPE
             ? ids.every(id => invState(id).transmitting && invState(id).fullGeneration > 0)
-            : main === 6412 && [6516, 6517].every(id => reader.ifText(id)?.trim() === 'Absolutely nothing!');
+            : main === IF_IDS.DUEL_CONFIRM && [IF_IDS.DUEL_CONFIRM_COM_103, IF_IDS.DUEL_CONFIRM_COM_104].every(id => reader.ifText(id)?.trim() === 'Absolutely nothing!');
         return { ready, mine, theirs };
     },
 
-    // offer screen = main modal 3323 (pack in side 3321); confirm screen = main modal 3443
+    // offer screen = TRADEMAIN (pack in TRADESIDE); confirm screen = TRADECONFIRM
     tradeOfferOpen(): boolean {
-        return raw?.mainModalId === 3323;
+        return raw?.mainModalId === IF_IDS.TRADEMAIN;
     },
 
     tradeConfirmOpen(): boolean {
-        return raw?.mainModalId === 3443;
+        return raw?.mainModalId === IF_IDS.TRADECONFIRM;
     },
 
     tradeMyOffer(): InvItemSnapshot[] {
-        return readInvComponent(3415, () => IfType.list[3415]?.iop ?? []); // trademain:inv
+        return readInvComponent(IF_IDS.TRADEMAIN_INV, () => IfType.list[IF_IDS.TRADEMAIN_INV]?.iop ?? []);
     },
 
     tradeTheirOffer(): InvItemSnapshot[] {
-        return readInvComponent(3416, () => IfType.list[3416]?.iop ?? []); // trademain:otherinv
+        return readInvComponent(IF_IDS.TRADEMAIN_OTHERINV, () => IfType.list[IF_IDS.TRADEMAIN_OTHERINV]?.iop ?? []);
     },
 
     tradeSidePack(): InvItemSnapshot[] {
-        return readInvComponent(3322, () => IfType.list[3322]?.iop ?? []); // tradeside:inv, your pack while trading
+        return readInvComponent(IF_IDS.TRADESIDE_INV, () => IfType.list[IF_IDS.TRADESIDE_INV]?.iop ?? []); // your pack while trading
     },
 
     tradePartner(): string | null {
-        return IfType.list[3417]?.text ?? null; // trademain:otherplayer, "Trading With: <name>"
+        return IfType.list[IF_IDS.TRADEMAIN_OTHERPLAYER]?.text ?? null; // "Trading With: <name>"
     },
 
-    // Why: the confirm screen is its own interface with its own inv components, and it is the screen the accept lands on, so the offer screen's 3415/3416 are the wrong thing to re-read here.
+    // Why: the confirm screen is its own interface with its own inv components, and it is the screen the accept lands on, so the offer screen's TRADEMAIN_INV and TRADEMAIN_OTHERINV are the wrong thing to re-read here.
     // Why: the engine transmits into inv1/otherinv1 below 14 items and inv2/otherinv2 at 14 or more (interface_trade/scripts/trade.rs2), so both must be read.
     tradeConfirmOffers(): { mine: InvItemSnapshot[]; theirs: InvItemSnapshot[] } {
         const read = (comId: number): InvItemSnapshot[] =>

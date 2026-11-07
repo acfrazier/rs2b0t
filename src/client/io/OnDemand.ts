@@ -28,7 +28,8 @@ export default class OnDemand extends OnDemandProvider {
     mapIndex: number[] = [];
     mapLand: number[] = [];
     mapLoc: number[] = [];
-    mapFree: number[] = [];
+    /** map_index members flag byte (Java 377 `mapMembers`; named `mapFree` at 289). */
+    mapMembers: number[] = [];
     animFrameIndex: number[] = [];
     midiJingle: number[] = [];
     running: boolean = true;
@@ -107,13 +108,13 @@ export default class OnDemand extends OnDemandProvider {
             this.mapIndex = new Array(count);
             this.mapLand = new Array(count);
             this.mapLoc = new Array(count);
-            this.mapFree = new Array(count);
+            this.mapMembers = new Array(count);
 
             for (let i = 0; i < count; i++) {
                 this.mapIndex[i] = buf.g2();
                 this.mapLand[i] = buf.g2();
                 this.mapLoc[i] = buf.g2();
-                this.mapFree[i] = buf.g1();
+                this.mapMembers[i] = buf.g1();
             }
         }
 
@@ -182,7 +183,7 @@ export default class OnDemand extends OnDemandProvider {
     async prefetchMaps(members: boolean) {
         const count = this.mapIndex.length;
         for (let i = 0; i < count; i++) {
-            if (members || this.mapFree[i] !== 0) {
+            if (members || this.mapMembers[i] !== 0) {
                 await this.prefetchPriority(3, this.mapLoc[i], 2);
                 await this.prefetchPriority(3, this.mapLand[i], 2);
             }
@@ -251,7 +252,14 @@ export default class OnDemand extends OnDemandProvider {
             return req;
         }
 
-        req.data = gunzipSync(req.data.subarray(0, req.data.length - 2));
+        try {
+            // Java OnDemand.cycle unzips the whole buffer; the 2-byte version trailer is stripped first.
+            req.data = gunzipSync(req.data.subarray(0, req.data.length - 2));
+        } catch (e) {
+            console.error(`[onDemand] gunzip failed archive=${req.archive} file=${req.file} len=${req.data.length}`, e);
+            // Java throws RuntimeException("error unzipping"); the browser hands the caller null data.
+            req.data = null;
+        }
         return req;
     }
 
