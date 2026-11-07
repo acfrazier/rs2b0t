@@ -19,7 +19,7 @@ collision cannot express:
 | Data | Source | What it adds |
 |---|---|---|
 | [`doors.json`](../../src/bot/event/webwalk/data/doors.json) | [`tools/nav/derive-doors.ts`](../../tools/nav/derive-doors.ts) | openable barriers, and which tiles they join |
-| [`stairEdges.json`](../../src/bot/event/webwalk/data/stairEdges.json) | [`tools/nav/derive-stairs.ts`](../../tools/nav/derive-stairs.ts) | stairs and ladders, so paths can change level |
+| [`stairEdges.json`](../../src/bot/event/webwalk/data/stairEdges.json) | [`tools/nav/derive-transports.sh`](../../tools/nav/derive-transports.sh): `derive-stairs.ts`, then `derive-ladders.py` and `enrich-transports.py` | stairs and ladders, so paths can change level |
 | [`transports.json`](../../src/bot/event/webwalk/data/transports.json) | curated | edges the derivations cannot infer |
 | [`travelCatalog.ts`](../../src/bot/event/webwalk/travelCatalog.ts) | content constants | 2004 travel (spirit/glider/Entrana/cart/essence/levers/agi) merged at graph load |
 | [`specialRequires.ts`](../../src/bot/event/webwalk/specialRequires.ts) | content scripts | plan-time skill/coin gates on doors and transport from-tiles |

@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
@@ -386,7 +387,23 @@ function snapAndReverse(finder: PathFinder, curated: PricedTransportEdgeData[], 
     return { edges: kept, dropped, supersededDropped };
 }
 
+/** Why: derive-ladders.py and enrich-transports.py rewrite stairEdges.json after this stage, so this stage's own output never equals the committed file; `--check` runs the composed pipeline's check instead. */
+function checkComposed(): never {
+    if (argVal('--out') !== undefined || argVal('--data-dir') !== undefined) {
+        console.error('--check compares the composed files under NAV_DATA_ROOT; it takes no --out or --data-dir');
+        process.exit(2);
+    }
+    const result = spawnSync('sh', ['tools/nav/derive-transports.sh', '--check'], {
+        stdio: 'inherit',
+        env: { ...process.env, ENGINE_DIR: engine, CONTENT_DIR: content, NAV_PACK_PATH: packPath, BUN_BIN: process.execPath }
+    });
+    process.exit(result.status ?? 1);
+}
+
 function main(): void {
+    if (process.argv.includes('--check')) {
+        checkComposed();
+    }
     const { configs } = loadLocTypes(engine, revision);
     const prices = revision === 377 ? loadStairPrices() : null;
     const edges: PricedTransportEdgeData[] = [];
@@ -468,19 +485,9 @@ function main(): void {
     const json = '[\n' + finalEdges.map(e => '    ' + JSON.stringify(e)).join(',\n') + '\n]\n';
 
     const stats = `${finalEdges.length} edges (${rawCount} raw = ${stairsCases} stairs.rs2 + ${ladderEdges} generic-ladder, ${stairsSkipped} unresolved; ${dropped} unsnappable dropped; ${supersededDropped} curated-superseded dropped; snapped + reversed)`;
-    if (process.argv.includes('--check')) {
-        const current = fs.existsSync(out) ? fs.readFileSync(out, 'utf8') : '';
-        if (current !== json) {
-            console.error(`STALE: ${out} — run bun tools/nav/derive-stairs.ts`);
-            process.exitCode = 1;
-        } else {
-            console.log(`ok: ${out} matches — ${stats}`);
-        }
-    } else {
-        fs.mkdirSync(path.dirname(out), { recursive: true });
-        fs.writeFileSync(out, json);
-        console.log(`wrote ${out}: ${stats}`);
-    }
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, json);
+    console.log(`wrote ${out}: ${stats}`);
 
     if (revision === 289) {
         const cheb = (p: NavPoint, x: number, z: number): number => Math.max(Math.abs(p.x - x), Math.abs(p.z - z));

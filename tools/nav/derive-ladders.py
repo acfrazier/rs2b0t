@@ -619,6 +619,7 @@ def write_json(path: Path, edges: list[dict], check: bool) -> None:
     if check:
         if not path.exists() or path.read_text(encoding="utf-8") != text:
             raise SystemExit(f"STALE: {path} — run {Path(__file__).name}")
+        print(f"ok: {path} is up to date")
     else:
         path.write_text(text, encoding="utf-8")
 
@@ -629,7 +630,7 @@ def main() -> None:
     parser.add_argument("--engine", type=Path, required=True)
     parser.add_argument("--pack", type=Path, default=Path("out/collision.lcnav.gz"))
     parser.add_argument("--rs2b0t", type=Path, default=Path("."))
-    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--check", action="store_true", help="fail unless rerunning this stage on the committed files reproduces them; sh tools/nav/derive-transports.sh --check checks the whole pipeline")
     args = parser.parse_args()
 
     revision = enrichment.selected_revision()

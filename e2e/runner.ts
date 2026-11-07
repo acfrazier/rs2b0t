@@ -52,6 +52,8 @@ const OFFLINE_GATES: Gate[] = [
     { name: 'untradeable drift', cmd: ['bun', 'tools/items/gen-untradeable.ts', '--check'], verdict: DRIFT },
     { name: 'namecollisions drift', cmd: ['bun', 'tools/items/gen-namecollisions.ts', '--check'], verdict: DRIFT },
     { name: 'cooksurfaces drift', cmd: ['bun', 'tools/cooking/gen-cooksurfaces.ts', '--check'], verdict: DRIFT },
+    { name: 'doors drift', cmd: ['bun', 'tools/nav/derive-doors.ts', '--check'], verdict: DRIFT },
+    { name: 'nav transports drift', cmd: ['sh', 'tools/nav/derive-transports.sh', '--check'], verdict: DRIFT },
     { name: 'manifest verify', cmd: ['bun', 'tools/lib/manifest.ts', 'verify'], verdict: DRIFT }
 ];
 
