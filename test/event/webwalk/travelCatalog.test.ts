@@ -14,7 +14,7 @@ import {
     shiloGateEdges,
     essenceEntryEdges,
     wildyLeverEdges,
-    mageArenaBarrierEdges,
+    mageArenaLeverEdges,
     handelmortDoorEdges,
     agilityShortcutEdges,
     elkoyMazeEdges,
@@ -111,7 +111,7 @@ describe('ferries / cart', () => {
             + essenceEntryEdges().length
             + essenceExitEdges().length
             + wildyLeverEdges().length
-            + mageArenaBarrierEdges().length
+            + mageArenaLeverEdges().length
             + handelmortDoorEdges().length
             + agilityShortcutEdges().length
             + elkoyMazeEdges().length
@@ -126,8 +126,8 @@ describe('ferries / cart', () => {
         expect(names.has('ess_exit_ne_to_sedridor')).toBe(true);
         expect(names.has('ess_exit_ne_to_aubury')).toBe(true);
         expect(names.has('lever_ardougne_to_wild')).toBe(true);
-        expect(names.has('magearena_scan_in')).toBe(true);
-        expect(names.has('magearena_scan_out')).toBe(true);
+        expect(names.has('magearena_lever_to_cellar')).toBe(true);
+        expect(names.has('magearena_lever_from_cellar')).toBe(true);
         expect(names.has('agi_castle_crumbling_wall')).toBe(true);
         expect(names.has('handelmort_inner_door_out')).toBe(true);
     });

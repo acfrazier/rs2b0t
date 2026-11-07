@@ -13,13 +13,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Why: e2e-report stays on the tools side because it needs no browser; e2e may import tools.
-import { driftVerdict, errorTail, parseSkips } from '../tools/lib/e2e-report.js';
+import { driftVerdict, parseSkips } from '../tools/lib/e2e-report.js';
 import type { SkipLine } from '../tools/lib/e2e-report.js';
+import { run } from './lib/runChild.js';
+import type { Status, Verdict } from './lib/runChild.js';
 import { CASES } from './manifest.js';
 import { casesForLevel, selectByChanges } from './manifestQuery.js';
 import type { Case, Level } from './manifestTypes.js';
 
-type Status = 'pass' | 'fail' | 'timeout' | 'skip';
 interface Result { name: string; kind: 'gate' | 'harness'; status: Status; ms: number; note: string; }
 interface Run { startedAt: string; git: string; level: Level; results: Result[]; }
 
@@ -30,16 +31,13 @@ const LATEST = join(OUT, 'latest.json');
 /** Default case budget in minutes. */
 const DEFAULT_BUDGET = 12;
 
-/** Optional output verdict that overrides the process exit code. */
-// Why: generators may report STALE before an unrelated audio-shim teardown failure.
-// Why: it also fails a gate that skipped a local input (pitfalls 10, 29), so a receipt cannot
-// quote a green gate that never read its content or engine.
+/** Output verdict that a gate must also pass: a zero exit with a missing clean marker, a STALE line or a skipped local input fails (pitfalls 10, 29), and a nonzero exit fails whatever the output says. */
 const DRIFT = driftVerdict;
 
 /** Every `SKIP:` line a gate printed, kept for the report and the end-of-run summary. */
 const SKIPS: { gate: string; skip: SkipLine }[] = [];
 
-interface Gate { name: string; cmd: string[]; verdict?: (text: string) => Status; }
+interface Gate { name: string; cmd: string[]; verdict?: Verdict; }
 const OFFLINE_GATES: Gate[] = [
     { name: 'unit tests', cmd: ['bun', 'test'] },
     { name: 'typecheck', cmd: ['bun', 'run', 'typecheck'] },
@@ -49,7 +47,14 @@ const OFFLINE_GATES: Gate[] = [
     { name: 'spelldb drift', cmd: ['bun', 'tools/combat/gen-spelldb.ts', '--check'], verdict: DRIFT },
     { name: 'itemdb drift', cmd: ['bun', 'tools/items/gen-itemdb.ts', '--check'], verdict: DRIFT },
     { name: 'shopdb drift', cmd: ['bun', 'tools/shops/gen-shopdb.ts', '--check'], verdict: DRIFT },
-    { name: 'scriptdocs drift', cmd: ['bun', 'tools/gen-scriptdocs.ts', '--check'], verdict: DRIFT }
+    { name: 'scriptdocs drift', cmd: ['bun', 'tools/gen-scriptdocs.ts', '--check'], verdict: DRIFT },
+    { name: 'ifids drift', cmd: ['bun', 'tools/gen-ifids.ts', '--check'], verdict: DRIFT },
+    { name: 'untradeable drift', cmd: ['bun', 'tools/items/gen-untradeable.ts', '--check'], verdict: DRIFT },
+    { name: 'namecollisions drift', cmd: ['bun', 'tools/items/gen-namecollisions.ts', '--check'], verdict: DRIFT },
+    { name: 'cooksurfaces drift', cmd: ['bun', 'tools/cooking/gen-cooksurfaces.ts', '--check'], verdict: DRIFT },
+    { name: 'doors drift', cmd: ['bun', 'tools/nav/derive-doors.ts', '--check'], verdict: DRIFT },
+    { name: 'nav transports drift', cmd: ['sh', 'tools/nav/derive-transports.sh', '--check'], verdict: DRIFT },
+    { name: 'manifest verify', cmd: ['bun', 'tools/lib/manifest.ts', 'verify'], verdict: DRIFT }
 ];
 
 function arg(name: string): string | undefined {
@@ -76,72 +81,6 @@ function pick(level: Level, only: string[]): { cases: Case[]; why: string } {
         why += '; filtered by --only';
     }
     return { cases, why };
-}
-
-const TTY = Boolean(process.stdout.isTTY);
-const VERBOSE = process.argv.includes('--verbose') || process.argv.includes('-v');
-/** How often a non-TTY run (cron, CI) prints a still-alive line. */
-const HEARTBEAT_MS = 30_000;
-
-function statusLine(label: string, started: number, last: string): void {
-    const el = `${Math.floor((Date.now() - started) / 1000)}s`.padStart(5);
-    const text = `  ⏳ ${label} ${el}  ${last}`.slice(0, (process.stdout.columns || 100) - 1);
-    if (TTY) process.stdout.write(`\r\u001b[2K${text}`);
-    else console.log(text);
-}
-
-async function run(label: string, cmd: string[], logFile: string, budgetMs: number, verdict?: (text: string) => Status, caseEnv?: Readonly<Record<string, string>>): Promise<{ status: Status; ms: number; tail: string }> {
-    const started = Date.now();
-    // Why: the case env lands after HEADED so a case may ask for a headed run of its own.
-    const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, HEADED: '0', ...caseEnv } });
-    const timer = setTimeout(() => proc.kill(9), budgetMs);
-    const log = Bun.file(logFile).writer();
-    const lines: string[] = [];
-    let last = '';
-    let beat = Date.now();
-
-    const pump = async (stream: ReadableStream<Uint8Array>): Promise<void> => {
-        const decoder = new TextDecoder();
-        const rd = stream.getReader();
-        let buf = '';
-        for (;;) {
-            const { done, value } = await rd.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            const parts = buf.split('\n');
-            buf = parts.pop() ?? '';
-            for (const line of parts) {
-                log.write(`${line}\n`);
-                lines.push(line);
-                if (lines.length > 400) lines.shift();
-                const clean = line.trim();
-                if (!clean) continue;
-                last = clean;
-                if (VERBOSE) {
-                    if (TTY) process.stdout.write('\r\u001b[2K');
-                    console.log(`     ${clean}`.slice(0, (process.stdout.columns || 100) - 1));
-                } else if (TTY || Date.now() - beat > HEARTBEAT_MS) {
-                    beat = Date.now();
-                    statusLine(label, started, clean);
-                }
-            }
-        }
-    };
-
-    const ticker = TTY && !VERBOSE ? setInterval(() => statusLine(label, started, last), 1000) : null;
-    await Promise.all([pump(proc.stdout), pump(proc.stderr)]);
-    const code = await proc.exited;
-    clearTimeout(timer);
-    if (ticker) clearInterval(ticker);
-    if (TTY) process.stdout.write('\r\u001b[2K');
-    await log.end();
-
-    const ms = Date.now() - started;
-    const text = lines.join('\n');
-    const timedOut = ms >= budgetMs - 1000;
-    const tail = errorTail(lines);
-    const status: Status = timedOut ? 'timeout' : verdict ? verdict(text) : code === 0 ? 'pass' : 'fail';
-    return { status, ms, tail };
 }
 
 const mins = (ms: number): string => `${(ms / 60000).toFixed(1)}m`;

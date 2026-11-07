@@ -32,6 +32,7 @@ pure Lost City or 2004scape projects and is not maintained for those targets.
 | [Testing](TESTING.md) | [suites](reference/test-suites.md), [why it is testable](decisions/testability.md), [writing a harness](how-to/write-a-harness.md), [seeding](reference/seeding-test-accounts.md), [the tools/e2e boundary](reference/live-harness-boundary.md), [case manifest](reference/e2e-manifest.md) |
 | [Dev and deploy](DEV.md) | the three run modes, then [live wall](how-to/run-the-live-wall.md), [build targets](reference/build-targets.md), [maintainer infra](how-to/maintainer-infra.md) |
 | [Loc identity](decisions/loc-identity-model.md) | why a loc is a placement, not an ID |
+| [377 data sources](decisions/data-377-sources.md) | the 377 source lines behind each hand-authored data edition |
 | [Loc state in the client](reference/loc-identity.md) | what the client does with locs that change state, and the gaps |
 | [Nav operator tools](nav/README.md) | transport coverage, client-vs-pack path paint, live nav harnesses |
 

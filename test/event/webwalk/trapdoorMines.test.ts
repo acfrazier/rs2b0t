@@ -20,9 +20,9 @@ const EDGEVILLE_TRAP = {
     kind: 'dungeon'
 } as const;
 
-/** Falador party-room trapdoor into the Dwarven Mine (surface hop used by mining seeds). */
+/** Falador party-room trapdoor into the Dwarven Mine (surface hop used by mining seeds). The stand is the walkable tile west of the 377 placement: the tile south of it is blocked in the 377 pack. */
 const DWARVEN_TRAP = {
-    from: { x: 3019, z: 3449, level: 0 },
+    from: { x: 3018, z: 3450, level: 0 },
     to: { x: 3019, z: 9849, level: 0 },
     locName: 'Trapdoor',
     action: 'Climb-down',
@@ -68,19 +68,14 @@ function loadDefaultPack(): PathFinder {
 }
 
 describe('Trapdoor closed/open metadata', () => {
-    test('Edgeville and Dwarven Mine trapdoors pair closed locId with openLocId', () => {
-        for (const expected of [EDGEVILLE_TRAP, DWARVEN_TRAP]) {
-            const edge = findEdge(expected);
-            expect(edge, JSON.stringify(expected.from)).toBeDefined();
-            expect(edge!.locId).toBeDefined();
-            expect(edge!.openLocId).toBeDefined();
-            expect(edge!.locId).not.toBe(edge!.openLocId);
-            // Conventional pair for generic trapdoor
-            expect(edge!.locId).toBe(1568);
-            expect(edge!.openLocId).toBe(1570);
-            expect(edge!.locX).toBeDefined();
-            expect(edge!.locZ).toBeDefined();
-        }
+    // 377 content general_use/scripts/trapdoors.rs2:37 and pack/loc.pack:11868: the Falador party-room trapdoor is `fai_dwarf_trapdoor_down`, a single-state loc (no open twin), not the 1568/1570 pair of 289.
+    test('the walker recognises the placed 377 Dwarven Mine trapdoor and refuses the 289 trapdoor id at that tile', () => {
+        const edge = findEdge(DWARVEN_TRAP)!;
+        expect(edge).toBeDefined();
+        const transport = { locName: edge.locName, action: edge.action, locX: edge.locX!, locZ: edge.locZ!, locId: edge.locId, openLocId: edge.openLocId };
+        const at = { tile: () => ({ x: edge.locX!, z: edge.locZ! }) };
+        expect(matchesTransportLoc(transport, { id: 11867, ...at })).toBe(true);
+        expect(matchesTransportLoc(transport, { id: 1568, ...at })).toBe(false);
     });
 
     test('matchesTransportLoc accepts closed placement and open transform', () => {

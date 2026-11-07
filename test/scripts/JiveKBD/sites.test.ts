@@ -2,6 +2,13 @@ import { describe, expect, test } from 'bun:test';
 import { SPELL_TELEPORTS } from '#/bot/event/webwalk/teleportCatalog.js';
 import { KBD_LAIR, KBD_ROUTE, KBD_SITES, SITE_OPTIONS, siteFor } from '#/bot/scripts/JiveKBD/sites.js';
 import { KING_BLACK_DRAGON, derive, inputsPresent } from '../../../tools/nav/jive-safespots.js';
+import { skip377 } from '../../lib/skip377.js';
+
+// Why: JiveKBD is one of the 76 registry scripts the plan keeps as a 289 content program at cutover (docs/plans/rs2b0t-377.md:76); L2 qualifies it per content unit (lines 166 and 214, Q3) and S10b refuses it until then (line 168). The 377 maps place npc 50 (king_dragon) once, in m35_73 at (2269,4697) (maps/m35_73.jm2:7415), and none in the 289 lair square m42_153, so the 289 lair and lever route have nothing to derive from.
+const skipLair = skip377(
+    'test/scripts/JiveKBD/sites.test.ts',
+    'JiveKBD is unqualified on 377 until L2/Q3 (rs2b0t-377.md:76,166,168,214): 377 places npc 50 only in m35_73 at (2269,4697) (maps/m35_73.jm2:7415), none in the 289 lair square m42_153'
+);
 
 describe('KBD_SITES', () => {
     test('the lair is the only entry and every option resolves', () => {
@@ -92,7 +99,7 @@ describe('KBD_ROUTE', () => {
 
 // Why: the derivation needs out/collision.lcnav.gz and the rs2b2t-content maps, and CI carries neither.
 describe.skipIf(!inputsPresent(KING_BLACK_DRAGON))('the checked-in KBD derivation (pack-gated)', () => {
-    test('the alcove tiles are the two derived safespots nearest the arrival and the anchor is the derived one', () => {
+    skipLair('the alcove tiles are the two derived safespots nearest the arrival and the anchor is the derived one', () => {
         const derived = derive(KING_BLACK_DRAGON);
         expect([derived.anchor.x, derived.anchor.z]).toEqual([KBD_LAIR.meleeAnchor.x, KBD_LAIR.meleeAnchor.z]);
         expect(derived.safespots.map(s => [s.x, s.z])).toEqual([[2714, 9830], [2716, 9801], [2717, 9801]]);
@@ -100,7 +107,7 @@ describe.skipIf(!inputsPresent(KING_BLACK_DRAGON))('the checked-in KBD derivatio
         expect(derived.spawns.filter(s => !s.adult)).toHaveLength(9);
     }, 60_000);
 
-    test('the area holds every tile the run stands on and the derivation reaches them all from the arrival', () => {
+    skipLair('the area holds every tile the run stands on and the derivation reaches them all from the arrival', () => {
         const derived = derive(KING_BLACK_DRAGON);
         for (const t of [...KBD_LAIR.safespots, KBD_LAIR.meleeAnchor, KBD_ROUTE.lairArrival, KBD_ROUTE.outLever.tile]) {
             expect(derived.reachable.has(`${t.x},${t.z}`)).toBe(true);

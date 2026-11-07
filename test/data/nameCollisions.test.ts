@@ -92,18 +92,17 @@ describe('the hand-written aliases', () => {
 // Why: these are the families a shop puts on a shelf, so a customer has to be able to name one of them
 // Why: and the shop has to be able to say which it means. New content inside one fails here.
 describe('the families a shop trades are fully separated', () => {
+    // 377: the 289 dragonhide and unstrung-bow families are gone: the content names every member distinctly (`all.obj` :14517, :743);
+    // the families that still need separation are the key halves, the amulet pairs and the capes.
     const FAMILIES = [
-        'Dragonhide',
-        'Dragonhide body',
-        'Dragonhide chaps',
-        'Dragon leather',
-        'Dragon vambraces',
         'Half of a key',
-        'Cape',
-        'Maple longbow',
-        'Yew longbow',
-        'Magic shortbow',
-        'Sapphire amulet'
+        'Gold amulet',
+        'Sapphire amulet',
+        'Emerald amulet',
+        'Ruby amulet',
+        'Diamond amulet',
+        'Dragonstone ammy',
+        'Cape'
     ];
 
     for (const name of FAMILIES) {

@@ -12,9 +12,13 @@ export function trailKit(scrollId: number | null): string[] {
     return [SPADE_NAME, ...TRIO, ...(CLUE_DB[scrollId]?.items ?? [])];
 }
 
+/** Five 377 ground spade placements (obj 952) derived from the map OBJ sections; source lines in docs/decisions/data-377-sources.md#spade-spawns. */
 export const SPADE_SPAWNS: Tile[] = [
-    new Tile(2574, 3331, 0),
-    new Tile(2981, 3369, 0)
+    new Tile(2566, 3330, 0),
+    new Tile(2981, 3370, 0),
+    new Tile(3120, 3359, 0),
+    new Tile(3218, 3412, 1),
+    new Tile(1951, 4964, 0)
 ];
 
 type CoordTool = 'sextant' | 'watch' | 'chart';

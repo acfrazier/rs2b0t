@@ -14,12 +14,8 @@ export interface ClueGate {
 }
 
 /** Clues whose destination a quest seals off. */
-export const CLUE_GATES: Record<number, ClueGate> = {
-    // Isafdar and the elf camp open at Regicide; the seams themselves are REGICIDE_SEAMS, which the baked nav pack still doesn't carry.
-    3564: { quest: 'Regicide', reason: 'Lord Iorwerth is in the elf camp' },
-    3560: { quest: 'Regicide', reason: 'dig site is in Isafdar' },
-    3562: { quest: 'Regicide', reason: 'dig site is in Isafdar' }
-};
+// 377: empty; the 377 trail content carries no Isafdar clue item (see docs/decisions/data-377-sources.md#clue-gates).
+export const CLUE_GATES: Record<number, ClueGate> = {};
 
 // Why: `unknown` is the quest tab not loaded yet, so only `complete` opens the gate.
 export function clueGate(id: number, status: (quest: string) => QuestStatus): string | null {

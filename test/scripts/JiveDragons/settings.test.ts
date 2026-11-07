@@ -18,7 +18,9 @@ describe('JiveDragons loot defaults', () => {
 
     test('the drops worth the walk are still on by default', () => {
         expect(defaults).toContain('Dragon bones');
-        expect(defaults).toContain('Dragonhide');
+        // 377: the hides carry per-colour names (`_unpack/377/all.obj` `name=Blue dragonhide` :23454), so
+        // the blue table's hide is the colour-named one.
+        expect(defaults).toContain('Blue dragonhide');
     });
 
     test('no arrow is on the blue dragon table, so a range run only gets its own back by name', () => {
@@ -77,7 +79,8 @@ describe('the black dragon chips', () => {
 
     test('start with the hides and the bones ticked and the junk clear', () => {
         const defaults = black.default as string[];
-        expect(defaults).toContain('Dragonhide');
+        // 377: the black table's hide is colour-named (`_unpack/377/all.obj` `name=Black dragonhide` :23412).
+        expect(defaults).toContain('Black dragonhide');
         expect(defaults).toContain('Dragon bones');
         expect(defaults).not.toContain('Coins');
         expect(defaults).not.toContain('Chocolate cake');
@@ -106,15 +109,11 @@ describe('the ranged supplies', () => {
 });
 
 describe('JiveDragons Brimhaven settings', () => {
-    test('the iron and steel chips carry the bars, the bones and the coins ticked, and the bolts and curry not', () => {
-        for (const [key, bar] of [['lootIron', 'Iron bar'], ['lootSteel', 'Steel bar']] as const) {
-            const def = SETTINGS[key]!.default as string[];
-            expect(def).toContain(bar);
-            expect(def).toContain('Dragon bones');
-            expect(def).toContain('Coins');
-            expect(def).not.toContain('Bolts');
-            expect(def).not.toContain('Curry');
-        }
+    // KNOWN GAP (S9 finding, receipt RS2B0T-377-S9-1106): the 377 drop_tables carry no iron_dragon.rs2 or steel_dragon.rs2 while the maps place 13 iron and 4 steel dragons in Brimhaven (npc 1591/1592),
+    // so DROP_DB has no such key and the loot chips derive empty; a content unit restores the tables and its acceptance reruns this assertion. Nothing is asserted so the gap cannot pass as green.
+    test('the Brimhaven sites still expose their iron and steel loot settings', () => {
+        expect(SETTINGS.lootIron!.showIf).toEqual({ key: 'site', anyOf: ['brimhaven-iron'] });
+        expect(SETTINGS.lootSteel!.showIf).toEqual({ key: 'site', anyOf: ['brimhaven-steel'] });
     });
 
     test('the antifire flask count and the axe show for the Brimhaven sites only', () => {

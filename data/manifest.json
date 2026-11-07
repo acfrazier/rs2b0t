@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "revision": 377,
-  "cutover": false,
+  "cutover": true,
   "engine": {
     "commit": "bc47497ee8cf6148dbfb7239714ddd5045c40194",
     "archives": {
@@ -19,7 +19,7 @@
   "generators": {
     "tools/clues/cluesParse.ts": "41eed0e98a17b0da13f0993e7d0a2c8f3a9cc0d6f8fa5a3f9a0d1394b1064606",
     "tools/clues/gen-cluedb.ts": "88ea7586ee86d7d0a2f8dc1f0e50d386e4eacf81847c0d4ce9fb0869692fd6fc",
-    "tools/combat/gen-dropdb.ts": "c168de0e955f30b3468fb9d7218e66dadf4df549cebd29d8cf4625f70cb9023c",
+    "tools/combat/gen-dropdb.ts": "e4f41ca3151aac1ed5376c92470dc093a46b9f1b7c0965529dc916819d27550e",
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
     "tools/gen-377-data.sh": "214a987daa89f5dcaaef149b5d0a6421b93532af917d981f9ed30ab2f363569b",
@@ -27,7 +27,7 @@
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/gen-scriptdocs.ts": "9b65974cf3e5f22a4d7010869e9182ddd5068c3e8e081962ce15183c31e6ddc5",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
-    "tools/items/gen-namecollisions.ts": "490bd4d603830b3b4ead8719d428f47edc53155c655c9a6031341514d5347f65",
+    "tools/items/gen-namecollisions.ts": "32b1680a3ffa286fa8ae8ab74e22af36f1f07b13d6f2cf3bd89bbb763cb874ee",
     "tools/items/gen-untradeable.ts": "2f97f8ba7a122d367d40ce016cf8a259f01d69442ba5f50e8718f395f8f270bb",
     "tools/items/parse.ts": "1e0f0cb50afdc4edd7519d158967095d2433cdd1e49f3e725b9f373780f57549",
     "tools/lib/content.ts": "ebd229b1ffe38c9e5162eb15a06f89171747db84ca1152724e118c586f5220c4",
@@ -35,11 +35,11 @@
     "tools/map/build-basemap.ts": "f90956e475ef0a71da30629225dc3c5b40b7e2c1a07c55309fc6de1165ee14dc",
     "tools/map/encodePng.ts": "ebf62672a4035f6b0a7cfe451cb3d856dfe82201cc3b830c4eec9f4b6159f961",
     "tools/nav/build-collision.ts": "84af9f74ac800e16cf29f9665576069346cedac043056e04d00a9cca09210bcb",
-    "tools/nav/derive-doors.ts": "36e6bb5114e227d797a7f7e81fac281157d8ff1cfccd4824295d74d4f66bdfa2",
-    "tools/nav/derive-ladders.py": "96263e7d865e923be22030e0da3dbe6f580d9f5122a9499649a30df164588526",
-    "tools/nav/derive-stairs.ts": "72db7026ab46c7722676f793afeca78c90fcbda7382da2d9c6779aed3df67136",
-    "tools/nav/derive-transports.sh": "57e8df7c2818ff8184edd48a1b8733012204dd2211acd21d6341a5853bc40ac1",
-    "tools/nav/enrich-transports.py": "7d0b68e611b0c693904f9c28879abf4660bed83b090862ea6771dbb6374489ae",
+    "tools/nav/derive-doors.ts": "24e165951b0af08eb25bcc24d7f708cc3f36a434a495e637d46bd1dc753eec41",
+    "tools/nav/derive-ladders.py": "31fd704e47343d5bc31a2077431dda24f0052bc32cb58cf7a71836e8ee1acea5",
+    "tools/nav/derive-stairs.ts": "503ff239117f0e37282ae49c77f2f223bce8766fffa8b62b0e330397791150d1",
+    "tools/nav/derive-transports.sh": "62b377a4a0610e1d49a5f91c824b44ddb5601f8e8fba63b4412cf7f9c32d1c08",
+    "tools/nav/enrich-transports.py": "73d01425aa66ee2b018d8ce132b2de09929967970e83a610ecf55e96400fbfed",
     "tools/nav/lib.ts": "93f5d22f03c65f8be03e95319085a16b0da62acdaa9753af81c777cb9c476a22",
     "tools/nav/stairsParse.ts": "9369171ffbee7ec995d8da4444a0f11da8ed145ad4154a694dd47668b9eeec06",
     "tools/patches/worldmap-377.patch": "0ac9dbe029993299bf4a2579944b24ff57f68611d4b54906990f329229ccf223",
@@ -48,332 +48,332 @@
   },
   "artifacts": [
     {
-      "path": "data/377/docs/SCRIPTS.md",
-      "sha256": "ad7d5d1a52be599b46ad63d05aeca71b29697246516faded2e5a8fd554e30334",
+      "path": "docs/SCRIPTS.md",
+      "sha256": "b35466f002115047371deb2ea1062c80ced3067a2b390f3477b9d0e779881ff6",
       "kind": "generated",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/api/ai/clues/data/cluedb.ts",
+      "path": "src/bot/api/ai/clues/data/cluedb.ts",
       "sha256": "c888c441a0675749cfcf494f5c05046ab7d4ab771c65f077c8ec9cf3be376af7",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/api/ai/clues/data/clueGates.ts",
-      "sha256": "cef23ab3dc65d086a35de95905926fc682058eef79a4fe3f9aabd28c19cd6145",
+      "path": "src/bot/api/ai/clues/data/clueGates.ts",
+      "sha256": "816af47661183a697a5101fa1858462c285d440b473c890c5f43b5dbec374492",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/api/ai/clues/data/killAnchors.ts",
-      "sha256": "93b3341c7d9cfc026ce276b7553ed8291ad2343a4a93f694268b987c58b4faed",
+      "path": "src/bot/api/ai/clues/data/killAnchors.ts",
+      "sha256": "36859c3dfdc99b41ded6f77d0ae07d26cdd1e34f884c7e1fdabf0a13d7040dfa",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/api/ai/clues/data/puzzlePieces.ts",
+      "path": "src/bot/api/ai/clues/data/puzzlePieces.ts",
       "sha256": "b086dbb95c60373c422b100ff872ddda70bff08d5d5c2fecb22c6c56fbdd035e",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/api/ai/clues/data/toolAcquire.ts",
-      "sha256": "19053c74d1b5f24f552eeee19fbf3ae2f7711f7f2942a498d733e275a7c25d6f",
+      "path": "src/bot/api/ai/clues/data/toolAcquire.ts",
+      "sha256": "243f9c2ed508a53c7a4569a912055eecbb846068e14c214ed439f739f97a9277",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/api/ai/clues/data/unreachable.ts",
-      "sha256": "8c32508e23264f8e95514631d73b3603767be51fbfaa3d04d608436d4f056de1",
+      "path": "src/bot/api/ai/clues/data/unreachable.ts",
+      "sha256": "c3cd344861782be115a754e9dd91b726bc186c4f82df9854532053dbf2bfc3a5",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/cookLocations.ts",
-      "sha256": "a57e81ba5be380301078319b821d9ccd8893228c0a996ea28e47f997b829a2dd",
+      "path": "src/bot/data/cookLocations.ts",
+      "sha256": "ac55055ffbd5121a843c2e8b8a75df414a42978ffce6e0236d12bb24b020a6f2",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/cookSurfaceLocs.ts",
+      "path": "src/bot/data/cookSurfaceLocs.ts",
       "sha256": "d9876350d5a4758803333ad1eff97a5d9a5336b2f77ac037ee4bcc99558c06d1",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/data/cowKillerLocations.ts",
-      "sha256": "74de1e18202a4c69e78e3ef31f2cfd205e581b5ffb6e40e9b0b3c304db645392",
+      "path": "src/bot/data/cowKillerLocations.ts",
+      "sha256": "9f9386f07cf4016b921a90d02af14e4a9c193a4b23e7022256e184f51ad29fcd",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/dropdb.ts",
-      "sha256": "7faebd08323d155677a781d4f2217c3999b5d4326abef0fc981896c5482e9a3b",
+      "path": "src/bot/data/dropdb.ts",
+      "sha256": "2e71ba5caa2683f9fef61063ccb17393c2450221451df10863aac481534393c3",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/data/fishingLocations.ts",
-      "sha256": "3535529193ec7fde442970b6b034c7137bc46800c5c88345e2b6b5eaa00c9b8e",
+      "path": "src/bot/data/fishingLocations.ts",
+      "sha256": "dbd0ad0f5debbedfd29e57bcde76e1433e45c4d07273a3c27d6f060a68c616f9",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/ifIds.ts",
+      "path": "src/bot/data/ifIds.ts",
       "sha256": "f2fe94dd34bb0551cca951056726bd36630e663580eb83795d41f0347a4896d4",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/data/itemAliases.ts",
-      "sha256": "f65dff2de5cc82cdab49fed8109bde260456a429412a6d9c3081e131a4d99e2a",
+      "path": "src/bot/data/itemAliases.ts",
+      "sha256": "e75d090fbb6329009a7589470be54e687320afbba2c946f2cd0d32a987549f99",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/itemdb.ts",
+      "path": "src/bot/data/itemdb.ts",
       "sha256": "202954780e62cf685c1cced2b3732cf9339bb87054f14f7dc7d3ca4b5f9c1842",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/data/miningLocations.ts",
-      "sha256": "e83b1622bf4be7ae3486f7c6b2d51876389487b9e764e76965a7da93571eb3a3",
+      "path": "src/bot/data/miningLocations.ts",
+      "sha256": "cb2e1e2238df37eb641e8434b11873dbc182225b6749208a62a1c8a35d110068",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/miningRocks.ts",
-      "sha256": "a8628e9abb554e9472304b8576b43a05895b4844899c05ce8dfa82679cb5760a",
+      "path": "src/bot/data/miningRocks.ts",
+      "sha256": "392dff865953ad981a4bc6ac9cf8ea7d8d8934beccccc127893b2c7ee54976c8",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/nameCollisions.ts",
+      "path": "src/bot/data/nameCollisions.ts",
       "sha256": "2557efb121e81c9fdfa6b43a4f0e7f0f961b6d8c56b94071d172954692004625",
       "kind": "generated",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/runeCraftLocations.ts",
-      "sha256": "c6cd806bdfcc60be9f0b2014d3952100810229c1678e2cd8d4978ed5b5bd389a",
+      "path": "src/bot/data/runeCraftLocations.ts",
+      "sha256": "d7a153692524ac737c0685e5dba5823f8ac525d66ab98dfb50d9feeed9da6ec3",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/data/shopdb.ts",
+      "path": "src/bot/data/shopdb.ts",
       "sha256": "92791f340a29773d8e7d1174af45688bbc06fa7a357a92c3e2afa9d21973968d",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/data/spelldb.ts",
+      "path": "src/bot/data/spelldb.ts",
       "sha256": "5c59b575f5e24baac699c9fdb6ec7118634edfa9f42b9ed2faffc5f7555a0d69",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/data/untradeable.ts",
+      "path": "src/bot/data/untradeable.ts",
       "sha256": "f8e5faa0364a126f3704ecaee7f9c3637da8bb67ed2b57689667495227bd0781",
       "kind": "generated",
       "qualification": "pending"
     },
     {
-      "path": "data/377/src/bot/data/woodcuttingLocations.ts",
-      "sha256": "f95b85b970ea9d36bc753bcf83b3f17b594c27f599258e61f516fcb4e2fce1d7",
+      "path": "src/bot/data/woodcuttingLocations.ts",
+      "sha256": "1a25edd8a3a43349511b2d405297122464afb35b8141fcf9f4b8b9aba8b5f3be",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/event/webwalk/data/doors.json",
-      "sha256": "4ece60a5e81d25b39e0eaad4b67beb47ea69bfae17a5e8465fd1b70dee2c9d7d",
+      "path": "src/bot/event/webwalk/data/doors.json",
+      "sha256": "e570581e44d9353553474af01cf47e695792818fcdefe2f343373195668af7b3",
       "kind": "generated",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/event/webwalk/data/stairEdges.json",
-      "sha256": "4c1ff89e8c13be38db1ebcd2787039d9b1107bcbdda4dad60edba36088656745",
+      "path": "src/bot/event/webwalk/data/stairEdges.json",
+      "sha256": "a093eea39c414af500d02d0d3f6c8ff0a852e5e93d18a9a1c36fade2d4d69cf3",
       "kind": "generated",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/event/webwalk/data/transports.json",
-      "sha256": "b403b9c90f47ba2a0a6e43a532dd74644b7e357c3a56d65abe73a9d642de0fd0",
+      "path": "src/bot/event/webwalk/data/transports.json",
+      "sha256": "5f24e2487f5c7a2daae4cf670980c82d3290a18a254f54f841978489eb849ffb",
       "kind": "generated",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/event/webwalk/specialRequires.ts",
-      "sha256": "d028956edc3214b5eb11703dc120b2cd2ce329f48e893c9649e773593a1e14d7",
+      "path": "src/bot/event/webwalk/specialRequires.ts",
+      "sha256": "94b083773e81b07e85d6ae1f978cda2f1c98a937c5f0dceea342b644539ad26d",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/event/webwalk/teleportCatalog.ts",
+      "path": "src/bot/event/webwalk/teleportCatalog.ts",
       "sha256": "78b48071a49d3aeb8afb9b56cfb359c47215e45d73bead463f8472f1cacf24f7",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/src/bot/event/webwalk/travelCatalog.ts",
-      "sha256": "23fc5d9e298e8b80c9ea1aadd605b72ef308a3ac782b7caf0b1a96e2e3e30490",
+      "path": "src/bot/event/webwalk/travelCatalog.ts",
+      "sha256": "3e2884de207b0db5f488fb2b6160321e703959c964b9ee2a37fb81c036c8ab8f",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/event/webwalk/contract.test.ts",
+      "path": "test/event/webwalk/contract.test.ts",
       "sha256": "e75d202938ee47bf0cc00cf69c1f3c975070344d5b006796196b5f1570ed37ec",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/event/webwalk/jewelleryAndStateAware.test.ts",
+      "path": "test/event/webwalk/jewelleryAndStateAware.test.ts",
       "sha256": "0347bc27ea95f84039fed1ca68f610c90c49f5c886fdc23735832b3519503618",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/event/webwalk/routeCorpus377.test.ts",
-      "sha256": "97cb393b4effb811bf66f769e160d574f29c698e788ea6840d8992bd59ff0e41",
+      "path": "test/event/webwalk/routeCorpus377.test.ts",
+      "sha256": "dcc2c264f15838a1d825bfe5b8b8d568cf384a6e2287add2f803f6991dea9c1e",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/event/webwalk/sinclairMansionLadder.test.ts",
+      "path": "test/event/webwalk/sinclairMansionLadder.test.ts",
       "sha256": "08c459e3833435ede80d1ac804c48bad53fec831ca57acaf655c9c8c6d512450",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/ai/clues/AcquireTools.test.ts",
+      "path": "test/api/ai/clues/AcquireTools.test.ts",
       "sha256": "30f8b034b4a0ba743192fce23722a165d25ac686efb8b53522068027cee51f66",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/ai/clues/clue-audit.test.ts",
+      "path": "test/api/ai/clues/clue-audit.test.ts",
       "sha256": "f27c121d756a27c123571e3bd06511509f7334cb1d395da558d1768bb72a6b41",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/ai/clues/ClueExecutor.test.ts",
-      "sha256": "1e2cb0adee1e1a867bbda4f5e2808d7aae10c466119423a6b1770087c0e84d5f",
+      "path": "test/api/ai/clues/ClueExecutor.test.ts",
+      "sha256": "90eb15ca4620847a8e4d062f2da0e928ea73923272dddb73460a00811c99938a",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/ai/clues/data/clueGates.test.ts",
+      "path": "test/api/ai/clues/data/clueGates.test.ts",
       "sha256": "264ae437ce5075becf074f91cef4ccbc9f08d4be979151d13201247c933f3261",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/ai/clues/data/toolAcquire.test.ts",
+      "path": "test/api/ai/clues/data/toolAcquire.test.ts",
       "sha256": "4fd2d00d0b0d5786a739e2c3553e7cfa71eb44e6250cf21437d1c9263c94fd07",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/ai/clues/hard-tier.test.ts",
+      "path": "test/api/ai/clues/hard-tier.test.ts",
       "sha256": "23efcda729653dd851ed4db36106366d79278619bed5cc1582c808bf2bdb27fd",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/ai/clues/kharaziJungle.test.ts",
+      "path": "test/api/ai/clues/kharaziJungle.test.ts",
       "sha256": "4686fa698cb13203ed92935149f6e34ce52847e75a0cc73b37ed344543119d8e",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/bank/zanaris-bank.test.ts",
+      "path": "test/api/bank/zanaris-bank.test.ts",
       "sha256": "a051b9e0052a72d8f21f1af5bb6bdde837bace67b999e9f76f2b8e61af49ad8e",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/api/market/catalog.test.ts",
-      "sha256": "11a3a118c28c718e790af2a360862ff71081c2645ee906d9a74cf04b6cb5a1cf",
+      "path": "test/api/market/catalog.test.ts",
+      "sha256": "b7401e44d67fc53bd7e75f3eb4639625c3fb8c3fc68fd0491a9e4a0e545e4935",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/data/FishingLocations.test.ts",
+      "path": "test/data/FishingLocations.test.ts",
       "sha256": "010a7bc19436e224757c64a13f0cb5d6bbb4f46b87f26581417e0c7ef14aadd6",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/data/mining-rocks.test.ts",
+      "path": "test/data/mining-rocks.test.ts",
       "sha256": "1b0e872c8f5ea16c38b57a99f968a0491674d7f05c61ee280d4bc9a5d392b26f",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/data/nameCollisions.test.ts",
-      "sha256": "43233b314522e891102080217dbab80285c36ac20ecfe1a29828bc1e25c30183",
+      "path": "test/data/nameCollisions.test.ts",
+      "sha256": "cf36bdf192fab889d9052326d8025aa3825560b1e1747a6dd124b99e7d77734c",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/data/placementBoxes.test.ts",
-      "sha256": "36271cf25193ba0aed98fcac34066e78f3a63abd61198f3859210b10647bded5",
+      "path": "test/data/placementBoxes.test.ts",
+      "sha256": "960331b9bb3a9ef5b7f30017e3b1ab7eee67b275377bbf1eff22e092b0417383",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/data/WoodcuttingLocations.test.ts",
-      "sha256": "96e887c891b5bcec97d5ea8c92551a77c11fe9fcbb511afb56e594c8f642c70d",
+      "path": "test/data/WoodcuttingLocations.test.ts",
+      "sha256": "c82780c1074aae2c262e0fd12ba9c20bf07fb2dd841ab4e038a18956ec7c2e69",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/runtime/randomevents/RandomEvents.test.ts",
+      "path": "test/runtime/randomevents/RandomEvents.test.ts",
       "sha256": "299d53c62c66c1e5e19ba520d9aa9f5765c9c5ac0bd5ef0cd9f2d440cc43fd97",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/scripts/Alcher/AlcherLogic.test.ts",
+      "path": "test/scripts/Alcher/AlcherLogic.test.ts",
       "sha256": "4b2de70dbba2e6c3a33d5c4ec9a23149151a6cc38baad43db2ddeddeed7d7a80",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/scripts/JiveDragons/settings.test.ts",
-      "sha256": "c4faf45ffecce5f8991e014465deee74246fc919bdafc69042511530295f07a4",
+      "path": "test/scripts/JiveDragons/settings.test.ts",
+      "sha256": "3338b876e749d92dc5561bbddc950c870fb56daa06f50f983a76d0793aad8d11",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/test/scripts/marketMakerLogic.test.ts",
+      "path": "test/scripts/marketMakerLogic.test.ts",
       "sha256": "91e2b84e73b091c606296c1d736c52880518e2e54da7e4416ff691ec9cade662",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/tools/content-drift.sh",
+      "path": "tools/content-drift.sh",
       "sha256": "c4545cd93f89f16f27c9a85a0040daf63e1105a6e12855cff75e2f45a089a6a2",
       "kind": "edition",
       "qualification": "offline"
     },
     {
-      "path": "data/377/tools/nav/door-categories.json",
-      "sha256": "d29199f42958ab83af2bba05ae0d461852992d7323ee2f7ad1cdbbcc6d86a3be",
+      "path": "tools/nav/door-categories.json",
+      "sha256": "5a7cfc4c126d5885c3b2f78d0576d8b1562926bda25390bf73b5161fa21c49fc",
       "kind": "nav-input",
       "qualification": "offline"
     },
     {
-      "path": "data/377/tools/nav/mainland-routes.json",
+      "path": "tools/nav/mainland-routes.json",
       "sha256": "123e1597ac8ce6ea97667922109a435f2ac8f495aae222c56f6b101f7b81248e",
       "kind": "nav-input",
       "qualification": "offline"
     },
     {
-      "path": "data/377/tools/nav/stair-prices.json",
-      "sha256": "6b70fdc7a5e548beefc5bf34a7d3d73748895ecc52d82c251bf4c83ba98a75bc",
+      "path": "tools/nav/stair-prices.json",
+      "sha256": "b0d773da25665ef3c3cb1c479a8c6ddd10594dca91a60af73d41c0239ec4da31",
       "kind": "nav-input",
       "qualification": "offline"
     },
@@ -381,8 +381,7 @@
       "path": "out/collision.lcnav.gz",
       "sha256": "ccebd03c96ec984a2aaa99165cbde0d78ebfebb5459104fdd8c9b4c8a0478015",
       "kind": "out",
-      "qualification": "offline",
-      "stagedPath": "data/377/out/collision.lcnav.gz"
+      "qualification": "offline"
     },
     {
       "path": "out/worldmap-basemap.e6315f93c51abd46.png",

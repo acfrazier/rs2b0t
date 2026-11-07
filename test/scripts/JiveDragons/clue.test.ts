@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, spyOn, test } from 'bun:test';
 import { Navigator } from '#/bot/event/webwalk/Navigator.js';
 import { reader } from '#/bot/adapter/ClientAdapter.js';
 import { Loc } from '#/bot/api/locs/Locs.js';
@@ -14,6 +14,12 @@ import { Sustain } from '#/bot/api/sustain/Sustain.js';
 import { Traversal } from '#/bot/api/walking/Traversal.js';
 import Tile from '#/bot/geometry/Tile.js';
 import { scenario, restoreScenario } from './scheduler.fixture.js';
+import { installLegacyClueRows } from '../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 beforeEach(() => { spyOn(Navigator, 'findPath').mockResolvedValue({ ok: false, reason: 'no test route', expanded: 0 }); });
 afterEach(restoreScenario);

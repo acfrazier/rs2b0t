@@ -20,8 +20,8 @@ export const TROUSERS_OBJ = 285;
 export const FURNACE_LOC = 165;
 export const GATE_LOC: readonly number[] = [166, 167];
 
-export const PROD = 'Prod';
-export const FEED = 'Feed';
+export const PROD = 'Cattleprod';
+export const FEED = 'Sheep feed';
 export const JACKET = 'Plague jacket';
 export const TROUSERS = 'Plague trousers';
 

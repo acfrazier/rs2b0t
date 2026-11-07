@@ -66,7 +66,7 @@ export const DIG_ITEM = {
     UNCUT_OPAL: 'Uncut opal',
     ARCENIA_ROOT: 'Arcenia root',
     STONE_TABLET: 'Stone tablet',
-    TALISMAN: 'Talisman of zaros',
+    TALISMAN: 'Zaros talisman',
     EXPERT_SCROLL: 'Invitation letter',
     CHEST_KEY: 'Chest key',
     PLAIN_LETTER: 'Unstamped letter',

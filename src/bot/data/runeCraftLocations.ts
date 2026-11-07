@@ -8,6 +8,8 @@ export interface RuneRoute {
     ruins: Tile;
 }
 
+/** 377 `ruins` tiles are the `exit_coord` of each rune's `runecraft.dbrow` row; cosmic and death changed from 289. Source lines: docs/decisions/data-377-sources.md#rune-craft-locations. */
+
 /* Rune altar locations decoded from `runecraft.dbrow`; `exit_coord` is level_chunkX_chunkZ_offsetX_offsetZ with 64-tile chunks. */
 export const RUNES: Record<string, RuneRoute> = {
     'Air rune': {
@@ -57,7 +59,8 @@ export const RUNES: Record<string, RuneRoute> = {
         talisman: 'Cosmic talisman',
         level: 27,
         bank: 'Draynor',
-        ruins: new Tile(3173, 9501, 0)
+        // 377: runecraft.dbrow:101 exit_coord `0_37_68_38_28`, the Zanaris ruins east of cosmictemple_ruined (maps/m37_68.jm2:5816).
+        ruins: new Tile(2406, 4380, 0)
     },
     'Chaos rune': {
         rune: 'Chaos rune',
@@ -85,7 +88,8 @@ export const RUNES: Record<string, RuneRoute> = {
         talisman: 'Death talisman',
         level: 65,
         bank: 'Edgeville',
-        ruins: new Tile(3221, 3218, 0)
+        // 377: runecraft.dbrow:167 exit_coord `0_29_72_6_31`, the tile east of deathtemple_ruined (maps/m29_72.jm2:12379).
+        ruins: new Tile(1862, 4639, 0)
     }
 };
 

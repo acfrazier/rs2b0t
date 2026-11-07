@@ -9,7 +9,7 @@ export interface BioItem {
 // Why: both priest halves render "Priest gown", both cages render "Pigeon cage" and the mourner key renders "Key", so every lookup in this quest goes through the object id.
 export const BIO_ITEM = {
     COINS: { id: 995, name: 'Coins' },
-    ETHENEA: { id: 415, name: 'Ethanea' },
+    ETHENEA: { id: 415, name: 'Ethenea' },
     LIQUID_HONEY: { id: 416, name: 'Liquid honey' },
     SULPHURIC_BROLINE: { id: 417, name: 'Sulphuric broline' },
     PLAGUE_SAMPLE: { id: 418, name: 'Plague sample' },

@@ -98,7 +98,8 @@ function unreachable(finder: PathFinder, state: WorldStateData): number[] {
 
 describe('hard clue destinations, quests complete and the gate kit carried', () => {
     test('every hard clue has a coord or a talk anchor', () => {
-        expect(HARD.length).toBe(64);
+        // 377 sells 31 hard clues: 13 sextant dig rows, 17 riddle rows and one map row (the 289 cluedb had 64).
+        expect(HARD.length).toBe(31);
         expect(HARD.filter(id => destination(id) === null)).toEqual([]);
     });
 
@@ -114,14 +115,14 @@ describe('hard clue destinations, quests complete and the gate kit carried', () 
         ).toEqual([]);
     }, 120_000);
 
-    test('the quests are what open the gnome and Karamja destinations', () => {
+    // 377 trail_hard.enum lists 31 clues (13 sextant, 17 riddle, 1 map): none of their destinations sits in the gnome or Karamja areas the quests opened at 289, so completing quests must not change which of them are reachable.
+    test('completing quests opens no hard clue destination that was shut without them', () => {
         const finder = loadFinder();
         if (!finder) {
             return;
         }
         const withQuests = new Set(unreachable(finder, kitted(true)));
         const without = unreachable(finder, kitted(false));
-        const opened = without.filter(id => !withQuests.has(id));
-        expect(opened.length).toBeGreaterThan(0);
+        expect(without.filter(id => !withQuests.has(id))).toEqual([]);
     }, 240_000);
 });

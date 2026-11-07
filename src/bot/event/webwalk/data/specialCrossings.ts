@@ -87,7 +87,7 @@ export const SPECIAL_CROSSINGS: SpecialCrossing[] = [
     { x: 3268, z: 3227, level: 0, locName: 'Gate', action: 'Open', requires: { item: 'Coins', count: 10 }, questWaivesItems: 'Prince Ali Rescue', dialogue: { choose: ['Yes, ok.'] }, label: 'Al Kharid toll gate' },
     { x: 3268, z: 3228, level: 0, locName: 'Gate', action: 'Open', requires: { item: 'Coins', count: 10 }, questWaivesItems: 'Prince Ali Rescue', dialogue: { choose: ['Yes, ok.'] }, label: 'Al Kharid toll gate' },
 
-    // Plague City (#366): East Ardougne garden mud to sewer to pipe to West Ardougne manhole.
+    // Plague City (#366), 377 layout (quest_elena.constant:23-26): East Ardougne garden mud to the sewer at 2518,9760, the open pipe at 2514,9737 to the West Ardougne manhole stand 2529,3304.
     // Complete quest: dig soft mud (spade), climb mud pile out; pipe needs Gas mask worn.
     {
         x: 2566,
@@ -97,13 +97,13 @@ export const SPECIAL_CROSSINGS: SpecialCrossing[] = [
         action: 'Dig',
         useItem: { id: 952, name: 'Spade' },
         requires: { item: 'Spade', count: 1 },
-        toTile: { x: 2562, z: 9737, level: 0 },
+        toTile: { x: 2518, z: 9760, level: 0 },
         arrivalRadius: 2,
         label: 'Plague City mud dig → sewer (#366)'
     },
     {
-        x: 2562,
-        z: 9737,
+        x: 2519,
+        z: 9759,
         level: 0,
         locName: 'Mud pile',
         action: 'Climb',
@@ -112,11 +112,11 @@ export const SPECIAL_CROSSINGS: SpecialCrossing[] = [
         label: 'Plague City mud pile → garden (#366)'
     },
     {
-        x: 2530,
-        z: 9701,
+        x: 2514,
+        z: 9737,
         level: 0,
-        locName: 'Sewer pipe',
-        action: 'Search',
+        locName: 'Pipe',
+        action: 'Climb-up',
         toTile: { x: 2529, z: 3304, level: 0 },
         arrivalRadius: 2,
         label: 'Plague City sewer pipe → West Ardougne (#366)'
@@ -127,7 +127,7 @@ export const SPECIAL_CROSSINGS: SpecialCrossing[] = [
         level: 0,
         locName: 'Manhole',
         action: 'Climb-down',
-        toTile: { x: 2530, z: 9703, level: 0 },
+        toTile: { x: 2514, z: 9739, level: 0 },
         arrivalRadius: 2,
         label: 'West Ardougne manhole → sewer (#366)'
     },

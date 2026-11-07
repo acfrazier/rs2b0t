@@ -479,12 +479,13 @@ function rec(id: number, name: string, over: Partial<ObjRecord> = {}): ObjRecord
     return { id, name, cost: 1, stackable: false, members: false, equippable: false, certlink: -1, certtemplate: -1, ...over };
 }
 
-// Why: the strung bow is the equippable one, and that flag is the only thing separating the pair by name.
+// 377: the unstrung bow has its own display name (`_unpack/377/all.obj` `name=Maple longbow (u)` :803),
+// so the pair no longer separates by the equippable flag alone; the (u) name is the client's own.
 const QUOTE_CAT = buildCatalog([
     rec(440, 'Iron ore'),
     rec(1333, 'Rune scimitar', { equippable: true }),
     rec(851, 'Maple longbow', { equippable: true }),
-    rec(62, 'Maple longbow'),
+    rec(62, 'Maple longbow (u)'),
     rec(853, 'Yew longbow', { equippable: true }),
     rec(1515, 'Yew logs')
 ]);

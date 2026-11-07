@@ -90,14 +90,16 @@ test('a scene rebuild cannot release an abandoned living target for pickup', asy
     expect(state.takes).toBe(0);
 });
 
+const defersLoot = async (site: string, style: string): Promise<void> => {
+    const { state, task, engage } = await scenario(site, style);
+    expect(await task('LootCorpse').validate()).toBe(true);
+    await engage();
+    await task('LootCorpse').execute();
+    expect(state.takes).toBe(0);
+};
+
 for (const [site, style] of [['taverley-blue', 'range'], ['heroes-blue', 'mage'], ['brimhaven-iron', 'melee']]) {
-    test(`${site} ${style} also defers loot for its owned target`, async () => {
-        const { state, task, engage } = await scenario(site, style);
-        expect(await task('LootCorpse').validate()).toBe(true);
-        await engage();
-        await task('LootCorpse').execute();
-        expect(state.takes).toBe(0);
-    });
+    test(`${site} ${style} also defers loot for its owned target`, () => defersLoot(site, style));
 }
 
 test('a chase stall abandons credit without releasing the living target for loot', async () => {

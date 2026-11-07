@@ -5,36 +5,15 @@ import type { QuestStatus } from '#/bot/api/ui/questlog/Quests.js';
 
 const always = (status: QuestStatus) => (): QuestStatus => status;
 
-/** The three Isafdar / elf-camp clues, all gated on Regicide. */
-const TIRANNWN = [3560, 3562, 3564];
-
+// 377: the generated cluedb (tools/clues/gen-cluedb.ts against content a15d0faa8) carries 74 clue rows and none
+// sits in Isafdar or the elf camp (the 289 rows 3560/3562/3564 are not placed), so CLUE_GATES stays empty.
 describe('clueGate', () => {
     test('an ungated clue is open whatever the journal says', () => {
         expect(clueGate(2677, always('notStarted'))).toBeNull();
     });
 
-    test('a Tirannwn clue is open once Regicide reads complete', () => {
-        for (const id of TIRANNWN) {
-            expect(clueGate(id, always('complete')), `clue ${id}`).toBeNull();
-        }
-    });
-
-    test('a Tirannwn clue is blocked while Regicide is unfinished', () => {
-        for (const id of TIRANNWN) {
-            expect(clueGate(id, always('notStarted')), `clue ${id}`).toContain('Regicide');
-            expect(clueGate(id, always('inProgress')), `clue ${id}`).toContain('Regicide');
-        }
-    });
-
-    // Why: `unknown` is the quest tab not loaded yet, not a finished quest, so it must not open the gate.
-    test('an unloaded quest tab keeps the gate shut', () => {
-        expect(clueGate(3564, always('unknown'))).toContain('Regicide');
-    });
-
-    test('the block names the quest and the observed status', () => {
-        expect(clueGate(3564, always('inProgress'))).toBe(
-            'Lord Iorwerth is in the elf camp (Regicide reads inProgress)'
-        );
+    test('the 377 clue set has no quest-sealed destination', () => {
+        expect(Object.keys(CLUE_GATES)).toEqual([]);
     });
 
     test('every gate asks about the quest it names', () => {

@@ -215,22 +215,25 @@ describe('nav v2 path policy (teleports)', () => {
 });
 
 describe('nav v2 teleport catalog (Server scan)', () => {
-    test('includes core spell destinations with magic+rune requires', () => {
+    test('matches the six spell teleports in the revision 377 server pack', () => {
         const ids = SPELL_TELEPORTS.map(t => t.teleportId);
-        expect(ids).toEqual(
-            expect.arrayContaining(['varrock', 'lumbridge', 'falador', 'camelot', 'ardougne', 'watchtower', 'trollheim'])
-        );
+        expect(ids).toEqual(['varrock', 'lumbridge', 'falador', 'camelot', 'ardougne', 'watchtower']);
         const varrock = SPELL_TELEPORTS.find(t => t.teleportId === 'varrock')!;
         expect(varrock.to).toEqual({ x: 3213, z: 3424, level: 0 });
         expect(varrock.requires?.skills?.[0]).toEqual({ name: 'magic', level: 25 });
     });
-
-    test('jewellery matches Server single-dest duel ring and games neck', () => {
+    test('jewellery matches revision 377 duel ring options and games necklace', () => {
         const duel = JEWELLERY_TELEPORTS.find(t => t.teleportId === 'dueling_arena')!;
+        const castleWars = JEWELLERY_TELEPORTS.find(t => t.teleportId === 'dueling_castle_wars')!;
         const games = JEWELLERY_TELEPORTS.find(t => t.teleportId === 'games_burthorpe')!;
         expect(duel.to).toEqual({ x: 3315, z: 3235, level: 0 });
+        expect(castleWars.to).toEqual({ x: 2441, z: 3090, level: 0 });
+        expect(duel.requires?.members).toBe(true);
+        expect(castleWars.requires?.members).toBe(true);
+        expect(castleWars.dialogueChoose).toEqual(['Castle Wars']);
         expect(games.to).toEqual({ x: 2207, z: 4940, level: 0 });
         expect(inventoryNameMatchesJewellery('Ring of dueling(5)', duel)).toBe(true);
+        expect(inventoryNameMatchesJewellery('Ring of dueling(5)', castleWars)).toBe(true);
         expect(inventoryNameMatchesJewellery('Games necklace(8)', games)).toBe(true);
         expect(inventoryNameMatchesJewellery('Amulet of glory(4)', duel)).toBe(false);
     });
@@ -248,7 +251,7 @@ describe('nav v2 teleport catalog (Server scan)', () => {
         expect(edges.length).toBe(SPELL_TELEPORTS.length + JEWELLERY_TELEPORTS.length);
         expect(edges.every(e => e.kind === 'teleport')).toBe(true);
         expect(edges.every(e => e.landing?.acceptAnyLanding === true)).toBe(true);
-        expect(edges.some(e => e.teleportId === 'dueling_arena')).toBe(true);
+        expect(edges.some(e => e.teleportId === 'dueling_castle_wars')).toBe(true);
     });
 });
 

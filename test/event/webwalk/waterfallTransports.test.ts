@@ -13,7 +13,8 @@ const EXPECTED = [
         locX: 2604,
         locZ: 9900,
         debugName: 'baxtorian_door_2_waterfall_quest',
-        options: ['Open']
+        options: ['Open'],
+        extraTicks: 0
     },
     {
         from: { x: 2575, z: 9861, level: 0 },
@@ -25,7 +26,8 @@ const EXPECTED = [
         locX: 2575,
         locZ: 9861,
         debugName: 'baxtorian_door_waterfall_quest',
-        options: ['Open']
+        options: ['Open'],
+        extraTicks: 0
     },
     {
         from: { x: 2511, z: 3463, level: 0 },
@@ -37,7 +39,8 @@ const EXPECTED = [
         locX: 2512,
         locZ: 3463,
         debugName: 'barrel_waterfall_quest',
-        options: ['Get in']
+        options: ['Get in'],
+        extraTicks: 0
     }
 ] as const satisfies readonly TransportEdgeData[];
 

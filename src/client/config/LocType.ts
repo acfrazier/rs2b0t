@@ -56,11 +56,14 @@ export default class LocType {
     forceapproach: number = 0;
     forcedecor: boolean = false;
     breakroutefinding: boolean = false;
-    raiseobject: number = 0;
+    raiseobject: number = -1;
     multivarbit: number = -1;
+    /** 377 Java field1635 — varp selector when multivarbit is −1. */
+    multivar: number = -1;
     multiloc: number[] = [];
 
     static readonly STRICT: boolean = process.env.STRICT_CONFIG === '1';
+    static datEnd: number = 0;
 
     static init(config: JagFile): void {
         this.dat = new Packet(config.read('loc.dat'));
@@ -73,6 +76,15 @@ export default class LocType {
         for (let id: number = 0; id < this.numDefinitions; id++) {
             this.idx[id] = offset;
             offset += idx.g2();
+        }
+        this.datEnd = offset;
+        if (LocType.STRICT) {
+            if (idx.pos !== idx.length) {
+                throw new Error(`LocType: trailing idx bytes (pos ${idx.pos}, end ${idx.length})`);
+            }
+            if (this.dat.length !== offset) {
+                throw new Error(`LocType: trailing dat bytes (end ${offset}, length ${this.dat.length})`);
+            }
         }
 
         this.recent = new TypedArray1d(10, null);
@@ -93,6 +105,15 @@ export default class LocType {
             }
         }
 
+        // Java LocType.java:164: field1621.pos = field1612[arg0] throws AIOOBE.
+        // Cache first so list(-1) still hits unused slots (id defaults to -1).
+        if (id < 0 || id >= this.numDefinitions) {
+            if (LocType.STRICT) {
+                throw new Error(`LocType: id ${id} out of range (count ${this.numDefinitions})`);
+            }
+            throw new RangeError(`Index ${id} out of bounds for length ${this.numDefinitions}`);
+        }
+
         this.recentPos = (this.recentPos + 1) % 10;
 
         const loc: LocType = this.recent[this.recentPos]!;
@@ -100,6 +121,12 @@ export default class LocType {
         loc.id = id;
         loc.reset();
         loc.decode(this.dat);
+        if (LocType.STRICT) {
+            const end = id + 1 < this.numDefinitions ? this.idx[id + 1] : this.datEnd;
+            if (this.dat.pos !== end) {
+                throw new Error(`LocType ${id}: trailing config bytes (pos ${this.dat.pos}, end ${end})`);
+            }
+        }
 
         return loc;
     }
@@ -139,6 +166,7 @@ export default class LocType {
         this.breakroutefinding = false;
         this.raiseobject = -1;
         this.multivarbit = -1;
+        this.multivar = -1;
         this.multiloc = [];
     }
 
@@ -202,7 +230,7 @@ export default class LocType {
                 this.ambient = dat.g1b();
             } else if (code === 39) {
                 this.contrast = dat.g1b();
-            } else if (code >= 30 && code < 39) {
+            } else if (code >= 30 && code < 35) {
                 if (!this.op) {
                     this.op = new TypedArray1d(5, null);
                 }
@@ -249,8 +277,15 @@ export default class LocType {
             } else if (code === 75) {
                 this.raiseobject = dat.g1();
             } else if (code === 77) {
+                // 377 Java LocType.method568: g2 varbit, g2 varp, g1 count, (count+1)×g2
                 this.multivarbit = dat.g2();
-
+                if (this.multivarbit === 65535) {
+                    this.multivarbit = -1;
+                }
+                this.multivar = dat.g2();
+                if (this.multivar === 65535) {
+                    this.multivar = -1;
+                }
                 const count = dat.g1();
                 this.multiloc = new Array(count + 1);
                 for (let i = 0; i <= count; i++) {
@@ -294,7 +329,7 @@ export default class LocType {
         if (this.shape !== null) {
             for (let i = 0; i < this.shape.length; i++) {
                 if (this.shape[i] === shape) {
-                    return Model.requestDownload(this.model[i] & 0xFFFF);
+                    return Model.requestDownload(this.model[i] & 0xffff);
                 }
             }
             return true;
@@ -302,7 +337,7 @@ export default class LocType {
             let ready = true;
             for (let i = 0; i < this.model.length; i++) {
                 const model = this.model[i];
-                if (!Model.requestDownload(model & 0xFFFF)) {
+                if (!Model.requestDownload(model & 0xffff)) {
                     ready = false;
                 }
             }
@@ -320,7 +355,7 @@ export default class LocType {
         let ready = true;
         for (let i = 0; i < this.model.length; i++) {
             const model = this.model[i];
-            if (!Model.requestDownload(model & 0xFFFF)) {
+            if (!Model.requestDownload(model & 0xffff)) {
                 ready = false;
             }
         }
@@ -335,7 +370,7 @@ export default class LocType {
         }
 
         for (let i = 0; i < this.model.length; i++) {
-            out.add(this.model[i] & 0xFFFF);
+            out.add(this.model[i] & 0xffff);
         }
     }
 
@@ -347,7 +382,7 @@ export default class LocType {
         for (let i = 0; i < this.model.length; i++) {
             const model = this.model[i];
             if (model != -1) {
-                od.prefetch(0, model & 0xFFFF);
+                od.prefetch(0, model & 0xffff);
             }
         }
     }

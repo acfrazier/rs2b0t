@@ -1,7 +1,10 @@
 import { gameHttpUrl, TARGET, type Target } from './target.js';
 
-// rs2b2t rotates its RSA keypair on restart, so the baked modulus can go stale.
-// Login response 6 triggers one refresh from /loginkey or the server's client bundle.
+// Login response 6 triggers one refresh of the baked modulus. The 377 engine has no /loginkey route
+// (its web.ts serves only /crc and the archive routes) and keeps one static key in data/config/private.pem,
+// so against it the refresh finds nothing newer: /loginkey answers 404 and the scrape of the server's
+// client bundle returns the modulus already baked. A host that rotates its keypair on restart, as
+// rs2b2t does, serves /loginkey or a bundle that carries the new modulus.
 
 const BAKED_MODULUS = process.env.LOGIN_RSAN ?? '';
 const EXPONENT = process.env.LOGIN_RSAE ?? '65537';

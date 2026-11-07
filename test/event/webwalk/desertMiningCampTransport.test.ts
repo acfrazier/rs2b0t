@@ -38,7 +38,7 @@ const completeData = {
     members: true,
     quests: { 'The Tourist Trap': 'complete' },
     items: { 'Metal key': 1, 'Wrought iron key': 1 },
-    worn: { "Slaves' shirt": 1, 'Slave robe': 1, 'Slave boots': 1 }
+    worn: { 'Slave shirt': 1, 'Slave robe': 1, 'Slave boots': 1 }
 } as const;
 const complete = worldStateFromData(completeData);
 
@@ -236,7 +236,7 @@ describe('Desert Mining Camp shared transports', () => {
             ...emptyWorldStateData(),
             members: true,
             quests: { 'The Tourist Trap': 'started' },
-            worn: { "Slaves' shirt": 1, 'Slave robe': 1, 'Slave boots': 1 }
+            worn: { 'Slave shirt': 1, 'Slave robe': 1, 'Slave boots': 1 }
         });
         expect(meetsRequires(caveIn.requires, startedAndDisguised).ok).toBe(false);
         expect(meetsRequires(caveOutDisguised.requires, startedAndDisguised).ok).toBe(true);

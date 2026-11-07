@@ -60,7 +60,9 @@ export function startReplayArchiveServer(cache: CacheBundle): ReplayArchiveServe
                 return new NativeResponse(null, { status: 405 });
             }
 
-            const bytes = routeBytes.get(new URL(request.url).pathname);
+            // Java 377 sends /crc<random>-377 as a cache buster; the engine ignores the suffix.
+            const pathname = new URL(request.url).pathname;
+            const bytes = routeBytes.get(/^\/crc(?:-?\d+)*$/.test(pathname) ? '/crc' : pathname);
             if (!bytes) {
                 return new NativeResponse('not found', { status: 404 });
             }

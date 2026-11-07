@@ -158,8 +158,9 @@ describe('eventNpcTargetsAnotherPlayer', () => {
 });
 
 describe('isEntHijack', () => {
+    // 377 ent ids: macro_ent_willow1 1736 and macro_ent_yew 1740 (pack/npc.pack:1737,1741); the 289 pack's 444/452 are gone.
     const ent = (over: Partial<{ id: number; index: number; distance: number }> = {}) => ({
-        id: 444,
+        id: 1736,
         index: 12,
         distance: 1,
         ...over
@@ -167,7 +168,7 @@ describe('isEntHijack', () => {
 
     test('facing the Ent while chopping it is a hijack', () => {
         expect(isEntHijack(ent(), 12, true)).toBe(true);
-        expect(isEntHijack(ent({ id: 452, index: 7 }), 7, true)).toBe(true);
+        expect(isEntHijack(ent({ id: 1740, index: 7 }), 7, true)).toBe(true);
     });
 
     test('a neighbour loc chop (not facing the Ent) is not a hijack', () => {

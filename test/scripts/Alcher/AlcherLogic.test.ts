@@ -63,9 +63,12 @@ describe('the fodder table resolves against the item database', () => {
 });
 
 describe('labels disambiguate what the client name does not', () => {
-    test('all four dragonhide bodies share one client name', () => {
-        const hides = ALCH_ITEMS.filter(i => i.name === 'Dragonhide body');
+    // 377: the content names each dragonhide body per colour (`_unpack/377/all.obj` `name=Green d'hide body`
+    // :14517, Blue :27938, Red :27969, Black :28000), so the four bodies no longer share a client name.
+    test('the four dragonhide bodies carry four distinct 377 client names', () => {
+        const hides = ALCH_ITEMS.filter(i => i.key.endsWith('dragonhide_body'));
         expect(hides).toHaveLength(4);
+        expect(new Set(hides.map(i => i.name)).size).toBe(4);
         expect(new Set(hides.map(i => i.label)).size).toBe(4);
     });
 

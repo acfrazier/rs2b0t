@@ -82,11 +82,12 @@ function validateCategoryNames(table: DoorCategoryTable, categoryNames: Map<numb
     }
 }
 
-function parseArgs(): { engine: string; content: string; out: string; revision: number } {
+function parseArgs(): { engine: string; content: string; out: string; check: boolean; revision: number } {
     const args = process.argv.slice(2);
     let engine = process.env.ENGINE_DIR ?? path.join(homedir(), 'code', 'rs2b2t-engine');
     let content = process.env.CONTENT_DIR ?? path.join(homedir(), 'code', 'rs2b2t-content');
     let out = 'src/bot/event/webwalk/data/doors.json';
+    let check = false;
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--engine') {
             engine = args[++i];
@@ -94,13 +95,15 @@ function parseArgs(): { engine: string; content: string; out: string; revision: 
             content = args[++i];
         } else if (args[i] === '--out') {
             out = args[++i];
+        } else if (args[i] === '--check') {
+            check = true;
         } else {
             console.error(`unknown argument: ${args[i]}`);
             process.exit(2);
         }
     }
     const revision = process.env.REVISION === undefined ? CLIENT_VERSION : Number(process.env.REVISION);
-    return { engine, content, out, revision };
+    return { engine, content, out, check, revision };
 }
 
 function main(): void {
@@ -291,8 +294,18 @@ function main(): void {
     edges.sort((a, b) => a.level - b.level || a.x - b.x || a.z - b.z || a.locId - b.locId);
 
     const json = '[\n' + edges.map(edge => '    ' + JSON.stringify(edge)).join(',\n') + '\n]\n';
-    fs.mkdirSync(path.dirname(opts.out), { recursive: true });
-    fs.writeFileSync(opts.out, json);
+    if (opts.check) {
+        const current = fs.existsSync(opts.out) ? fs.readFileSync(opts.out, 'utf8') : '';
+        if (current !== json) {
+            console.error(`STALE: ${opts.out} — run bun tools/nav/derive-doors.ts`);
+            process.exitCode = 1;
+        } else {
+            console.log(`ok: ${opts.out} is up to date`);
+        }
+    } else {
+        fs.mkdirSync(path.dirname(opts.out), { recursive: true });
+        fs.writeFileSync(opts.out, json);
+    }
 
     console.log(`openable wall loc types: ${openable.size} (skipped ${refusedTypes} policy-refused types, ${oneWaySkipped} one-way instances -> curated transports, ${brokenEngineSkipped} broken Engine instances)`);
     console.log(`mapsquares scanned: ${mapsquares}`);

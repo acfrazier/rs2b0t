@@ -1,4 +1,4 @@
-import { afterEach, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, expect, mock, spyOn, test } from 'bun:test';
 import { reader } from '#/bot/adapter/ClientAdapter.js';
 import { SettingsStore, SettingsBag } from '#/bot/runtime/Settings.js';
 import { Game } from '#/bot/api/game/Game.js';
@@ -13,6 +13,12 @@ import { Sustain } from '#/bot/api/sustain/Sustain.js';
 import { Loc } from '#/bot/api/locs/Locs.js';
 import { ChatDialog } from '#/bot/api/ui/dialogue/ChatDialog.js';
 import { crossesClueDuel, DUEL_CLUE_TILE, walkAcrossClueDuel } from '#/bot/api/ai/clues/duelTravel.js';
+import { installLegacyClueRows } from '../../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 const lobby = { x: 3368, z: 3274, level: 0 };
 const wrong = { x: 3340, z: 3230, level: 0 };

@@ -42,8 +42,8 @@ export function dirtyFamiliesForPacket(ptype: number): ProducerFamily[] | 'reset
     if (ptype === ServerProt.MESSAGE_GAME || ptype === ServerProt.MESSAGE_PRIVATE) {
         return ['chat'];
     }
-    // Rebuild can reshuffle UI/state; re-seed everything cheaply once.
-    if (ptype === ServerProt.REBUILD_NORMAL) {
+    // Rebuild can reshuffle UI/state; re-seed everything cheaply once. REBUILD_REGION is the instanced-scene twin of REBUILD_NORMAL.
+    if (ptype === ServerProt.REBUILD_NORMAL || ptype === ServerProt.REBUILD_REGION) {
         return ['skills', 'inventory', 'varps', 'chat'];
     }
     return null;

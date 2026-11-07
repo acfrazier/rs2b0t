@@ -112,7 +112,7 @@ LOC_LINE_RE = re.compile(
 )
 
 # scripts/general_use/scripts/manholes.rs2:1-10 opens 881 as 882 before descent.
-OPEN_LOC_DEBUGS = {"manholeclosed": "manholeopen"}
+OPEN_LOC_DEBUGS = {"manholeclosed": "manholeopen", "plaguemanholeclosed": "plaguemanholeopen"}
 
 
 def clean_value(value: str) -> str:
@@ -236,7 +236,7 @@ def resolve_source_loc(
     wanted_name = normalized(edge.get("locName"))
     wanted_action = normalized(edge.get("action"))
     kind = normalized(edge.get("kind"))
-    ranked: list[tuple[float, float, int, int, LocConfig, Placement]] = []
+    ranked: list[tuple[float, float, float, int, int, LocConfig, Placement]] = []
 
     source = edge["from"]
     destination = edge["to"]
@@ -301,17 +301,20 @@ def resolve_source_loc(
             corridor_distance = max(abs(placement.x - midpoint_x), abs(placement.z - midpoint_z))
             proximity = corridor_distance if use_midpoint else distance
             score -= proximity * 6
-            ranked.append((score, -proximity, -distance, -placement.loc_id, config, placement))
+            # Why: Chebyshev distance ties two placements that sit one tile orthogonally and one tile diagonally from the stand (the Gu'Tanoth battlements at 2507,3011 and 2507,3012); the straight-line distance picks the one the stand is beside instead of the first one scanned.
+            reference_x, reference_z = (midpoint_x, midpoint_z) if use_midpoint else (source["x"], source["z"])
+            straight_line = (placement.x - reference_x) ** 2 + (placement.z - reference_z) ** 2
+            ranked.append((score, -proximity, -straight_line, -distance, -placement.loc_id, config, placement))
 
     if not ranked:
         return None
-    ranked.sort(key=lambda item: item[:4], reverse=True)
+    ranked.sort(key=lambda item: item[:5], reverse=True)
     best = ranked[0]
     # Name-only matches far from the source are too ambiguous for common names
     # such as Door, Gate, Ladder, and Staircase.
     if best[0] < 70:
         return None
-    return best[4], best[5]
+    return best[5], best[6]
 
 
 def edge_key(edge: dict) -> tuple[int, int, int, int, int, int, str, str]:
@@ -375,7 +378,7 @@ def main() -> None:
     parser.add_argument("--rs2b0t", type=Path, default=Path("."))
     parser.add_argument("--transports-output", type=Path, default=Path("src/bot/event/webwalk/data/transports.json"))
     parser.add_argument("--stairs-output", type=Path, default=Path("src/bot/event/webwalk/data/stairEdges.json"))
-    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--check", action="store_true", help="fail unless rerunning this stage on the committed files reproduces them; sh tools/nav/derive-transports.sh --check checks the whole pipeline")
     args = parser.parse_args()
 
     revision = selected_revision()
@@ -387,10 +390,14 @@ def main() -> None:
     allowed_stair_debugs: set[str] = set()
     movement_handler_ops: set[tuple[str, int]] = set()
     oploc_re = re.compile(r"^\[oploc([1-5]),([a-z0-9_]+)]", re.MULTILINE)
+    oplocu_re = re.compile(r"^\[oplocu,([a-z0-9_]+)]", re.MULTILINE)
+    use_handlers: set[str] = set()
     for script in (args.content / "scripts").rglob("*.rs2"):
-        handlers = {(name, int(option)) for option, name in oploc_re.findall(script.read_text(encoding="utf-8"))}
+        text = script.read_text(encoding="utf-8")
+        handlers = {(name, int(option)) for option, name in oploc_re.findall(text)}
         movement_handler_ops.update(handlers)
         allowed_stair_debugs.update(name for name, _ in handlers)
+        use_handlers.update(oplocu_re.findall(text))
     allowed_stair_debugs.update({"laddertop", "ladder", "laddermiddle", "laddertop_directional", "ladder_directional"})
     data_dir = args.rs2b0t / "src" / "bot" / "event" / "webwalk" / "data"
     curated = json.loads((data_dir / "transports.json").read_text(encoding="utf-8"))
@@ -411,6 +418,15 @@ def main() -> None:
             return False
         handler = config.debug_name if config is not None else None
         if handler and any((handler, op) in movement_handler_ops for op in matching_options(config, edge.get("action"))):
+            return False
+        # Why: a crossing opened by using an item (Dig with a spade on the Plague City mud patch) is an oplocu handler, and its action is not one of the loc's own options.
+        placed = configs.get(edge.get("locId", -1))
+        if (
+            placed is not None
+            and placed.debug_name in use_handlers
+            and edge.get("requires", {}).get("items")
+            and normalized(edge.get("action")) not in {normalized(option) for option in option_values(placed)}
+        ):
             return False
         edge["disabledReason"] = "No matching revision 377 OPLOC handler for this location action."
         edge.pop("extraTicks", None)
@@ -488,6 +504,7 @@ def main() -> None:
         if args.check:
             if not path.exists() or path.read_text(encoding="utf-8") != text:
                 raise SystemExit(f"STALE: {path} — run {Path(__file__).name} --content <LostCity Content checkout>")
+            print(f"ok: {path} is up to date")
             return
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")

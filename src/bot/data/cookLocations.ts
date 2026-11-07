@@ -1,3 +1,4 @@
+/** 377 surfaces pair with the generated `cookSurfaceLocs.ts` (content a15d0faa8); source lines in docs/decisions/data-377-sources.md#cook-locations. */
 import type { WorldTile } from '../adapter/ClientAdapter.js';
 import type { BankLocation } from '../api/bank/BankLocations.js';
 import Tile from '../geometry/Tile.js';

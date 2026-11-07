@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, spyOn, test, mock } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { reader, type InvItemSnapshot } from '#/bot/adapter/ClientAdapter.js';
 import { SolveClue, type SolveClueHost } from '#/bot/api/ai/clues/SolveClue.js';
 import { ClueExecutor } from '#/bot/api/ai/clues/ClueExecutor.js';
@@ -10,6 +10,12 @@ import { Game } from '#/bot/api/game/Game.js';
 import { Sustain } from '#/bot/api/sustain/Sustain.js';
 import { Traversal } from '#/bot/api/walking/Traversal.js';
 import Tile from '#/bot/geometry/Tile.js';
+import { installLegacyClueRows } from '../../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 const clue: InvItemSnapshot = { id: 3490, name: 'Clue scroll (easy)', count: 1, slot: 0, comId: 1, ops: ['Read'] };
 let pack: InvItemSnapshot[];

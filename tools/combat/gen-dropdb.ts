@@ -80,6 +80,28 @@ const npcNames = loadConfigNames('.npc', (cur, line) => {
 });
 const blocks = loadBlocks();
 
+/** Every `[ai_queue3,<npc or _category>]` block under the content scripts, name to body; the default `[ai_queue3,_]` is not an owner. */
+function loadQueue3Bodies(): Map<string, string> {
+    const bodies = new Map<string, string>();
+    for (const f of filesUnder(join(CONTENT, 'scripts'), '.rs2')) {
+        let cur: string | null = null;
+        const lines: string[] = [];
+        const flush = (): void => { if (cur !== null) { bodies.set(cur, lines.join('\n')); } lines.length = 0; };
+        for (const raw of readFileSync(f, 'utf8').split('\n')) {
+            const head = /^\[([a-z0-9_]+)\s*,\s*([a-z0-9_]+)\](.*)$/.exec(raw.trim());
+            if (head) {
+                flush();
+                cur = head[1] === 'ai_queue3' && head[2] !== '_' ? head[2] : null;
+                lines.push(head[3]);
+            } else if (cur !== null) {
+                lines.push(raw);
+            }
+        }
+        flush();
+    }
+    return bodies;
+}
+
 function itemsIn(key: string, deathDrop: string | undefined, seen: Set<string>): Set<string> {
     const out = new Set<string>();
     const block = blocks.get(key);
@@ -132,6 +154,26 @@ function generate(): string {
                 if (name) { set.add(name); }
             }
             byDisplay.set(display, set);
+        }
+    }
+
+    // Why: an npc with no ai_queue3 block of its own or of its category runs the default death script, which adds the npc's `death_drop` param (377 skill_combat/scripts/npc/npc_combat.rs2:3,90-95); an own block that gosubs npc_default_death adds it too. Without this the table omits e.g. the iron dragon's dragon bones.
+    const queue3 = loadQueue3Bodies();
+    const categoryOf = new Map<string, string[]>();
+    for (const [cat, npcs] of categories) {
+        for (const npc of npcs) {
+            categoryOf.set(npc, [...(categoryOf.get(npc) ?? []), cat]);
+        }
+    }
+    for (const [npc, drop] of deathDrops) {
+        const display = npcNames.get(npc);
+        const name = objNames.get(drop);
+        if (!display || !name) {
+            continue;
+        }
+        const handler = queue3.get(npc) ?? (categoryOf.get(npc) ?? []).map(cat => queue3.get(`_${cat}`)).find(body => body !== undefined);
+        if (handler === undefined || /\bnpc_default_death\b/.test(handler)) {
+            byDisplay.set(display, (byDisplay.get(display) ?? new Set<string>()).add(name));
         }
     }
 

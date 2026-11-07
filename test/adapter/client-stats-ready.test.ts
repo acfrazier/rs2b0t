@@ -12,10 +12,16 @@ test('activeStatsReady rejects the empty snapshot seen during login', () => {
 test('activeStatsReady ignores unused slots but requires every active skill', () => {
     const levels = new Int32Array(25);
     levels.fill(1);
-    levels[19] = 0;
     levels[21] = 0;
+    levels[22] = 0;
     expect(activeStatsReady(levels)).toBe(true);
 
+    levels[18] = 0;
+    expect(activeStatsReady(levels)).toBe(false);
+    levels[18] = 1;
+    levels[19] = 0;
+    expect(activeStatsReady(levels)).toBe(false);
+    levels[19] = 1;
     levels[20] = 0;
     expect(activeStatsReady(levels)).toBe(false);
 });

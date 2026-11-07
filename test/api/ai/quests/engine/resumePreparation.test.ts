@@ -30,7 +30,7 @@ describe('resumePreparation', () => {
     test('preserves exact quest objects sharing display names and single-copy intermediates', () => {
         const inventory = [item(779, 'Crest part'), item(780, 'Crest part'), item(781, 'Crest part'),
             item(446, "'perfect' gold ore"), item(2365, "'perfect' gold bar"), item(623, 'Sword pommel'),
-            item(609, 'Rashiliya corpse'), item(610, 'Zadimus corpse'), item(605, 'Bone key'), item(1436, 'Rune essence')];
+            item(609, 'Rashiliyia corpse'), item(610, 'Zadimus corpse'), item(605, 'Bone key'), item(1436, 'Rune essence')];
         expect(resumePreparation(moduleFor(), snap(), inventory, null)).toEqual({
             keepIds: [779, 780, 781, 446, 2365, 623, 609, 610, 605], caps: []
         });

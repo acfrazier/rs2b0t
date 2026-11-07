@@ -62,6 +62,10 @@ export default class ObjType {
     ambient: number = 0;
     contrast: number = 0;
     team: number = 0;
+    /** Java field854 — opcode 10 stores g2 (not skip) */
+    unused10: number = -1;
+
+    static datEnd: number = 0;
 
     static init(config: JagFile, members: boolean): void {
         this.memServer = members;
@@ -76,6 +80,15 @@ export default class ObjType {
         for (let id: number = 0; id < this.numDefinitions; id++) {
             this.idx[id] = offset;
             offset += idx.g2();
+        }
+        this.datEnd = offset;
+        if (ObjType.STRICT) {
+            if (idx.pos !== idx.length) {
+                throw new Error(`ObjType: trailing idx bytes (pos ${idx.pos}, end ${idx.length})`);
+            }
+            if (this.dat.length !== offset) {
+                throw new Error(`ObjType: trailing dat bytes (end ${offset}, length ${this.dat.length})`);
+            }
         }
 
         this.recent = new TypedArray1d(10, null);
@@ -96,6 +109,15 @@ export default class ObjType {
             }
         }
 
+        // Java ObjType.java:188: field855.pos = field824[arg0] throws AIOOBE.
+        // Cache first so list(-1) still hits unused slots (id defaults to -1).
+        if (id < 0 || id >= this.numDefinitions) {
+            if (ObjType.STRICT) {
+                throw new Error(`ObjType: id ${id} out of range (count ${this.numDefinitions})`);
+            }
+            throw new RangeError(`Index ${id} out of bounds for length ${this.numDefinitions}`);
+        }
+
         this.recentPos = (this.recentPos + 1) % 10;
 
         const obj: ObjType = this.recent[this.recentPos]!;
@@ -103,6 +125,12 @@ export default class ObjType {
         obj.id = id;
         obj.reset();
         obj.decode(this.dat);
+        if (ObjType.STRICT) {
+            const end = id + 1 < this.numDefinitions ? this.idx[id + 1] : this.datEnd;
+            if (this.dat.pos !== end) {
+                throw new Error(`ObjType ${id}: trailing config bytes (pos ${this.dat.pos}, end ${end})`);
+            }
+        }
 
         if (obj.certtemplate !== -1) {
             obj.genCert();
@@ -157,6 +185,7 @@ export default class ObjType {
         this.ambient = 0;
         this.contrast = 0;
         this.team = 0;
+        this.unused10 = -1;
     }
 
     decode(dat: Packet): void {
@@ -189,7 +218,7 @@ export default class ObjType {
                     this.yof2d -= 65536;
                 }
             } else if (code === 10) {
-                dat.pos += 2;
+                this.unused10 = dat.g2();
             } else if (code === 11) {
                 this.stackable = true;
             } else if (code === 12) {

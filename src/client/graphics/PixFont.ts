@@ -172,6 +172,66 @@ export default class PixFont extends Linkable2 {
         }
     }
 
+
+    centreStringWave2(str: string | null, x: number, y: number, rgb: number, phase: number): void {
+        if (str === null) {
+            return;
+        }
+
+        x |= 0;
+        y |= 0;
+
+        let cursorX: number = x - ((this.stringWid(str) / 2) | 0);
+        const offY: number = y - this.height;
+
+        for (let i: number = 0; i < str.length; i++) {
+            const c: number = str.charCodeAt(i);
+            if (c !== 32) {
+                this.plotLetter(
+                    this.charMask[c],
+                    cursorX + this.charOffsetX[c] + ((Math.sin(phase / 5.0 + i / 5.0) * 5.0) | 0),
+                    offY + this.charOffsetY[c] + ((Math.sin(phase / 5.0 + i / 3.0) * 5.0) | 0),
+                    this.charMaskWidth[c],
+                    this.charMaskHeight[c],
+                    rgb
+                );
+            }
+            cursorX += this.charAdvance[c];
+        }
+    }
+
+    centreStringShake(str: string | null, x: number, y: number, rgb: number, strength: number, phase: number): void {
+        if (str === null) {
+            return;
+        }
+
+        x |= 0;
+        y |= 0;
+
+        let amp: number = 7.0 - strength / 8.0;
+        if (amp < 0.0) {
+            amp = 0.0;
+        }
+
+        let cursorX: number = x - ((this.stringWid(str) / 2) | 0);
+        const offY: number = y - this.height;
+
+        for (let i: number = 0; i < str.length; i++) {
+            const c: number = str.charCodeAt(i);
+            if (c !== 32) {
+                this.plotLetter(
+                    this.charMask[c],
+                    cursorX + this.charOffsetX[c],
+                    offY + this.charOffsetY[c] + ((Math.sin(i / 1.5 + phase) * amp) | 0),
+                    this.charMaskWidth[c],
+                    this.charMaskHeight[c],
+                    rgb
+                );
+            }
+            cursorX += this.charAdvance[c];
+        }
+    }
+
     drawStringTag(str: string, x: number, y: number, rgb: number, shadowed: boolean): void {
         x |= 0;
         y |= 0;
@@ -183,7 +243,7 @@ export default class PixFont extends Linkable2 {
         y -= this.height;
         for (let i: number = 0; i < length; i++) {
             if (str.charAt(i) === '@' && i + 4 < length && str.charAt(i + 4) === '@') {
-                const tag = this.updateState(str.substring(i + 1, i + 4));
+                const tag = this.evaluateTag(str.substring(i + 1, i + 4));
                 if (tag !== -1) {
                     rgb = tag;
                 }
@@ -217,7 +277,7 @@ export default class PixFont extends Linkable2 {
         const offY: number = y - this.height;
         for (let i: number = 0; i < str.length; i++) {
             if (str.charAt(i) === '@' && i + 4 < str.length && str.charAt(i + 4) === '@') {
-                const tag = this.updateState(str.substring(i + 1, i + 4));
+                const tag = this.evaluateTag(str.substring(i + 1, i + 4));
                 if (tag !== -1) {
                     rgb = tag;
                 }
@@ -240,7 +300,7 @@ export default class PixFont extends Linkable2 {
         }
     }
 
-    updateState(tag: string): number {
+    evaluateTag(tag: string): number {
         if (tag === 'red') {
             return Colour.RED;
         } else if (tag === 'gre') {
@@ -278,6 +338,9 @@ export default class PixFont extends Linkable2 {
         } else {
             if (tag === 'str') {
                 this.strikeout = true;
+            }
+            if (tag === 'end') {
+                this.strikeout = false;
             }
 
             return -1;

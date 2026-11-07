@@ -226,6 +226,7 @@ test('progress identifies travel and purchase counts before the external action 
     await provision(plan, f.port, update => { message = update.message; destination = update.destination; });
 });
 
+// 377 shopdb: Aemad (adventurershop) is the only vendor of both Vial of water (500 stock) and Ball of wool (30 stock); the 289 test paired Vial of water with Rope, which 377 supplyOffers sends to Shantay.
 test('multiple unstackable needs share a vendor inventory limit including travel food', async () => {
     const f = fixture();
     let visits = 0;
@@ -241,9 +242,9 @@ test('multiple unstackable needs share a vendor inventory limit including travel
         if (used > 28) throw new Error('Inventory full');
         return bought;
     };
-    await provision({ ...plan, needs: [{ item: 'Vial of water', count: 27 }, { item: 'Rope', count: 2 }] }, f.port);
+    await provision({ ...plan, needs: [{ item: 'Vial of water', count: 27 }, { item: 'Ball of wool', count: 2 }] }, f.port);
     expect(f.bank['Vial of water']).toBe(27);
-    expect(f.bank.Rope).toBe(2);
+    expect(f.bank['Ball of wool']).toBe(2);
     expect(visits).toBe(2);
     expect(largestPack).toBe(28);
     expect(f.bank.Shrimps).toBe(30);
@@ -357,7 +358,7 @@ test.skipIf(!existsSync('out/collision.lcnav.gz'))('the navigation graph reaches
     });
     expect(route.ok).toBe(true);
     if (!route.ok) return;
-    expect(route.hops.find(hop => hop.locId === 1568)).toMatchObject({
+    expect(route.hops.find(hop => hop.locId === 11867)).toMatchObject({
         kind: 'dungeon', action: 'Climb-down', to: { x: 3019, z: 9849, level: 0 }
     });
     expect(route.waypoints.at(-1)).toMatchObject({ x: 2997, z: 9844, level: 0 });

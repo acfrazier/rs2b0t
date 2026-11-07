@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import { BANK_LOCATIONS, USE_MAGE_BANK, bankUnlocked, nearestBank } from '#/bot/api/bank/BankLocations.js';
-import TRANSPORTS from '#/bot/event/webwalk/data/transports.json';
+import { existsSync, readFileSync } from 'node:fs';
+import { gunzipSync } from 'fflate';
+import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
+import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
+import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
+
+const PACK = 'out/collision.lcnav.gz';
 
 const MAGE = BANK_LOCATIONS.find(b => b.name === 'Mage Arena')!;
 const KEY = `rs2b0t:set:Global:${USE_MAGE_BANK}`;
 
-/** At the web/ladder entrance in deep Wilderness. Gundai is nearest by far. */
+/** Beside the lever in deep Wilderness. Gundai is nearest by far. */
 const DEEP_WILDERNESS = { x: 3091, z: 3958, level: 0 };
 
 function setSetting(on: boolean | null): void {
@@ -21,27 +27,15 @@ function setSetting(on: boolean | null): void {
 afterEach(() => setSetting(null));
 
 describe('Mage Arena bank gate', () => {
-    test('sits where the ladder lands, approached from the ladder mouth', () => {
-        // transports.json: magearena_ladder_to_cellar (3091,3958) -> (2542,4714).
-        // Not Kolodion's arena teleport. That is the minigame, not the bank.
-        expect(MAGE.tile.x).toBe(2542);
-        expect(MAGE.tile.z).toBe(4714);
-        expect(MAGE.approach?.x).toBe(3091);
-        expect(MAGE.approach?.z).toBe(3958);
-        expect(MAGE.npcAccess?.name).toBe('Gundai');
-    });
-
-    test('the surface route it is ranked by is baked into the nav graph', () => {
-        const at = (e: { from: { x: number; z: number }; to: { x: number; z: number } }, fx: number, tx: number): boolean =>
-            e.from.x === fx && e.from.z === 3957 && e.to.x === tx && e.to.z === 3957;
-        // Two slashable webs west along z=3957, then the ladder down.
-        expect(TRANSPORTS.some(e => at(e, 3096, 3094))).toBe(true);
-        expect(TRANSPORTS.some(e => at(e, 3094, 3092))).toBe(true);
-        expect(
-            TRANSPORTS.some(
-                e => e.from.x === MAGE.approach!.x && e.from.z === MAGE.approach!.z && e.to.x === MAGE.tile.x && e.to.z === MAGE.tile.z
-            )
-        ).toBe(true);
+    test.skipIf(!existsSync(PACK))('the navigation graph walks from the webs to the cellar bank: two webs, then the lever', () => {
+        const finder = new PathFinder(gunzipSync(readFileSync(PACK)));
+        loadDefaultNavEdges(finder);
+        const state = { ...emptyWorldStateData(true), canSlashWeb: true };
+        const route = finder.findPath({ x: 3098, z: 3957, level: 0 }, { x: MAGE.tile.x, z: MAGE.tile.z, level: 0 }, { state, useTeleportCatalog: false });
+        expect(route.ok).toBe(true);
+        if (!route.ok) return;
+        expect(route.hops.map(hop => `${hop.locName}:${hop.action}`)).toEqual(['Web:Slash', 'Web:Slash', 'Lever:Pull']);
+        expect(route.waypoints.at(-1)).toMatchObject({ x: MAGE.tile.x, z: MAGE.tile.z });
     });
 
     test('off by default, so nothing routes through the Wilderness to bank', () => {

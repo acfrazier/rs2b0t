@@ -1,15 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { BANK_LOCATIONS } from '#/bot/api/bank/BankLocations.js';
 import Tile from '#/bot/geometry/Tile.js';
-import {
-    WOODCUTTING_LOCATIONS,
-    WOODCUTTING_LOCATION_OPTIONS,
-    resolveWoodcuttingLocation,
-    ENT_NPC_IDS,
-    ENT_LIFE_TICKS,
-    isEntNpcId,
-    entNpcOnTile
-} from '#/bot/data/woodcuttingLocations.js';
+import { WOODCUTTING_LOCATIONS, WOODCUTTING_LOCATION_OPTIONS, resolveWoodcuttingLocation, ENT_NPC_IDS, ENT_LIFE_TICKS, isEntNpcId, entNpcOnTile } from '#/bot/data/woodcuttingLocations.js';
 
 const bankTiles = new Set(BANK_LOCATIONS.map(b => `${b.tile.x},${b.tile.z},${b.tile.level}`));
 
@@ -20,13 +12,12 @@ describe('resolveWoodcuttingLocation', () => {
     });
 
     test('Use Closest near Draynor willows', () => {
-        expect(resolveWoodcuttingLocation('Use Closest', new Tile(3087, 3234, 0))?.name).toBe(
-            'Draynor Willows'
-        );
+        expect(resolveWoodcuttingLocation('Use Closest', new Tile(3087, 3234, 0))?.name).toBe('Draynor Willows');
     });
 
     test('Use Closest near Seers maples', () => {
-        expect(resolveWoodcuttingLocation('Use Closest', new Tile(2728, 3501, 0))?.name).toBe('Seers Maples');
+        // 377: the maple stand moved into the grove at 2722,3572, so the probe stands there.
+        expect(resolveWoodcuttingLocation('Use Closest', new Tile(2722, 3572, 0))?.name).toBe('Seers Maples');
     });
 
     test('Use Closest still snaps even NW of Crafting Guild (no chunk gate)', () => {
@@ -35,22 +26,13 @@ describe('resolveWoodcuttingLocation', () => {
     });
 
     test('named match is case-insensitive', () => {
-        expect(resolveWoodcuttingLocation('edgeville yews', new Tile(0, 0, 0))?.name).toBe(
-            'Edgeville Yews'
-        );
+        expect(resolveWoodcuttingLocation('edgeville yews', new Tile(0, 0, 0))?.name).toBe('Edgeville Yews');
     });
 });
 
 describe('WOODCUTTING_LOCATIONS table', () => {
     test('dropdown is Auto + Use Closest + Use Start Position + Use Custom Position + legacy None + camps', () => {
-        expect(WOODCUTTING_LOCATION_OPTIONS).toEqual([
-            'Auto',
-            'Use Closest',
-            'Use Start Position',
-            'Use Custom Position',
-            'None',
-            ...WOODCUTTING_LOCATIONS.map(l => l.name)
-        ]);
+        expect(WOODCUTTING_LOCATION_OPTIONS).toEqual(['Auto', 'Use Closest', 'Use Start Position', 'Use Custom Position', 'None', ...WOODCUTTING_LOCATIONS.map(l => l.name)]);
     });
 
     test('every bankStand is a known BANK_LOCATIONS tile', () => {
@@ -61,11 +43,7 @@ describe('WOODCUTTING_LOCATIONS table', () => {
     });
 
     test('core catalog entries are verified; tick-manip camps may be provisional', () => {
-        const provisional = new Set([
-            'S Falador Oaks',
-            'Lumbridge Farmer Willows',
-            'Lumbridge Castle Willows'
-        ]);
+        const provisional = new Set(['S Falador Oaks', 'Lumbridge Farmer Willows', 'Lumbridge Castle Willows']);
         for (const loc of WOODCUTTING_LOCATIONS) {
             if (provisional.has(loc.name)) {
                 expect(loc.verified, loc.name).toBe(false);
@@ -93,21 +71,27 @@ describe('WOODCUTTING_LOCATIONS table', () => {
 });
 
 describe('ENT_NPC_IDS', () => {
-    test('covers pack 444-452 and stops before suit of armour', () => {
+    // 377: the pack numbers macro_ent_* 1719-1750 and 1791-1792 (`pack/npc.pack:1720-1751,1792-1793`); the 289 ids 444-452 are gone,
+    // and the neighbours are not ents (crow 1751, favour_jimmy 1718, mm_waymottin_final_battle 1790, favour_tassie_slipcast 1793).
+    test('covers the 377 macro_ent pack rows and stops at their neighbours', () => {
         expect(ENT_LIFE_TICKS).toBe(60);
-        expect(ENT_NPC_IDS.size).toBe(9);
-        expect(isEntNpcId(443)).toBe(false);
-        expect(isEntNpcId(444)).toBe(true);
-        expect(isEntNpcId(452)).toBe(true);
-        expect(isEntNpcId(453)).toBe(false);
+        expect(ENT_NPC_IDS.size).toBe(34);
+        expect(isEntNpcId(1718)).toBe(false);
+        expect(isEntNpcId(1719)).toBe(true);
+        expect(isEntNpcId(1750)).toBe(true);
+        expect(isEntNpcId(1751)).toBe(false);
+        expect(isEntNpcId(1790)).toBe(false);
+        expect(isEntNpcId(1791)).toBe(true);
+        expect(isEntNpcId(1792)).toBe(true);
+        expect(isEntNpcId(1793)).toBe(false);
     });
 
     test('entNpcOnTile is the clicked loc only', () => {
         const tree = { x: 3087, z: 3234, level: 0 };
         const neighbour = { x: 3088, z: 3234, level: 0 };
-        const npcs = [{ id: 444, tile: tree }];
+        const npcs = [{ id: 1736, tile: tree }];
         expect(entNpcOnTile(npcs, tree)).toBe(true);
         expect(entNpcOnTile(npcs, neighbour)).toBe(false);
-        expect(entNpcOnTile([{ id: 443, tile: tree }], tree)).toBe(false);
+        expect(entNpcOnTile([{ id: 1718, tile: tree }], tree)).toBe(false);
     });
 });

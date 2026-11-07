@@ -1,4 +1,5 @@
-/** Spell and jewellery teleport destinations (revision 274 content pack) injected into PathFinder A*. */
+/** Spell and jewellery destinations reconstructed from revision 377 content. */
+// Sources: scripts/skill_magic/configs/magic_spells.dbrow:62-114; scripts/skill_magic/scripts/spells/teleport.rs2:1-6.
 
 import { ensureEdgeId } from './edgeId.js';
 import { teleportEdgeCost } from './geometry/edgeCosts.js';
@@ -46,7 +47,7 @@ const fire = (n: number) => ({ name: 'Fire rune', count: n, consumed: true as co
 const water = (n: number) => ({ name: 'Water rune', count: n, consumed: true as const });
 const earth = (n: number) => ({ name: 'Earth rune', count: n, consumed: true as const });
 
-/** Standard spellbook, magic_spells.dbrow + teleport.rs2 */
+/** Standard spellbook. Rune/level/landing rows are magic_spells.dbrow; teleport.rs2 dispatches these six spells. */
 export const SPELL_TELEPORTS: readonly TeleportDestination[] = [
     {
         teleportId: 'varrock',
@@ -120,35 +121,33 @@ export const SPELL_TELEPORTS: readonly TeleportDestination[] = [
         source: 'magic_spell_teleport_watchtower',
         notes: 'Landing is level 2; requires Watchtower complete + scroll. Cast via Game.teleport.'
     },
-    {
-        teleportId: 'trollheim',
-        family: 'spell',
-        label: 'Trollheim teleport',
-        to: { x: 2890, z: 3679, level: 0 },
-        requires: {
-            members: true,
-            skills: [{ name: 'magic', level: 61 }],
-            items: [fire(2), law(2)],
-            quests: [{ quest: "Eadgar's Ruse", minStatus: 'complete' }]
-        },
-        origin: { maxWildernessLevel: SPELL_MAX_WILDERNESS },
-        source: 'magic_spell_teleport_trollheim',
-        notes: 'Requires Eadgar\'s Ruse complete. Cast via Game.teleport.'
-    }
 ];
 
-/** Jewellery, Server-implemented destinations only; duel ring and games neck are single-dest on this pack. */
+/** Jewellery destinations (rings: scripts/general/scripts/enchanted_jewellry/ring_of_dueling.rs2:7,21-27; scripts/_unpack/377/all.obj:28645-28665; games necklace: scripts/general/scripts/enchanted_jewellry/necklace_of_minigames.rs2:1-21; scripts/_unpack/377/all.obj:47170-47191). */
 export const JEWELLERY_TELEPORTS: readonly TeleportDestination[] = [
     {
         teleportId: 'dueling_arena',
         family: 'jewellery',
         label: 'Ring of dueling → Al Kharid Duel Arena',
         to: { x: 3315, z: 3235, level: 0 },
+        requires: { members: true },
         itemNameMatch: ['Ring of dueling'],
         dialogueChoose: ['Al Kharid', 'Duel Arena'],
         origin: { maxWildernessLevel: SPELL_MAX_WILDERNESS },
-        source: 'ring_of_dueling.rs2',
-        notes: 'Charges 8→1. Inventory Rub only. Wildy >20 blocked. No Castle Wars on this Server.'
+        source: 'scripts/general/scripts/enchanted_jewellry/ring_of_dueling.rs2:7,21-27',
+        notes: 'Charges 8→1. Inventory Rub only. Wildy >20 blocked. Both Duel Arena and Castle Wars options.'
+    },
+    {
+        teleportId: 'dueling_castle_wars',
+        family: 'jewellery',
+        label: 'Ring of dueling → Castle Wars',
+        to: { x: 2441, z: 3090, level: 0 },
+        requires: { members: true },
+        itemNameMatch: ['Ring of dueling'],
+        dialogueChoose: ['Castle Wars'],
+        origin: { maxWildernessLevel: SPELL_MAX_WILDERNESS },
+        source: 'scripts/general/scripts/enchanted_jewellry/ring_of_dueling.rs2:7,21-27',
+        notes: 'Charges 8→1. Inventory Rub only. Wildy >20 blocked.'
     },
     {
         teleportId: 'games_burthorpe',
@@ -159,8 +158,8 @@ export const JEWELLERY_TELEPORTS: readonly TeleportDestination[] = [
         itemNameMatch: ['Games necklace'],
         dialogueChoose: ['Burthorpe', 'Games Room'],
         origin: { maxWildernessLevel: SPELL_MAX_WILDERNESS },
-        source: 'necklace_of_minigames.rs2',
-        notes: 'Charges 8→1. Inventory Rub only. Wildy >20. Burthorpe only on this Server.'
+        source: 'scripts/general/scripts/enchanted_jewellry/necklace_of_minigames.rs2:7,21',
+        notes: 'Charges 8→1. Inventory Rub only. Wildy >20 blocked. Burthorpe only on this server.'
     },
     {
         teleportId: 'glory_edgeville',
@@ -170,7 +169,7 @@ export const JEWELLERY_TELEPORTS: readonly TeleportDestination[] = [
         itemNameMatch: ['Amulet of glory('],
         dialogueChoose: ['Edgeville'],
         origin: { maxWildernessLevel: GLORY_MAX_WILDERNESS },
-        source: 'amulet_of_glory.rs2 case 1',
+        source: 'scripts/general/scripts/enchanted_jewellry/amulet_of_glory.rs2:13,30',
         notes: 'Requires charged glory (1–4). Wildy >30 blocked. Inventory Rub only.'
     },
     {
@@ -181,7 +180,7 @@ export const JEWELLERY_TELEPORTS: readonly TeleportDestination[] = [
         itemNameMatch: ['Amulet of glory('],
         dialogueChoose: ['Karamja'],
         origin: { maxWildernessLevel: GLORY_MAX_WILDERNESS },
-        source: 'amulet_of_glory.rs2 case 2'
+        source: 'scripts/general/scripts/enchanted_jewellry/amulet_of_glory.rs2:13,31'
     },
     {
         teleportId: 'glory_draynor',
@@ -191,7 +190,7 @@ export const JEWELLERY_TELEPORTS: readonly TeleportDestination[] = [
         itemNameMatch: ['Amulet of glory('],
         dialogueChoose: ['Draynor'],
         origin: { maxWildernessLevel: GLORY_MAX_WILDERNESS },
-        source: 'amulet_of_glory.rs2 case 3'
+        source: 'scripts/general/scripts/enchanted_jewellry/amulet_of_glory.rs2:13,32'
     },
     {
         teleportId: 'glory_alkharid',
@@ -201,7 +200,7 @@ export const JEWELLERY_TELEPORTS: readonly TeleportDestination[] = [
         itemNameMatch: ['Amulet of glory('],
         dialogueChoose: ['Al Kharid'],
         origin: { maxWildernessLevel: GLORY_MAX_WILDERNESS },
-        source: 'amulet_of_glory.rs2 case 4'
+        source: 'scripts/general/scripts/enchanted_jewellry/amulet_of_glory.rs2:13,33'
     }
 ];
 
@@ -211,16 +210,16 @@ export const LEVER_TELEPORTS: readonly TeleportDestination[] = [
         teleportId: 'lever_ardougne_to_wild',
         family: 'lever',
         label: 'Ardougne wilderness lever (in)',
-        to: { x: 3154, z: 3928, level: 0 },
-        source: 'wilderness_lever.rs2 wildinlever',
-        notes: 'Walk to lever loc; warning dialog. Deep wild landing.'
+        to: { x: 3154, z: 3924, level: 0 },
+        source: 'scripts/areas/area_ardougne_east/configs/wilderness_lever.constant:1-2; scripts/areas/area_ardougne_east/scripts/wilderness_lever.rs2:28',
+        notes: 'Walk to lever loc; warning dialog. Exact deep-wild teleport landing.'
     },
     {
         teleportId: 'lever_wild_to_ardougne',
         family: 'lever',
         label: 'Wilderness lever (out to Ardougne)',
         to: { x: 2562, z: 3311, level: 0 },
-        source: 'wilderness_lever.rs2 wildoutlever'
+        source: 'scripts/areas/area_ardougne_east/scripts/wilderness_lever.rs2:44'
     }
 ];
 

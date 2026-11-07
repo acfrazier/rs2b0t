@@ -10,10 +10,12 @@ import CollisionMap from '#/client/dash3d/CollisionMap.js';
 import Model from '#/client/dash3d/Model.js';
 import type ModelSource from '#/client/dash3d/ModelSource.js';
 import { ClientProt } from '#/client/io/ClientProt.js';
+import { writeInvButtonD, writeMessagePublic, writeResumePCountDialog } from '#/client/io/gameOutbound.js';
 import { ServerProt } from '#/client/io/ServerProt.js';
 import WordFilter from '#/client/wordfilter/WordFilter.js';
 import WordPack from '#/client/wordfilter/WordPack.js';
 import JString from '#/client/datastruct/JString.js';
+import { IF_IDS } from '#/bot/data/ifIds.js';
 
 import { SELF_TEST, type RawClient } from './RawClient.js';
 
@@ -346,12 +348,12 @@ const PUBLIC_CHAT_TYPE = 2;
 const CHAT_BUBBLE_TICKS = 150;
 
 // tradeconfirm inv components; the engine picks the *_LARGE pair once a side offers 14 or more items.
-const TRADE_CONFIRM_MINE_SMALL = 3542; // tradeconfirm:inv1
-const TRADE_CONFIRM_MINE_LARGE = 3538; // tradeconfirm:inv2
-const TRADE_CONFIRM_THEIRS_SMALL = 3532; // tradeconfirm:otherinv1
-const TRADE_CONFIRM_THEIRS_LARGE = 3539; // tradeconfirm:otherinv2
-const TRADE_CONFIRM_MINE_NOTHING = 3557; // tradeconfirm:inv_nothing
-const TRADE_CONFIRM_THEIRS_NOTHING = 3558; // tradeconfirm:otherinv_nothing
+const TRADE_CONFIRM_MINE_SMALL = IF_IDS.TRADECONFIRM_INV1;
+const TRADE_CONFIRM_MINE_LARGE = IF_IDS.TRADECONFIRM_INV2;
+const TRADE_CONFIRM_THEIRS_SMALL = IF_IDS.TRADECONFIRM_OTHERINV1;
+const TRADE_CONFIRM_THEIRS_LARGE = IF_IDS.TRADECONFIRM_OTHERINV2;
+const TRADE_CONFIRM_MINE_NOTHING = IF_IDS.TRADECONFIRM_INV_NOTHING;
+const TRADE_CONFIRM_THEIRS_NOTHING = IF_IDS.TRADECONFIRM_OTHERINV_NOTHING;
 
 /** One obj definition, flattened for bot code that may not import client internals. */
 export interface ObjRecord {
@@ -1422,42 +1424,44 @@ export const reader = {
 
     duelOffers(): { ready: boolean; mine: InvItemSnapshot[]; theirs: InvItemSnapshot[] } {
         const main = raw?.mainModalId;
-        const ids = main === 6575 ? [6669, 6670] : main === 6412 ? [6507, 6508] : [];
+        const ids = main === IF_IDS.DUEL_SELECT_TYPE
+            ? [IF_IDS.DUEL_SELECT_TYPE_INV, IF_IDS.DUEL_SELECT_TYPE_OTHERINV]
+            : main === IF_IDS.DUEL_CONFIRM ? [IF_IDS.DUEL_CONFIRM_INV, IF_IDS.DUEL_CONFIRM_OTHERINV] : [];
         const read = (id: number): InvItemSnapshot[] => readInvComponent(id, () => []);
         const mine = ids.length ? read(ids[0]) : [];
         const theirs = ids.length ? read(ids[1]) : [];
-        const ready = main === 6575
+        const ready = main === IF_IDS.DUEL_SELECT_TYPE
             ? ids.every(id => invState(id).transmitting && invState(id).fullGeneration > 0)
-            : main === 6412 && [6516, 6517].every(id => reader.ifText(id)?.trim() === 'Absolutely nothing!');
+            : main === IF_IDS.DUEL_CONFIRM && [IF_IDS.DUEL_CONFIRM_COM_103, IF_IDS.DUEL_CONFIRM_COM_104].every(id => reader.ifText(id)?.trim() === 'Absolutely nothing!');
         return { ready, mine, theirs };
     },
 
-    // offer screen = main modal 3323 (pack in side 3321); confirm screen = main modal 3443
+    // offer screen = TRADEMAIN (pack in TRADESIDE); confirm screen = TRADECONFIRM
     tradeOfferOpen(): boolean {
-        return raw?.mainModalId === 3323;
+        return raw?.mainModalId === IF_IDS.TRADEMAIN;
     },
 
     tradeConfirmOpen(): boolean {
-        return raw?.mainModalId === 3443;
+        return raw?.mainModalId === IF_IDS.TRADECONFIRM;
     },
 
     tradeMyOffer(): InvItemSnapshot[] {
-        return readInvComponent(3415, () => IfType.list[3415]?.iop ?? []); // trademain:inv
+        return readInvComponent(IF_IDS.TRADEMAIN_INV, () => IfType.list[IF_IDS.TRADEMAIN_INV]?.iop ?? []);
     },
 
     tradeTheirOffer(): InvItemSnapshot[] {
-        return readInvComponent(3416, () => IfType.list[3416]?.iop ?? []); // trademain:otherinv
+        return readInvComponent(IF_IDS.TRADEMAIN_OTHERINV, () => IfType.list[IF_IDS.TRADEMAIN_OTHERINV]?.iop ?? []);
     },
 
     tradeSidePack(): InvItemSnapshot[] {
-        return readInvComponent(3322, () => IfType.list[3322]?.iop ?? []); // tradeside:inv, your pack while trading
+        return readInvComponent(IF_IDS.TRADESIDE_INV, () => IfType.list[IF_IDS.TRADESIDE_INV]?.iop ?? []); // your pack while trading
     },
 
     tradePartner(): string | null {
-        return IfType.list[3417]?.text ?? null; // trademain:otherplayer, "Trading With: <name>"
+        return IfType.list[IF_IDS.TRADEMAIN_OTHERPLAYER]?.text ?? null; // "Trading With: <name>"
     },
 
-    // Why: the confirm screen is its own interface with its own inv components, and it is the screen the accept lands on, so the offer screen's 3415/3416 are the wrong thing to re-read here.
+    // Why: the confirm screen is its own interface with its own inv components, and it is the screen the accept lands on, so the offer screen's TRADEMAIN_INV and TRADEMAIN_OTHERINV are the wrong thing to re-read here.
     // Why: the engine transmits into inv1/otherinv1 below 14 items and inv2/otherinv2 at 14 or more (interface_trade/scripts/trade.rs2), so both must be read.
     tradeConfirmOffers(): { mine: InvItemSnapshot[]; theirs: InvItemSnapshot[] } {
         const read = (comId: number): InvItemSnapshot[] =>
@@ -1678,8 +1682,7 @@ export const actions = {
         if (!raw || !raw.ingame || !raw.out || !raw.dialogInputOpen) {
             return false;
         }
-        raw.out.p1Enc(ClientProt.RESUME_P_COUNTDIALOG);
-        raw.out.p4(Math.max(0, Math.floor(value)));
+        writeResumePCountDialog(raw.out, ClientProt.RESUME_P_COUNTDIALOG, Math.max(0, Math.floor(value)));
         raw.dialogInputOpen = false;
         return true;
     },
@@ -1710,11 +1713,7 @@ export const actions = {
             com.swapSlots(from, to);
         }
 
-        raw.out.p1Enc(ClientProt.INV_BUTTOND);
-        raw.out.p2(comId);
-        raw.out.p2(from);
-        raw.out.p2(to);
-        raw.out.p1(mode);
+        writeInvButtonD(raw.out, ClientProt.INV_BUTTOND, to, mode, comId, from);
         return true;
     },
 
@@ -1725,13 +1724,7 @@ export const actions = {
             return false;
         }
 
-        raw.out.p1Enc(ClientProt.MESSAGE_PUBLIC);
-        raw.out.p1(0);
-        const start = raw.out.pos;
-        raw.out.p1(0);
-        raw.out.p1(0);
-        WordPack.pack(raw.out, message);
-        raw.out.psize1(raw.out.pos - start);
+        writeMessagePublic(raw.out, ClientProt.MESSAGE_PUBLIC, 0, 0, packed => WordPack.pack(packed, message));
 
         // Why: the server never sends a public line back to whoever said it, so the client echoes its own as it writes the packet. Without this the operator watches a shop that looks mute while everyone else reads it.
         const player = raw.localPlayer;

@@ -34,7 +34,8 @@ and every artifact's hash, kind and qualification. Three readers:
   check and refuse a mismatch.
 - `bun tools/cutover-377.ts`: moves `data/377/<repo path>` onto its repo path, deletes the
   staging tree and the 289 recordings, and rewrites the manifest. It refuses an unlisted
-  staged file or a hash mismatch before moving anything.
+  staged file or a hash mismatch before moving anything. It has run on this branch: the
+  manifest reads `cutover: true` and `data/377/` no longer exists.
 
 For the 377 navigation bake, `tools/gen-377-data.sh` stages door, stair and transport
 JSONs plus the door-category and stair-price inputs under `data/377/`. The compressed
@@ -43,6 +44,16 @@ artifact at `out/collision.lcnav.gz` with its temporary source in `data/377/out/
 cutover validates and moves that source. `build-collision.ts` defaults to
 `out/collision.lcnav` for every revision, and deploy/pack callers name that path explicitly,
 so a revision-specific build cannot overwrite a staged pack.
+
+The stair and transport files are composed. `tools/nav/derive-transports.sh` runs
+`derive-stairs.ts`, which writes `stairEdges.json`. Then `derive-ladders.py` and
+`enrich-transports.py` rewrite `stairEdges.json` and `transports.json` in place. So the stair
+stage alone never reproduces the committed file. `sh tools/nav/derive-transports.sh --check`
+reruns all three stages in a scratch root, starting from the committed `transports.json`,
+and compares both results with the committed files. `derive-stairs.ts --check` runs that
+same check. The `--check` of `derive-ladders.py` or `enrich-transports.py` reruns only that
+stage on the committed files, and `derive-doors.ts --check` compares `doors.json`. Each
+prints `ok:` per file, or a `STALE:` line and exits 1.
 
 ### Generator output and staging
 
@@ -92,10 +103,27 @@ bun tools/gen-ifids.ts [--check] [--stage <dir>]
 `~/code/rs2b2t-content`), and `REVISION` sets the revision label in the generated header
 comment (default `CLIENT_VERSION`).
 
-Until the cutover, `data/377/` is tracked but inert: `bunfig.toml` roots test discovery at
+Before the cutover `data/377/` was tracked but inert: `bunfig.toml` roots test discovery at
 `test/`, `tsconfig.json` excludes the tree and eslint ignores it.
 `test/repo/stagingInert.test.ts` keeps a throwing test and an unresolvable import there, so
-removing one of the three exclusions fails the suite.
+removing one of the three exclusions fails the suite. After it, the manifest reads
+`cutover: true` and `test/repo/publicBoundary.test.ts` requires the tree to be absent.
+
+### Deploying against a 377 engine
+
+A 377 engine serves `rs2.html` and no `bot.html`. `deployIsolatedClient` takes the page it
+copies from the engine's `public/bot.html`; with `--seed-html` on the script's command line
+(or `{ seedHtml: true }`) it falls back to this repository's `public-bot/bot.html`. The
+run's own `bot-<tag>.html` is the only file written to the engine's `public/`.
+
+### Tests the 377 data cannot satisfy
+
+A test whose scenario 377 does not contain is never edited to a 377 expectation without a
+source line. `test/lib/skip377.ts` skips it by name, prints a `SKIP: <file>: <reason>` line
+for the job summary, and the reason names what the 377 tree lacks. Executor tests keyed on
+clue ids the 377 trail does not sell inject the 289 rows from `test/lib/legacyClueRows.ts`
+for the length of the file and remove them again; an id the 377 cluedb carries is never
+overwritten.
 
 ## What a run did not check
 

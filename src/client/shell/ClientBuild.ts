@@ -2,6 +2,7 @@ import FloType from '#/client/config/FloType.js';
 import LocType from '#/client/config/LocType.js';
 
 import ClientLocAnim from '#/client/dash3d/ClientLocAnim.js';
+import { CollisionFlag } from '#/client/dash3d/CollisionFlag.js';
 import CollisionMap, { BuildArea } from '#/client/dash3d/CollisionMap.js';
 import { LocAngle } from '#/client/dash3d/LocAngle.js';
 import { LocShape } from '#/client/dash3d/LocShape.js';
@@ -10,6 +11,7 @@ import Model from '#/client/dash3d/Model.js';
 import type ModelSource from '#/client/dash3d/ModelSource.js';
 import { TerrainOverlayShape } from '#/client/dash3d/TerrainOverlayShape.js';
 import World from '#/client/dash3d/World.js';
+import WorldRegion from '#/client/dash3d/WorldRegion.js';
 
 import { Colour } from '#/client/graphics/Colour.js';
 import Pix3D from '#/client/dash3d/Pix3D.js';
@@ -30,6 +32,8 @@ export default class ClientBuild {
 
     static lowMem: boolean = true;
     static minusedlevel: number = 0;
+    /** Java `World.field113`: lowest level that received ground or a loc in this build (the scene's base level under lowMem). */
+    static minBuiltLevel: number = 99;
 
     private readonly maxTileX: number;
     private readonly maxTileZ: number;
@@ -50,6 +54,8 @@ export default class ClientBuild {
     private readonly mapo: Int32Array[][];
 
     public constructor(maxTileX: number, maxTileZ: number, groundh: Int32Array[][], mapl: Uint8Array[][]) {
+        ClientBuild.minBuiltLevel = 99;
+
         this.maxTileX = maxTileX;
         this.maxTileZ = maxTileZ;
 
@@ -198,7 +204,17 @@ export default class ClientBuild {
                             blendTot -= this.tot[dz2];
                         }
 
-                        if (z0 >= 1 && z0 < this.maxTileZ - 1 && (!ClientBuild.lowMem || ((this.mapl[level][x0][z0] & MapFlag.ForceHighDetail) === 0 && this.getVisBelowLevel(level, x0, z0) === ClientBuild.minusedlevel))) {
+                        if (
+                            z0 >= 1 &&
+                            z0 < this.maxTileZ - 1 &&
+                            (!ClientBuild.lowMem ||
+                                (this.mapl[0][x0][z0] & MapFlag.LinkBelow) !== 0 ||
+                                ((this.mapl[level][x0][z0] & MapFlag.ForceHighDetail) === 0 && this.getVisBelowLevel(level, x0, z0) === ClientBuild.minusedlevel))
+                        ) {
+                            if (level < ClientBuild.minBuiltLevel) {
+                                ClientBuild.minBuiltLevel = level;
+                            }
+
                             const t1: number = this.floort1[level][x0][z0] & 0xff;
                             const t2: number = this.floort2[level][x0][z0] & 0xff;
 
@@ -284,7 +300,7 @@ export default class ClientBuild {
                                         overlay = Pix3D.getTextureAverage(texture);
                                         t2Colour = -1;
                                     } else if (flo.colour === Colour.MAGENTA) {
-                                        overlay = 0;
+                                        overlay = Pix3D.colourTable[ClientBuild.getOCol(flo.overlayHsl, 96)];
                                         t2Colour = -2;
                                         texture = -1;
                                     } else {
@@ -565,71 +581,156 @@ export default class ClientBuild {
         }
     }
 
-    loadGround(src: Uint8Array, originX: number, originZ: number, xOffset: number, zOffset: number): void {
+    /** Java `World.method22`: decode one 64x64 land file into the scene and clear UNLOADED on the tiles it covers. */
+    loadGround(src: Uint8Array, originX: number, originZ: number, xOffset: number, zOffset: number, collisions: (CollisionMap | null)[]): void {
+        for (let level: number = 0; level < BuildArea.LEVELS; level++) {
+            for (let x: number = 0; x < 64; x++) {
+                for (let z: number = 0; z < 64; z++) {
+                    if (xOffset + x > 0 && xOffset + x < 103 && zOffset + z > 0 && zOffset + z < 103) {
+                        const cmap: CollisionMap | null = collisions[level];
+                        if (cmap) {
+                            cmap.flags[CollisionMap.index(xOffset + x, zOffset + z)] &= ~CollisionFlag.UNLOADED;
+                        }
+                    }
+                }
+            }
+        }
+
         const buf: Packet = new Packet(src);
 
         for (let level: number = 0; level < BuildArea.LEVELS; level++) {
             for (let x: number = 0; x < 64; x++) {
                 for (let z: number = 0; z < 64; z++) {
-                    const stx: number = x + xOffset;
-                    const stz: number = z + zOffset;
-                    let opcode: number;
+                    this.readGroundTile(originX, originZ, buf, 0, xOffset + x, level, zOffset + z);
+                }
+            }
+        }
+    }
 
-                    if (stx >= 0 && stx < BuildArea.SIZE && stz >= 0 && stz < BuildArea.SIZE) {
-                        this.mapl[level][stx][stz] = 0;
-
-                        while (true) {
-                            opcode = buf.g1();
-                            if (opcode === 0) {
-                                if (level === 0) {
-                                    this.groundh[0][stx][stz] = -ClientBuild.perlinNoise(stx + originX + 932731, stz + 556238 + originZ) * 8;
-                                } else {
-                                    this.groundh[level][stx][stz] = this.groundh[level - 1][stx][stz] - 240;
-                                }
-                                break;
-                            }
-
-                            if (opcode === 1) {
-                                let height: number = buf.g1();
-                                if (height === 1) {
-                                    height = 0;
-                                }
-                                if (level === 0) {
-                                    this.groundh[0][stx][stz] = -height * 8;
-                                } else {
-                                    this.groundh[level][stx][stz] = this.groundh[level - 1][stx][stz] - height * 8;
-                                }
-                                break;
-                            }
-
-                            if (opcode <= 49) {
-                                this.floort2[level][stx][stz] = buf.g1b();
-                                this.floors[level][stx][stz] = ((((opcode - 2) / 4) | 0) << 24) >> 24;
-                                this.floorr[level][stx][stz] = (((opcode - 2) & 0x3) << 24) >> 24;
-                            } else if (opcode <= 81) {
-                                this.mapl[level][stx][stz] = ((opcode - 49) << 24) >> 24;
-                            } else {
-                                this.floort1[level][stx][stz] = ((opcode - 81) << 24) >> 24;
-                            }
-                        }
-                    } else {
-                        while (true) {
-                            opcode = buf.g1();
-                            if (opcode === 0) {
-                                break;
-                            }
-
-                            if (opcode === 1) {
-                                buf.g1();
-                                break;
-                            }
-
-                            if (opcode <= 49) {
-                                buf.g1();
-                            }
-                        }
+    /**
+     * Java `World.method16`: copy one 8x8 chunk of a source land file (source level, tile origin srcTileX/Z) into the
+     * scene at `level`, rotated clockwise by `rotation` quarter turns, with its south-west corner at destTileX/Z.
+     */
+    loadGroundChunk(
+        land: Uint8Array,
+        rotation: number,
+        level: number,
+        srcLevel: number,
+        srcTileX: number,
+        srcTileZ: number,
+        destTileX: number,
+        destTileZ: number,
+        collisions: (CollisionMap | null)[]
+    ): void {
+        for (let dx: number = 0; dx < 8; dx++) {
+            for (let dz: number = 0; dz < 8; dz++) {
+                if (destTileX + dx > 0 && destTileX + dx < 103 && destTileZ + dz > 0 && destTileZ + dz < 103) {
+                    const cmap: CollisionMap | null = collisions[level];
+                    if (cmap) {
+                        cmap.flags[CollisionMap.index(destTileX + dx, destTileZ + dz)] &= ~CollisionFlag.UNLOADED;
                     }
                 }
+            }
+        }
+
+        const buf: Packet = new Packet(land);
+
+        for (let plane: number = 0; plane < BuildArea.LEVELS; plane++) {
+            for (let x: number = 0; x < 64; x++) {
+                for (let z: number = 0; z < 64; z++) {
+                    if (srcLevel === plane && x >= srcTileX && x < srcTileX + 8 && z >= srcTileZ && z < srcTileZ + 8) {
+                        this.readGroundTile(0, 0, buf, rotation, destTileX + WorldRegion.localX(rotation, x & 0x7, z & 0x7), level, destTileZ + WorldRegion.localZ(z & 0x7, x & 0x7, rotation));
+                    } else {
+                        this.readGroundTile(0, 0, buf, 0, -1, 0, -1);
+                    }
+                }
+            }
+        }
+    }
+
+    /** Java `World.method14`: flatten an absent instance chunk to height 0, bleeding the edge heights of its south and west neighbours. */
+    clearChunk(level: number, tileX: number, tileZ: number): void {
+        for (let dx: number = 0; dx < 8; dx++) {
+            for (let dz: number = 0; dz < 8; dz++) {
+                this.groundh[level][tileX + dx][tileZ + dz] = 0;
+            }
+        }
+
+        if (tileX > 0) {
+            for (let dz: number = 1; dz < 8; dz++) {
+                this.groundh[level][tileX][tileZ + dz] = this.groundh[level][tileX - 1][tileZ + dz];
+            }
+        }
+
+        if (tileZ > 0) {
+            for (let dx: number = 1; dx < 8; dx++) {
+                this.groundh[level][tileX + dx][tileZ] = this.groundh[level][tileX + dx][tileZ - 1];
+            }
+        }
+
+        if (tileX > 0 && this.groundh[level][tileX - 1][tileZ] !== 0) {
+            this.groundh[level][tileX][tileZ] = this.groundh[level][tileX - 1][tileZ];
+        } else if (tileZ > 0 && this.groundh[level][tileX][tileZ - 1] !== 0) {
+            this.groundh[level][tileX][tileZ] = this.groundh[level][tileX][tileZ - 1];
+        } else if (tileX > 0 && tileZ > 0 && this.groundh[level][tileX - 1][tileZ - 1] !== 0) {
+            this.groundh[level][tileX][tileZ] = this.groundh[level][tileX - 1][tileZ - 1];
+        }
+    }
+
+    /** Java `World.method31`: decode one land tile; a tile outside the scene is read and dropped, which keeps the stream aligned. */
+    private readGroundTile(originX: number, originZ: number, buf: Packet, rotation: number, tileX: number, level: number, tileZ: number): void {
+        if (tileX < 0 || tileX >= BuildArea.SIZE || tileZ < 0 || tileZ >= BuildArea.SIZE) {
+            while (true) {
+                const opcode: number = buf.g1();
+                if (opcode === 0) {
+                    return;
+                }
+
+                if (opcode === 1) {
+                    buf.g1();
+                    return;
+                }
+
+                if (opcode <= 49) {
+                    buf.g1();
+                }
+            }
+        }
+
+        this.mapl[level][tileX][tileZ] = 0;
+
+        while (true) {
+            const opcode: number = buf.g1();
+            if (opcode === 0) {
+                if (level === 0) {
+                    this.groundh[0][tileX][tileZ] = -ClientBuild.perlinNoise(tileX + originX + 932731, tileZ + 556238 + originZ) * 8;
+                } else {
+                    this.groundh[level][tileX][tileZ] = this.groundh[level - 1][tileX][tileZ] - 240;
+                }
+                return;
+            }
+
+            if (opcode === 1) {
+                let height: number = buf.g1();
+                if (height === 1) {
+                    height = 0;
+                }
+                if (level === 0) {
+                    this.groundh[0][tileX][tileZ] = -height * 8;
+                } else {
+                    this.groundh[level][tileX][tileZ] = this.groundh[level - 1][tileX][tileZ] - height * 8;
+                }
+                return;
+            }
+
+            if (opcode <= 49) {
+                this.floort2[level][tileX][tileZ] = buf.g1b();
+                this.floors[level][tileX][tileZ] = ((((opcode - 2) / 4) | 0) << 24) >> 24;
+                this.floorr[level][tileX][tileZ] = (((opcode - 2 + rotation) & 0x3) << 24) >> 24;
+            } else if (opcode <= 81) {
+                this.mapl[level][tileX][tileZ] = ((opcode - 49) << 24) >> 24;
+            } else {
+                this.floort1[level][tileX][tileZ] = ((opcode - 81) << 24) >> 24;
             }
         }
     }
@@ -778,8 +879,74 @@ export default class ClientBuild {
         }
     }
 
+    /**
+     * Java `World.method20`: place the locs of one 8x8 chunk of a source loc file (source level, tile origin srcTileX/Z)
+     * into the scene at `level`, rotated by `rotation` quarter turns, with the chunk's south-west corner at destTileX/Z.
+     */
+    loadLocsChunk(
+        locData: Uint8Array,
+        rotation: number,
+        level: number,
+        srcLevel: number,
+        srcTileX: number,
+        srcTileZ: number,
+        destTileX: number,
+        destTileZ: number,
+        world: World | null,
+        collisions: (CollisionMap | null)[]
+    ): void {
+        const buf: Packet = new Packet(locData);
+        let locId: number = -1;
+
+        while (true) {
+            const deltaId: number = buf.gsmart();
+            if (deltaId === 0) {
+                return;
+            }
+
+            locId += deltaId;
+
+            let locPos: number = 0;
+            while (true) {
+                const deltaPos: number = buf.gsmart();
+                if (deltaPos === 0) {
+                    break;
+                }
+
+                locPos += deltaPos - 1;
+                const z: number = locPos & 0x3f;
+                const x: number = (locPos >> 6) & 0x3f;
+                const plane: number = locPos >> 12;
+
+                const info: number = buf.g1();
+                const shape: number = info >> 2;
+                const locAngle: number = info & 0x3;
+
+                if (srcLevel === plane && x >= srcTileX && x < srcTileX + 8 && z >= srcTileZ && z < srcTileZ + 8) {
+                    const loc: LocType = LocType.list(locId);
+                    const stx: number = destTileX + WorldRegion.locX(rotation, loc.length, locAngle, x & 0x7, loc.width, z & 0x7);
+                    const stz: number = destTileZ + WorldRegion.locZ(loc.width, rotation, x & 0x7, z & 0x7, loc.length, locAngle);
+
+                    if (stx > 0 && stz > 0 && stx < BuildArea.SIZE - 1 && stz < BuildArea.SIZE - 1) {
+                        let currentLevel: number = level;
+                        if ((this.mapl[1][stx][stz] & MapFlag.LinkBelow) !== 0) {
+                            currentLevel = level - 1;
+                        }
+
+                        let cmap: CollisionMap | null = null;
+                        if (currentLevel >= 0) {
+                            cmap = collisions[currentLevel];
+                        }
+
+                        this.addLoc(level, stx, stz, locId, shape, (rotation + locAngle) & 0x3, world, cmap);
+                    }
+                }
+            }
+        }
+    }
+
     private addLoc(level: number, x: number, z: number, locId: number, shape: number, angle: number, world: World | null, collision: CollisionMap | null): void {
-        if (ClientBuild.lowMem) {
+        if (ClientBuild.lowMem && (this.mapl[0][x][z] & MapFlag.LinkBelow) === 0) {
             if ((this.mapl[level][x][z] & MapFlag.ForceHighDetail) !== 0) {
                 return;
             }
@@ -787,6 +954,10 @@ export default class ClientBuild {
             if (this.getVisBelowLevel(level, x, z) !== ClientBuild.minusedlevel) {
                 return;
             }
+        }
+
+        if (level < ClientBuild.minBuiltLevel) {
+            ClientBuild.minBuiltLevel = level;
         }
 
         let heightSW: number = this.groundh[level][x][z];
@@ -1187,9 +1358,9 @@ export default class ClientBuild {
     static changeLocUnchecked(level: number, x: number, z: number, locId: number, shape: number, angle: number, trueLevel: number, levelHeightmap: Int32Array[][], world: World | null, cmap: CollisionMap | null): void {
         let heightSW: number = levelHeightmap[trueLevel][x][z];
         let heightSE: number = levelHeightmap[trueLevel][x + 1][z];
-        let heightNW: number = levelHeightmap[trueLevel][x + 1][z + 1];
-        let heightNE: number = levelHeightmap[trueLevel][x][z + 1];
-        const y: number = (heightSW + heightSE + heightNW + heightNE) >> 2;
+        let heightNE: number = levelHeightmap[trueLevel][x + 1][z + 1];
+        let heightNW: number = levelHeightmap[trueLevel][x][z + 1];
+        const y: number = (heightSW + heightSE + heightNE + heightNW) >> 2;
 
         const loc: LocType = LocType.list(locId);
 

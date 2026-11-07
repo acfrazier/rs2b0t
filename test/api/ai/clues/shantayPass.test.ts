@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { reader, type InvItemSnapshot, type WorldTile } from '#/bot/adapter/ClientAdapter.js';
 import { ClueExecutor } from '#/bot/api/ai/clues/ClueExecutor.js';
 import { GuardianProtection } from '#/bot/api/ai/clues/guardianKit.js';
@@ -12,6 +12,12 @@ import { ChatDialog } from '#/bot/api/ui/dialogue/ChatDialog.js';
 import { Quests } from '#/bot/api/ui/questlog/Quests.js';
 import { Traversal } from '#/bot/api/walking/Traversal.js';
 import { WalkExecutor } from '#/bot/event/webwalk/WalkExecutor.js';
+import { installLegacyClueRows } from '../../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 const origin = { x: 3222, z: 3218, level: 0 };
 const target = { x: 3168, z: 3041, level: 0 };

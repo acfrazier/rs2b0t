@@ -4,6 +4,7 @@ import Packet from '#/client/io/Packet.js';
 export default class FloType {
     static numDefinitions: number = 0;
     static list: FloType[] = [];
+    static readonly STRICT: boolean = process.env.STRICT_CONFIG === '1';
 
     colour: number = 0;
     texture: number = -1;
@@ -32,6 +33,10 @@ export default class FloType {
 
             this.list[id].decode(dat);
         }
+
+        if (FloType.STRICT && dat.pos !== dat.length) {
+            throw new Error(`FloType: trailing config bytes (pos ${dat.pos}, end ${dat.length})`);
+        }
     }
 
     decode(dat: Packet): void {
@@ -52,6 +57,21 @@ export default class FloType {
                 this.occlude = false;
             } else if (code === 6) {
                 this.debugname = dat.gjstr();
+            } else if (code === 7) {
+                // Java FloType.method217: recompute overlayHsl from secondary RGB while restoring HSL fields
+                const hue = this.hue;
+                const saturation = this.saturation;
+                const lightness = this.lightness;
+                const underlayHue = this.underlayHue;
+                const secondary = dat.g3();
+                this.getHsl(secondary);
+                this.hue = hue;
+                this.saturation = saturation;
+                this.lightness = lightness;
+                this.underlayHue = underlayHue;
+                this.chroma = underlayHue;
+            } else if (FloType.STRICT) {
+                throw new Error(`FloType: unknown config opcode ${code}`);
             } else {
                 console.log('Error unrecognised config code: ', code);
             }
@@ -59,6 +79,11 @@ export default class FloType {
     }
 
     private getHsl(rgb: number): void {
+        // Java: magenta sentinel → black
+        if (rgb === 16711935) {
+            rgb = 0;
+        }
+
         const red: number = ((rgb >> 16) & 0xff) / 256.0;
         const green: number = ((rgb >> 8) & 0xff) / 256.0;
         const blue: number = (rgb & 0xff) / 256.0;

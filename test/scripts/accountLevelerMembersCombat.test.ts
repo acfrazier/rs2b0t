@@ -193,7 +193,8 @@ test.skipIf(!existsSync('out/collision.lcnav.gz')).each(starters.map(([id]) => i
     loadDefaultNavEdges(finder);
     const camp = COMBAT_CAMPS.find(camp => camp.id === id)!;
     const destination = { x: camp.x, z: camp.z, level: 0 };
-    for (const start of [{ x: 3092, z: 3243, level: 0 }, { x: 3013, z: 3355, level: 0 }, { x: 3208, z: 3220, level: 0 }]) {
+    // The third start is the Lumbridge courtyard: in the 377 pack the 289 start tile 3208,3220 is a sealed castle room whose only door is the Recipe for Disaster door (hundred_lumbridge_door, rfd_feast_door.rs2:6-9).
+    for (const start of [{ x: 3092, z: 3243, level: 0 }, { x: 3013, z: 3355, level: 0 }, { x: 3222, z: 3218, level: 0 }]) {
         const route = finder.findPath(start, destination, {
             state: { ...emptyWorldStateData(), members: true, skills: { agility: 1 }, items: { Coins: 200 }, entranaRestrictedGear: true, canSlashWeb: false },
             avoidZones: resolveDangerZones(['white-wolf-mountain'], { includeAutomatic: true, combatLevel: 3, start, destination }), useTeleportCatalog: false

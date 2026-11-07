@@ -103,8 +103,8 @@ describe('ladder transport data', () => {
         const ardougne = stairEdges.find(edge => edge.from.x === 2527 && edge.from.z === 3293
             && edge.from.level === 1 && edge.to.x === 2526 && edge.to.z === 3290 && edge.to.level === 0);
 
-        expect(yanille).toMatchObject({ locId: 1736, locX: 2516, locZ: 3425, debugName: 'loc_1736' });
-        expect(ardougne).toMatchObject({ locId: 1736, locX: 2526, locZ: 3292, debugName: 'loc_1736' });
+        expect(yanille).toMatchObject({ locId: 1736, locX: 2516, locZ: 3425, debugName: 'scenery_1736' });
+        expect(ardougne).toMatchObject({ locId: 1736, locX: 2526, locZ: 3292, debugName: 'scenery_1736' });
     });
 
     test('keeps state-dependent Watchtower climbs auditable but out of the active graph', () => {

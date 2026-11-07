@@ -1,7 +1,7 @@
 {
   "source": {
     "repository": "FR-engine",
-    "commit": "78c03c40e24dae77cb0d37d989e2ca9a7c34f24a",
+    "commit": "bc47497ee8cf6148dbfb7239714ddd5045c40194",
     "files": [
       "src/network/game/client/ClientGameProt.ts",
       "src/network/game/server/ServerGameProt.ts",

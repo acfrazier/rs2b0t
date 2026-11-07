@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { reader, type InvItemSnapshot } from '#/bot/adapter/ClientAdapter.js';
 import JiveDragons from '#/bot/scripts/JiveDragons/JiveDragons.js';
 import { SettingsBag } from '#/bot/runtime/Settings.js';
@@ -18,6 +18,12 @@ import Tile from '#/bot/geometry/Tile.js';
 import { Prayer } from '#/bot/api/prayer/Prayer.js';
 import { Navigator } from '#/bot/event/webwalk/Navigator.js';
 import { Input } from '#/bot/input/Input.js';
+import { installLegacyClueRows } from '../../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 function item(id: number, name: string, count = 1): InvItemSnapshot {
     return { id, name, count, slot: 0, comId: 1, ops: ['Wield', 'Eat', 'Drink'] };

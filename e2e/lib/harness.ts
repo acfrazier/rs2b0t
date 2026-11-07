@@ -46,15 +46,36 @@ export interface IsolatedClient {
 // Why: `bot.html` hardcodes one bundle path, so every session that deploys into `public/bot/` overwrites the others and the last writer decides what everyone runs.
 // Why: a copy per run under its own directory costs a few megabytes and removes the race rather than detecting it. The client is served by the engine either way, so the origin, the websocket and the asset stream are unchanged.
 
+/** The page a run's copy is cut from: the engine's `bot.html`, else the repo template when seeding is on, else the engine's path so the caller reports it missing. */
+export function pageTemplatePath(publicDir: string, seedHtml: boolean): string {
+    const engineHtml = `${publicDir}/bot.html`;
+    return existsSync(engineHtml) || !seedHtml ? engineHtml : 'public-bot/bot.html';
+}
+
+export interface DeployOptions {
+    /**
+     * Take the page template from this repo's `public-bot/bot.html` when the engine ships no `bot.html`.
+     * Why: the 377 engine serves only `rs2.html`, and seeding reads the repo template into this run's own page instead of writing the engine's shared one.
+     * Defaults to the `--seed-html` flag on the running script's command line.
+     */
+    seedHtml?: boolean;
+}
+
 /**
  * Deploy this run's own client next to the engine's, and return the page that loads it.
  * @see docs/decisions/quest-pitfalls-3.md
  */
-export function deployIsolatedClient(tag: string, engineDir = process.env.ENGINE_DIR ?? `${homedir()}/code/rs2b2t-engine`, buildDir = 'out'): IsolatedClient {
+export function deployIsolatedClient(
+    tag: string,
+    engineDir = process.env.ENGINE_DIR ?? `${homedir()}/code/rs2b2t-engine`,
+    buildDir = 'out',
+    options: DeployOptions = {}
+): IsolatedClient {
+    const seedHtml = options.seedHtml ?? process.argv.includes('--seed-html');
     const publicDir = `${engineDir}/public`;
-    const shared = `${publicDir}/bot.html`;
+    const shared = pageTemplatePath(publicDir, seedHtml);
     if (!existsSync(shared)) {
-        fail(`deploy: ${shared} not found — set ENGINE_DIR to the engine serving this run`);
+        fail(`deploy: ${shared} not found — set ENGINE_DIR to the engine serving this run${seedHtml ? '' : ', or pass --seed-html to use the repo template'}`);
     }
     // Why: the bundled client decodes configs with the engine's archives; a mismatch desyncs every
     // later entry and looks like a bot bug. The manifest pins the archives the data came from (pitfall 7).

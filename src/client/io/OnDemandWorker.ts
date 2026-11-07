@@ -523,9 +523,14 @@ class WorkerOnDemand {
                 if (this.current) {
                     this.packetCycle = 0;
 
+                    // Java OnDemand.read: size 0 is a server reject. The request completes with null data only
+                    // when urgent, and the archive-3 to 93 rewrite stays out of this path.
                     if (size === 0) {
                         this.current.data = null;
-                        this.complete(this.current);
+                        if (this.current.urgent) {
+                            this.postCompleted(this.current);
+                        }
+                        this.removePending(this.current);
                         this.current = null;
                     } else {
                         if (this.current.data === null && part === 0) {

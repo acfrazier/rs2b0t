@@ -3,7 +3,7 @@ import type { NpcStop } from '../../exec/primitives.js';
 
 export const MURDER_NAME = 'Murder Mystery';
 
-// Why: every floured item renders the same name as its clean form, all 3 threads render "Criminals' thread", and "Pot" has twins, so nothing here is matched by name.
+// Why: every floured item renders the same name as its clean form, all 3 threads render "Criminal's thread", and "Pot" has twins, so nothing here is matched by name.
 
 /** Object ids. */
 export const MURDER_OBJ = {
@@ -149,13 +149,13 @@ export function suspectOrder(thread: number): readonly Suspect[] {
 
 /** Every object the guard's evidence check or a barrel's own gate counts, in the bank as well as the pack. */
 export const MURDER_EVIDENCE: readonly { id: number; name: string }[] = [
-    { id: MURDER_OBJ.DAGGER, name: "Criminals' dagger" },
-    { id: MURDER_OBJ.DAGGER_DUST, name: "Criminals' dagger" },
+    { id: MURDER_OBJ.DAGGER, name: "Criminal's dagger" },
+    { id: MURDER_OBJ.DAGGER_DUST, name: "Criminal's dagger" },
     { id: MURDER_OBJ.UNKNOWN_PRINT, name: 'Unknown print' },
     { id: MURDER_OBJ.KILLERS_PRINT, name: "Killers' print" },
-    { id: MURDER_OBJ.THREAD_RED, name: "Criminals' thread" },
-    { id: MURDER_OBJ.THREAD_GREEN, name: "Criminals' thread" },
-    { id: MURDER_OBJ.THREAD_BLUE, name: "Criminals' thread" },
+    { id: MURDER_OBJ.THREAD_RED, name: "Criminal's thread" },
+    { id: MURDER_OBJ.THREAD_GREEN, name: "Criminal's thread" },
+    { id: MURDER_OBJ.THREAD_BLUE, name: "Criminal's thread" },
     ...SUSPECTS.flatMap(s => [
         { id: s.silver, name: 'silver keepsake' },
         { id: s.dust, name: 'floured keepsake' },

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { reader, type InvItemSnapshot } from '#/bot/adapter/ClientAdapter.js';
 import { ClueExecutor } from '#/bot/api/ai/clues/ClueExecutor.js';
 import * as Tools from '#/bot/api/ai/clues/AcquireTools.js';
@@ -12,6 +12,12 @@ import { Quests } from '#/bot/api/ui/questlog/Quests.js';
 import { ChatDialog } from '#/bot/api/ui/dialogue/ChatDialog.js';
 import { Traversal } from '#/bot/api/walking/Traversal.js';
 import Tile from '#/bot/geometry/Tile.js';
+import { installLegacyClueRows } from '../../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 const item = (id: number, name: string, count = 1): InvItemSnapshot => ({ id, name, count, slot: 0, comId: 3214, ops: ['Dig'] });
 let pack: InvItemSnapshot[];

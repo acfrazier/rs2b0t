@@ -332,9 +332,7 @@
     },
     "grandtree_laddermiddle": {
       "extraTicks": 1,
-      "locIds": [
-        2884
-      ],
+      "locIds": [2884],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:133"
     },
     "hauntedmine_ladder": {
@@ -563,23 +561,17 @@
     },
     "ladder_broken": {
       "extraTicks": 0,
-      "locIds": [
-        1752
-      ],
+      "locIds": [1752],
       "source": "scripts/quests/quest_dragon/scripts/melzars_maze.rs2:36"
     },
     "laddermiddle": {
       "extraTicks": 1,
-      "locIds": [
-        1748
-      ],
+      "locIds": [1748],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:59"
     },
     "laddertop": {
       "extraTicks": 1,
-      "locIds": [
-        1746
-      ],
+      "locIds": [1746],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:43"
     },
     "laddertop_norim": {
@@ -673,12 +665,33 @@
       ],
       "source": "scripts/areas/area_mausoleum/scripts/holy_barrier.rs2:16"
     },
+    "plaguemanholeopen": {
+      "extraTicks": 0,
+      "locIds": [
+        2544
+      ],
+      "source": "scripts/areas/area_ardougne_west/scripts/manhole.rs2:14-19 climbs down with a zero-length delay then p_telejump"
+    },
+    "plaguemudpatch1": {
+      "extraTicks": 0,
+      "locIds": [
+        2531
+      ],
+      "source": "scripts/quests/quest_elena/scripts/mud_patch.rs2:1-4,13-29 digs with a spade (oplocu), then p_telejump into the sewer"
+    },
     "plaguemudpile": {
       "extraTicks": 0,
       "locIds": [
         2533
       ],
       "source": "scripts/quests/quest_elena/scripts/mud_pile.rs2:1"
+    },
+    "plaguesewerpipe_open": {
+      "extraTicks": 4,
+      "locIds": [
+        2542
+      ],
+      "source": "scripts/quests/quest_elena/scripts/sewerpipe.rs2:1-15,33-49 forcewalks one tile, then agility_exactmove runs 126 client cycles (about 4 ticks) before the p_telejump"
     },
     "puzzle_ladder": {
       "extraTicks": 0,
@@ -727,18 +740,19 @@
       ],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:175"
     },
+    "manholeopen": {
+      "extraTicks": 0,
+      "locIds": [882],
+      "source": "scripts/general_use/scripts/manholes.rs2:8-10"
+    },
     "ranging_ladder_down": {
       "extraTicks": 1,
-      "locIds": [
-        2512
-      ],
+      "locIds": [2512],
       "source": "scripts/minigames/game_ranging/scripts/ranging_guild_tower.rs2:48"
     },
     "ranging_ladder_up": {
       "extraTicks": 1,
-      "locIds": [
-        2511
-      ],
+      "locIds": [2511],
       "source": "scripts/minigames/game_ranging/scripts/ranging_guild_tower.rs2:3"
     },
     "rantzogrecaveentrance": {
@@ -974,10 +988,13 @@
     },
     "stairs": {
       "extraTicks": 1,
-      "locIds": [
-        1722
-      ],
+      "locIds": [1722],
       "source": "scripts/ladders+stairs/scripts/stairs.rs2:2"
+    },
+    "trapdoor_14879": {
+      "extraTicks": 0,
+      "locIds": [14879],
+      "source": "scripts/general_use/scripts/trapdoors.rs2:31-35"
     },
     "thrttavernbasementladder": {
       "extraTicks": 1,
@@ -1150,9 +1167,7 @@
     },
     "volcano_entrance": {
       "extraTicks": 1,
-      "locIds": [
-        492
-      ],
+      "locIds": [492],
       "source": "scripts/areas/area_karamja/scripts/misc_locs.rs2:3"
     },
     "watchladderdown": {
@@ -1199,9 +1214,7 @@
     },
     "zq_logbalance": {
       "extraTicks": 1,
-      "locIds": [
-        2332
-      ],
+      "locIds": [2332],
       "source": "scripts/skill_agility/scripts/shortcuts.rs2:47"
     },
     "zqclimbingrocks": {

@@ -1,5 +1,5 @@
-// Curated travel edges derived from the 2004 server content.
-// Destinations follow content constants; live probes may refine the approach stands.
+// Revision-377 curated travel edges from server content and 377 map placements.
+// Constant landings cite their content sources; stand tiles are pack-checked approaches.
 
 import type { TransportEdgeData } from './PathFinder.js';
 import { iceQueenRockslideEdges } from './iceQueenRockslide.js';
@@ -8,7 +8,7 @@ import { parseLcCoord } from './geometry/lcCoord.js';
 import { REQ } from './transportQuestReqs.js';
 import type { NavPoint, TransportRequires } from './types.js';
 
-/** Content-constant landings (spirit_tree.constant / glider.constant). */
+/** Spirit-tree and glider pads: scripts/areas/area_gnome/configs/{spirit_tree,glider}.constant (377). */
 export const SPIRIT_TREE = {
     stronghold: parseLcCoord('0_38_53_29_52'),
     village: parseLcCoord('0_39_49_46_33'),
@@ -25,15 +25,15 @@ export const GLIDER_PAD = {
     karHewo: parseLcCoord('0_51_50_20_11')
 } as const;
 
-/** set_sail landings (monk_of_entrana.rs2). */
+/** set_sail endpoints: scripts/areas/area_port_sarim/scripts/monk_of_entrana.rs2:23 and scripts/areas/area_entrana/scripts/monk_of_entrana.rs2:7. */
 export const ENTRANA_LAND = parseLcCoord('1_44_52_18_3');
 const PORT_SARIM_FROM_ENTRANA = parseLcCoord('1_47_50_40_31');
 
-/** Cart p_teleport targets (vigroy.rs2 / hajedy.rs2). */
+/** Cart p_teleport endpoints: scripts/areas/area_shilo/scripts/vigroy.rs2:30 and scripts/areas/area_brimhaven/scripts/hajedy.rs2:43. */
 export const CART_BRIMHAVEN = parseLcCoord('0_43_50_24_14');
 export const CART_SHILO = parseLcCoord('0_44_46_18_7');
 
-/** Essence-mine surface return stands (runecraft.constant), also the NPC stands for entry edges; the mine landing is random so the planner uses one pad. */
+/** Surface returns: scripts/skill_runecraft/configs/runecraft.constant:15-20; the mine destination is random. */
 export const ESSENCE_RETURN = {
     aubury: parseLcCoord('0_50_53_53_9'),
     sedridor: parseLcCoord('0_48_149_34_36'),
@@ -42,16 +42,16 @@ export const ESSENCE_RETURN = {
     cromperty: parseLcCoord('0_41_51_60_58')
 } as const;
 
-/** Representative essence-mine pad (essence_mine_teleports.enum val=0). */
+/** Representative pad: scripts/skill_runecraft/configs/essence_mine_teleports.enum:4; scripts/skill_runecraft/scripts/essence_mine.rs2:22-25 chooses randomly. */
 export const ESSENCE_MINE_PAD = parseLcCoord('0_45_75_32_33');
 
-/** Wildy lever landings (wilderness_lever.constant). */
+/** Wildy lever landings: scripts/areas/area_ardougne_east/configs/wilderness_lever.constant:1-2 and scripts/areas/area_ardougne_east/scripts/wilderness_lever.rs2:28,44. */
 export const WILDY_LEVER = {
     deepWild: parseLcCoord('0_49_61_18_20'),
     ardougne: parseLcCoord('0_40_51_2_47')
 } as const;
 
-/** Pier / NPC stand heuristics (Talk-to range); the pathfinder keeps an edge only if both ends are walkable in the pack. */
+/** Pack-walkable Talk-to/lever approaches for the 377 placements; retained as stand heuristics, not content constants. */
 export const TRAVEL_STANDS = {
     portSarimMonk: { x: 3048, z: 3236, level: 0 } as NavPoint,
     entranaMonk: { x: 2834, z: 3335, level: 0 } as NavPoint,
@@ -85,8 +85,8 @@ function edge(
     };
 }
 
-// Why: in spirit_tree.rs2 the stronghold tree needs Grand Tree complete while the village and young trees need Tree Gnome Village.
-// Why: encoded as members plus quest complete on each origin family.
+// scripts/areas/area_gnome/scripts/spirit_tree.rs2:1-47,49-74: the stronghold needs Grand Tree; village/young trees need Tree Gnome Village.
+// Members requirement is also checked by spirit_tree.rs2:64-74.
 
 /** Spirit tree network edges. */
 export function spiritTreeEdges(): TransportEdgeData[] {
@@ -115,8 +115,8 @@ export function spiritTreeEdges(): TransportEdgeData[] {
     return out;
 }
 
-// Why: gnome_glider.rs2 forces non-hub hops via Ta Quir Priw, so only hub-to-pad edges are encoded.
-// Why: execution is a Talk-to on the Gnome pilot plus a glidermap click. There is no loc named glider.
+// scripts/areas/area_gnome/scripts/gnome_glider.rs2:1-22,27-55: non-hub hops route through Ta Quir Priw.
+// Execution is Talk-to plus a glidermap click; no glider loc is involved.
 
 /** Gnome glider pad edges. */
 export function gliderEdges(): TransportEdgeData[] {
@@ -141,7 +141,7 @@ export function gliderEdges(): TransportEdgeData[] {
     return out;
 }
 
-/** Port Sarim/Entrana ferry (monk Talk-to + weapon search; members). */
+/** Port Sarim/Entrana ferry: monk Talk-to, membership and equipment checks (scripts/areas/area_port_sarim/scripts/monk_of_entrana.rs2:1-23; scripts/areas/area_entrana/scripts/monk_of_entrana.rs2:1-10). */
 export function entranaFerryEdges(): TransportEdgeData[] {
     // Port Sarim to Entrana: monks refuse weapons/armour (plan + execute).
     const toEntrana: TransportRequires = {
@@ -172,10 +172,10 @@ export function entranaFerryEdges(): TransportEdgeData[] {
     ];
 }
 
-// Why: the fare is 5% of coins clamped 10-200, so the plan uses a minimum of 10 coins.
-// Why: Brimhaven to Shilo requires Shilo Village complete.
+// Fare is 5% of inventory coins, clamped 10-200 (scripts/areas/area_brimhaven/scripts/hajedy.rs2:30-55).
+// Brimhaven-to-Shilo is blocked until Shilo Village is complete (hajedy.rs2:16-19,25-29).
 
-/** Shilo/Brimhaven jungle cart edges (vigroy / hajedy). */
+/** Shilo/Brimhaven cart endpoints and requirements: scripts/areas/area_shilo/scripts/vigroy.rs2:15-31; scripts/areas/area_brimhaven/scripts/hajedy.rs2:16-55. */
 export function shiloCartEdges(): TransportEdgeData[] {
     const coins10: TransportRequires = {
         members: true,
@@ -208,14 +208,14 @@ export function shiloCartEdges(): TransportEdgeData[] {
     ];
 }
 
-// Why: add the fixed gate and cart landings because the collision pack seals Shilo's east strip.
-// Why: the 2 gates in between are already door edges out of `doors.json`; only the ends of the corridor were missing.
+// Why: 377 collision data seals Shilo's east strip; the two intervening gates are already derived door edges.
+// These two script-backed endpoints repair only the missing corridor edges.
 
-// The 3x3 cart uses the walkable village-side stand expected by its coordx check.
-/** Beside the broken cart, village side; the Search telejumps out to open ground. */
+// The loc's 3x3 placement is scripts/_unpack/377/all.loc:15498-15501; walkable stands come from the 377 collision pack.
+/** Beside the broken cart, village side; Search telejumps out to open ground (scripts/quests/quest_zombiequeen/scripts/quest_zombiequeen.rs2:4-21). */
 const SHILO_CART = { x: 2876, z: 2953, level: 0 } as NavPoint;
 const SHILO_CART_OUT = { x: 2880, z: 2952, level: 0 } as NavPoint;
-/** Where Mosol Rei's "shall I show you the way?" puts you down. */
+/** Mosol's outside/inside endpoints; scripts/quests/quest_zombiequeen/scripts/mosol_rei.rs2:11-19 telejumps to the latter after quest completion. */
 const SHILO_MOSOL = { x: 2883, z: 2951, level: 0 } as NavPoint;
 const SHILO_MOSOL_IN = { x: 2866, z: 2952, level: 0 } as NavPoint;
 
@@ -232,9 +232,8 @@ export function shiloGateEdges(): TransportEdgeData[] {
     ];
 }
 
-// Why: essence-mine entry lands on one of 22 random pads, so scripts own the wizard hop (#388).
-// Why: `essenceEntrySetsReturn` stays on the audit rows so docs and tests know which wizard sets which session return; blacklisted rows never plan.
-// Why: exit edges stay routable and require the matching `essenceExitReturn` (#377).
+// scripts/skill_runecraft/scripts/essence_mine.rs2:1-25 chooses among 22 pads; a wizard hop is the only script entry.
+// It records the source-specific return (scripts/skill_runecraft/configs/runecraft.constant:15-20); exits stay session-gated by essenceExitReturn.
 
 /** Rune Mysteries complete, essence mine via the wizard Teleport. */
 export function essenceEntryEdges(): TransportEdgeData[] {
@@ -272,7 +271,7 @@ export function essenceEntryEdges(): TransportEdgeData[] {
     ];
 }
 
-/** Ardougne/deep wilderness levers (wilderness_lever.rs2). */
+/** Ardougne/deep-wilderness lever teleports: scripts/areas/area_ardougne_east/configs/wilderness_lever.constant:1-2. */
 export function wildyLeverEdges(): TransportEdgeData[] {
     const members: TransportRequires = { members: true };
     return [
@@ -297,50 +296,28 @@ export function wildyLeverEdges(): TransportEdgeData[] {
     ];
 }
 
-// Why: `mage_arena.rs2` gives one placement pair for `magearena_scan` (loc 2880, map m48_61), with direction taken from the player versus the loc.
-// Why: inbound (north to south) needs `%magearena >= complete` plus no armour or weapons (`~can_enter_mage_arena`).
-// Why: the miniquest has no journal state, so planning can only check membership and Entrana gear.
-// Why: outbound (south to north) is a free tele to north of the loc.
-// Why: dual directed edges are emitted so pathfind cannot pin one approach and drop a side (#403).
+/**
+ * Mage Arena cellar levers: scripts/areas/area_mage_arena/scripts/mage_arena.rs2:1-22 teleports to 0_39_73_43_40 (to_cellar, lever 5959 at 3090,3956) and 0_48_61_18_52 (from_cellar, lever 5960 at 2539,4712).
+ * The 377 pack still places the 289 cellar ladders (locs 2871/2872) but no script handles them, so the levers are the only way down to Gundai.
+ */
+export const MAGE_ARENA_LEVER = {
+    surface: parseLcCoord('0_48_61_18_52'),
+    cellar: parseLcCoord('0_39_73_43_40')
+} as const;
 
-/** Mage Arena outdoor barrier edges. */
-export function mageArenaBarrierEdges(): TransportEdgeData[] {
-    // Placements: 0_48_61_33_49 + 0_48_61_34_49, i.e. (3105|3106, 3953).
-    const locX = 3105;
-    const locZ = 3953;
-    const north = { x: 3105, z: 3954, level: 0 };
-    const south = { x: 3105, z: 3952, level: 0 };
-    const inbound: TransportRequires = {
-        members: true,
-        forbidEntranaRestricted: true
-    };
-    const outbound: TransportRequires = { members: true };
-    const mk = (
-        from: NavPoint,
-        to: NavPoint,
-        debug: string,
-        requires: TransportRequires
-    ): TransportEdgeData => ({
-        from: { ...from },
-        to: { ...to },
-        locName: 'Mystic portal',
-        action: 'Walk-through',
-        kind: 'gate',
-        locId: 2880,
-        locX,
-        locZ,
-        debugName: debug,
-        options: ['Walk-through'],
-        requires
-    });
+/** Both lever teleports; the stand is the lever's own tile, which is also where each pull lands. */
+export function mageArenaLeverEdges(): TransportEdgeData[] {
+    const members: TransportRequires = { members: true };
     return [
-        mk(north, south, 'magearena_scan_in', inbound),
-        mk(south, north, 'magearena_scan_out', outbound)
+        edge(MAGE_ARENA_LEVER.surface, MAGE_ARENA_LEVER.cellar, 'Lever', 'Pull', 'portal', 'magearena_lever_to_cellar', members),
+        edge(MAGE_ARENA_LEVER.cellar, MAGE_ARENA_LEVER.surface, 'Lever', 'Pull', 'portal', 'magearena_lever_from_cellar', members)
     ];
 }
 
-// Why: `[oploc1,tribaltotemdoor]` opens only for `coordz(coord) > coordz(loc_coord)`, so the mansion's one ground-floor door lets a player out and never in.
-// Why: derive-doors.ts drops the instance entirely, so this restores the half that works; without it every route out of the mansion reads unreachable.
+// 377 has no Mage Arena barrier: loc 2880 (magearena_scan) is placed in no map near 3105,3953 (it appears only in m28_68 level 1), and 3105,3952 / 3105,3954 are blocked by cavewall locs 1489, so the 289 mystic-portal rows could never be walked. The arena is entered by the lever edges above.
+
+// scripts/quests/quest_totem/scripts/quest_totem.rs2:1-4 opens only from the north side, so this is an exit-only edge.
+// The 377-derived door pass drops this handler's one-way instance; restore the direction that works.
 
 /** Handelmort Mansion's inner door (loc 0_41_51_11_57), northward side only. */
 export function handelmortDoorEdges(): TransportEdgeData[] {
@@ -359,7 +336,7 @@ export function handelmortDoorEdges(): TransportEdgeData[] {
     }];
 }
 
-/** Agility shortcuts from skill_agility/shortcuts.rs2 that fill OD gaps; coal logs and island ropes already live in transports.json. */
+/** Agility shortcuts from scripts/skill_agility/scripts/shortcuts.rs2:112-122; unmodeled crossings remain in derived transports. */
 export function agilityShortcutEdges(): TransportEdgeData[] {
     const sheepStile = (fromX: number, toX: number): TransportEdgeData => ({
         from: { x: fromX, z: 3375, level: 0 },
@@ -419,9 +396,7 @@ export function agilityShortcutEdges(): TransportEdgeData[] {
     ];
 }
 
-// Why: in areas/area_gnome/scripts/elkoy.rs2 the outside `elkoy` goes to ^elkoy_maze_coord and the village `elkoy_village` goes to ^elkoy_entrance_coord.
-// Why: Tree Gnome Village must be started for the escort dialogue, not_started offers the intro only.
-
+// scripts/areas/area_gnome/scripts/elkoy.rs2:48-50,74,91,109,121; scripts/quests/quest_tree/configs/quest_tree.constant:11-12: Tree Gnome Village must be started for the escort dialogue; `not_started` only offers the intro.
 /** Elkoy maze escort edges. */
 export function elkoyMazeEdges(): TransportEdgeData[] {
     const entrance = parseLcCoord('0_39_49_8_56'); // 2504,3192
@@ -445,14 +420,14 @@ export function elkoyMazeEdges(): TransportEdgeData[] {
     ];
 }
 
-/** Tourist Trap mining-camp barriers and cart whose handlers teleport or direction-gate you; the adjacent door rows are dropped at graph load. */
+/** Tourist Trap handlers from scripts/quests/quest_desertrescue/scripts/quest_desertrescue.rs2:84-149 and 377 desert mining camp placements. */
 export function desertMiningCampEdges(): TransportEdgeData[] {
     const complete: TransportRequires = {
         quests: [{ quest: 'The Tourist Trap', minStatus: 'complete' }]
     };
     const disguised: TransportRequires = {
         worn: [
-            { name: "Slaves' shirt", count: 1 },
+            { name: 'Slave shirt', count: 1 },
             { name: 'Slave robe', count: 1 },
             { name: 'Slave boots', count: 1 }
         ]
@@ -619,7 +594,7 @@ export function curatedTravelEdges(): TransportEdgeData[] {
         // Session multiloc: portal x return, gated by WorldState.essenceExitReturn; replaces the 4 Sedridor-only rows transports.json used to carry.
         ...essenceExitEdges(),
         ...wildyLeverEdges(),
-        ...mageArenaBarrierEdges(),
+        ...mageArenaLeverEdges(),
         ...handelmortDoorEdges(),
         ...agilityShortcutEdges(),
         ...elkoyMazeEdges(),
@@ -639,9 +614,9 @@ export const TRAVEL_FAMILIES = [
     'spell_teleport',
     'jewellery_teleport',
     'wildy_lever',
+    'mage_arena_lever',
     'essence_entry',
     'essence_exit',
-    'mage_arena_barrier',
     'handelmort_door',
     'agility_shortcut',
     'elkoy_maze',

@@ -2,6 +2,14 @@ import { describe, expect, test } from 'bun:test';
 import { BRIMHAVEN_IRON, BRIMHAVEN_STEEL, DRAGON_SITES, MAX_STANDS, SITE_OPTIONS, STAND_SITE_KEYS, TAVERLEY_BLUE, huntNames, needsShield, siteFor, standFor } from '#/bot/scripts/JiveDragons/sites.js';
 import { SPELL_TELEPORTS } from '#/bot/event/webwalk/teleportCatalog.js';
 import { BLACK_DRAGON, GUTANOTH_BLUE, HEROES_BLUE, IRON_DRAGON, STEEL_DRAGON, derive, inputsPresent } from '../../../tools/nav/jive-safespots.js';
+import { skip377 } from '../../lib/skip377.js';
+
+const FILE = 'test/scripts/JiveDragons/sites.test.ts';
+// Why: JiveDragons is one of the 76 registry scripts the plan keeps as a 289 content program at cutover (docs/plans/rs2b0t-377.md:76); L2 qualifies it per content unit (lines 166 and 214, Q3) and S10b refuses it until then (line 168). Its hand-picked stands are 289 picks the 377 derivation does not reproduce.
+const UNQUALIFIED = 'JiveDragons is unqualified on 377 until L2/Q3 (rs2b0t-377.md:76,166,168,214)';
+const skipBlackAnchor = skip377(FILE, `${UNQUALIFIED}: the 289 Taverley black melee anchor is not among the anchors the 377 pack derives`);
+const skipIronCamps = skip377(FILE, `${UNQUALIFIED}: the 289 Brimhaven iron camp tiles are not open candidates on the 377 pack`);
+const skipSteelCamp = skip377(FILE, `${UNQUALIFIED}: the 289 Brimhaven steel camp tile is not an open candidate on the 377 pack`);
 
 describe('DRAGON_SITES', () => {
     test('the two Taverley sites, the Heroes\' Guild pen, the Enclave and the two Brimhaven rooms are the entries, and every option resolves', () => {
@@ -146,7 +154,7 @@ describe.skipIf(!inputsPresent(BLACK_DRAGON))('the black dragon derivation (pack
         expect(derived.spawns.filter(sp => sp.adult)).toHaveLength(2);
     });
 
-    test('the melee anchor is one the probe derived too', () => {
+    skipBlackAnchor('the melee anchor is one the probe derived too', () => {
         const site = DRAGON_SITES['taverley-black']!;
         const anchors = new Set(derive(BLACK_DRAGON).anchors.map(a => `${a.x},${a.z}`));
         expect(anchors.has(`${site.meleeAnchor.x},${site.meleeAnchor.z}`)).toBe(true);
@@ -498,7 +506,7 @@ describe('the Brimhaven Dungeon metal dragons', () => {
 
 // Why: the camps are open tiles, so they are pinned as tiles the anywhere derivation ranks, each seeing most of one dragon's idle wander rather than one pocket's worth.
 describe.skipIf(!inputsPresent(IRON_DRAGON))('the Brimhaven derivation (pack-gated)', () => {
-    test('every iron camp tile is an open candidate clear of both kinds\' idle reach that sees a dragon over sixty percent of its wander', () => {
+    skipIronCamps('every iron camp tile is an open candidate clear of both kinds\' idle reach that sees a dragon over sixty percent of its wander', () => {
         const derived = derive({ ...IRON_DRAGON, anywhere: true });
         const spots = new Map(derived.safespots.map(s => [`${s.x},${s.z}`, s]));
         for (const stand of BRIMHAVEN_IRON.stands!) {
@@ -519,7 +527,7 @@ describe.skipIf(!inputsPresent(IRON_DRAGON))('the Brimhaven derivation (pack-gat
         expect(derived.safespots.some(s => s.x === 2734 && s.z === 9430)).toBe(false);
     }, 120_000);
 
-    test('the steel camp is an open candidate that sees the west dragon at half its wander', () => {
+    skipSteelCamp('the steel camp is an open candidate that sees the west dragon at half its wander', () => {
         const derived = derive({ ...STEEL_DRAGON, anywhere: true });
         const spots = new Map(derived.safespots.map(s => [`${s.x},${s.z}`, s]));
         for (const t of BRIMHAVEN_STEEL.stands![0]!.tiles) {

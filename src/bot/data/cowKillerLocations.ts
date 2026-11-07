@@ -1,3 +1,4 @@
+/** 377 cow spawns are the map placements of the Cow-named npcs (content a15d0faa8); source lines in docs/decisions/data-377-sources.md#cow-killer-locations. */
 import type { WorldTile } from '../adapter/ClientAdapter.js';
 import type { BankDestination } from '../api/bank/Banking.js';
 import Tile from '../geometry/Tile.js';

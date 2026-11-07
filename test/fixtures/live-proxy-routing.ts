@@ -45,7 +45,7 @@ async function routeTraffic() {
     const origin = `http://127.0.0.1:${proxy.port}`;
     assert.equal(await (await fetch(origin + '/multibox.html')).text(), 'one local wall');
     for (const world of [1, 2, 3]) {
-        for (const path of ['/crc', '/title-123', '/config456', '/versionlist0', '/loginkey', '/client/client.js']) {
+        for (const path of ['/crc', '/crc48210377-377', '/title-123', '/config456', '/versionlist0', '/loginkey', '/client/client.js']) {
             const response = await fetch(`${origin}/__rs2b0t/world/${world}${path}`);
             assert.equal(response.status, 200);
             assert.equal(await response.text(), `${world}:${path}`);

@@ -1,58 +1,29 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
 import { afterEach, describe, expect, test } from 'bun:test';
-import { gunzipSync } from 'fflate';
 
-import doors from '#/bot/event/webwalk/data/doors.json';
-import stairs from '#/bot/event/webwalk/data/stairEdges.json';
-import transports from '#/bot/event/webwalk/data/transports.json';
-import { PathFinder, type DoorEdgeData, type NavPoint, type TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
 import { Bank } from '#/bot/api/bank/Bank.js';
 import { Equipment } from '#/bot/api/equipment/Equipment.js';
 import { Game } from '#/bot/api/game/Game.js';
 import { Inventory } from '#/bot/api/inventory/Inventory.js';
 import { Skills } from '#/bot/api/skills/Skills.js';
 import { Quests } from '#/bot/api/ui/questlog/Quests.js';
+import type { NavPoint } from '#/bot/event/webwalk/PathFinder.js';
 import Tile from '#/bot/geometry/Tile.js';
 import { CLUE_DB } from '#/bot/api/ai/clues/data/cluedb.js';
-import { PACK_UNREACHABLE } from '#/bot/api/ai/clues/data/unreachable.js';
-import {
-    KHARAZI_CLUES,
-    crossesKharazi,
-    hasJungleMap,
-    inKharazi,
-    jungleCrossing,
-    jungleAxe,
-    jungleKitMissing
-} from '#/bot/api/ai/clues/kharaziTravel.js';
+import { crossesKharazi, hasJungleMap, inKharazi, jungleCrossing, jungleAxe, jungleKitMissing } from '#/bot/api/ai/clues/kharaziTravel.js';
 import { stubProps } from '../../../lib/stubSingletons.js';
 
-const KHARAZI_IDS = [...KHARAZI_CLUES].sort((a, b) => a - b);
-/** trail_clue_hard_sextant019, 08 degrees 05 minutes South, 15 degrees 56 minutes East. */
-const CHEST_DIG = 3536;
+const JUNGLE_INTERIOR: NavPoint = { x: 2950, z: 2902, level: 0 };
 /** Two chops south of the mouth: the first jungle tile the band opens onto. */
 const JUNGLE_LANDING: NavPoint = { x: 2816, z: 2936, level: 0 };
 const KARAMJA_MAINLAND: NavPoint = { x: 2946, z: 3050, level: 0 };
 
-describe('the Kharazi clue set', () => {
-    test('is exactly the clues whose dig is inside the jungle', () => {
-        const inside = Object.keys(CLUE_DB)
-            .map(Number)
-            .filter(id => inKharazi(CLUE_DB[id]!.coord ?? null))
+describe('the 377 Kharazi clue inventory', () => {
+    test('has no clue dig destinations inside the jungle', () => {
+        const inside = Object.entries(CLUE_DB)
+            .filter(([, clue]) => inKharazi(clue.coord ?? null))
+            .map(([id]) => Number(id))
             .sort((a, b) => a - b);
-        expect(inside).toEqual(KHARAZI_IDS);
-    });
-
-    test('08 05 South 15 56 East is one of them, and digs at (2950,2902)', () => {
-        expect(KHARAZI_CLUES.has(CHEST_DIG)).toBe(true);
-        expect(CLUE_DB[CHEST_DIG]!.coord).toEqual({ x: 2950, z: 2902, level: 0 });
-    });
-
-    test('each one still tells the pack audit why it cannot be routed to', () => {
-        for (const id of KHARAZI_IDS) {
-            expect(PACK_UNREACHABLE[id], `${id} must stay diagnosed`).toContain('machete');
-        }
+        expect(inside).toEqual([]);
     });
 });
 
@@ -83,22 +54,23 @@ function stubPack(opts: { at: NavPoint; inv?: string[]; worn?: string[]; bank?: 
 
 describe('cutting into the jungle', () => {
     test('the direction to cut follows which end is inside', () => {
-        const dig = CLUE_DB[CHEST_DIG]!.coord!;
-        expect(jungleCrossing(dig, KARAMJA_MAINLAND)).toBe('enter');
-        expect(jungleCrossing(KARAMJA_MAINLAND, dig)).toBe('leave');
-        expect(jungleCrossing(dig, JUNGLE_LANDING)).toBe('none');
+        expect(inKharazi(JUNGLE_INTERIOR)).toBe(true);
+        expect(inKharazi(KARAMJA_MAINLAND)).toBe(false);
+        expect(jungleCrossing(JUNGLE_INTERIOR, KARAMJA_MAINLAND)).toBe('enter');
+        expect(jungleCrossing(KARAMJA_MAINLAND, JUNGLE_INTERIOR)).toBe('leave');
+        expect(jungleCrossing(JUNGLE_INTERIOR, JUNGLE_LANDING)).toBe('none');
         expect(jungleCrossing(KARAMJA_MAINLAND, KARAMJA_MAINLAND)).toBe('none');
-        // Why: an unknown tile reads as outside, so a walk to a dig still cuts its way in rather than giving up.
-        expect(jungleCrossing(dig, null)).toBe('enter');
+        // Why: an unknown tile reads as outside, so a walk to a jungle destination still cuts in rather than giving up.
+        expect(jungleCrossing(JUNGLE_INTERIOR, null)).toBe('enter');
     });
 
-    test('a dig inside is a crossing from the mainland and not from inside', () => {
+    test('a jungle destination crosses from the mainland and not from inside', () => {
         stubPack({ at: KARAMJA_MAINLAND });
-        expect(crossesKharazi(CLUE_DB[CHEST_DIG]!.coord!)).toBe(true);
+        expect(crossesKharazi(JUNGLE_INTERIOR)).toBe(true);
         restore.pop()!();
 
         stubPack({ at: JUNGLE_LANDING });
-        expect(crossesKharazi(CLUE_DB[CHEST_DIG]!.coord!)).toBe(false);
+        expect(crossesKharazi(JUNGLE_INTERIOR)).toBe(false);
         expect(crossesKharazi(KARAMJA_MAINLAND)).toBe(true);
     });
 
@@ -127,29 +99,4 @@ describe('cutting into the jungle', () => {
         stubPack({ at: KARAMJA_MAINLAND });
         expect(jungleAxe()).toBeNull();
     });
-});
-
-const PACK_PATH = path.join(process.cwd(), 'out/collision.lcnav.gz');
-const HAS_COLLISION_PACK = fs.existsSync(PACK_PATH);
-
-function loadFinder(): PathFinder {
-    let bytes: Uint8Array = new Uint8Array(fs.readFileSync(PACK_PATH));
-    if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
-        bytes = gunzipSync(bytes);
-    }
-    const built = new PathFinder(bytes);
-    built.addEdges(doors as DoorEdgeData[], transports as TransportEdgeData[], stairs as TransportEdgeData[]);
-    return built;
-}
-
-// Why: the feature rests on the band being the only thing in the way, so both halves are pinned: the
-// Why: pack cannot route in, and once the chop has landed the ordinary walker reaches every dig.
-describe.skipIf(!HAS_COLLISION_PACK)('the band is the only thing sealing the digs', () => {
-    test('no dig routes from Karamja, and every one routes from the far side of the band', () => {
-        const finder = loadFinder();
-        const fromMainland = KHARAZI_IDS.filter(id => finder.findPath(KARAMJA_MAINLAND, CLUE_DB[id]!.coord!, undefined, 4_000_000).ok);
-        expect(fromMainland).toEqual([]);
-        const fromJungle = KHARAZI_IDS.filter(id => finder.findPath(JUNGLE_LANDING, CLUE_DB[id]!.coord!, undefined, 4_000_000).ok);
-        expect(fromJungle).toEqual(KHARAZI_IDS);
-    }, 120_000);
 });

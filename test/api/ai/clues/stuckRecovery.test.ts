@@ -9,6 +9,7 @@ import { Sustain } from '#/bot/api/sustain/Sustain.js';
 import { Quests } from '#/bot/api/ui/questlog/Quests.js';
 import { ChatDialog } from '#/bot/api/ui/dialogue/ChatDialog.js';
 import { Traversal } from '#/bot/api/walking/Traversal.js';
+import { CLUE_GATES } from '#/bot/api/ai/clues/data/clueGates.js';
 import Tile from '#/bot/geometry/Tile.js';
 
 const item = (id: number): InvItemSnapshot => ({ id, name: id === 952 ? 'Spade' : 'Clue scroll', count: 1, slot: 0, comId: 3214, ops: ['Dig'] });
@@ -93,9 +94,15 @@ test('the next clue leg receives its own reset allowance', async () => {
 });
 
 test('an unmet quest requirement does not trigger navigation recovery', async () => {
-    pack = [item(3564)];
-    spyOn(Quests, 'status').mockReturnValue('notStarted');
-    expect(await ClueExecutor.solveHeldClue(log)).toBe('abandon');
-    expect(resets).toBe(0);
-    expect(walks).toBe(0);
+    // 377 seals no clue behind a quest (CLUE_GATES is empty), so the gate is injected on a real talk riddle row (Gerrant).
+    CLUE_GATES[2778] = { quest: 'Regicide', reason: 'the destination is sealed' };
+    try {
+        pack = [item(2778)];
+        spyOn(Quests, 'status').mockReturnValue('notStarted');
+        expect(await ClueExecutor.solveHeldClue(log)).toBe('abandon');
+        expect(resets).toBe(0);
+        expect(walks).toBe(0);
+    } finally {
+        delete CLUE_GATES[2778];
+    }
 });

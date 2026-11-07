@@ -1,14 +1,21 @@
 import { Client } from '#/client/shell/Client.js';
 
 import LocType from '#/client/config/LocType.js';
-import { resolveMultiloc } from '#/client/config/resolveMultiloc.js';
+import { resolveMultiloc, setMorphVarps } from '#/client/config/resolveMultiloc.js';
 import SeqType from '#/client/config/SeqType.js';
 
 import type Model from '#/client/dash3d/Model.js';
 import ModelSource from '#/client/dash3d/ModelSource.js';
 
 export default class ClientLocAnim extends ModelSource {
-    static app: Client;
+    static #app: Client;
+    static get app(): Client {
+        return ClientLocAnim.#app;
+    }
+    static set app(value: Client) {
+        ClientLocAnim.#app = value;
+        setMorphVarps(value?.var ?? []);
+    }
     readonly index: number;
     readonly shape: number;
     readonly angle: number;
@@ -34,7 +41,7 @@ export default class ClientLocAnim extends ModelSource {
 
         this.anim = seq === -1 ? null : SeqType.list[seq];
         this.animFrame = 0;
-        this.animCycle = Client.loopCycle;
+        this.animCycle = Client.loopCycle - 1;
 
         if (randomFrame && this.anim && this.anim.loops !== -1) {
             this.animFrame = (Math.random() * this.anim.numFrames) | 0;
@@ -50,7 +57,7 @@ export default class ClientLocAnim extends ModelSource {
             }
 
             while (delta > this.anim.getDelay(this.animFrame)) {
-                delta -= this.anim.getDelay((this.animFrame));
+                delta -= this.anim.getDelay(this.animFrame);
                 this.animFrame++;
 
                 if (this.animFrame < this.anim.numFrames) {

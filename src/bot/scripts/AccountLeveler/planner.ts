@@ -9,7 +9,9 @@ import { canResumeObjective, trainingPriority } from './priority.js';
 import { requirementKey, stockOf, type ActivityPlan, type Decision, type LevelerSnapshot, type SessionMemory } from './types.js';
 
 export { scimitarFor } from './combat.js';
-export const enabledSkills = Skill.names.filter((name, index) => Skill.used[index] && name !== '-unused-');
+/** Skills `methods.ts` can train, not `Skill.used`, so slayer/farming stay off the leveler. */
+const TRAINABLE = new Set(['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'runecraft']);
+export const enabledSkills = Skill.names.filter(name => TRAINABLE.has(name));
 export const emptyMemory = (): SessionMemory => ({ objective: null, recent: [], cooldowns: {}, attempted: {}, deaths: 0 });
 const LOST_CITY = QUESTS.find(quest => quest.id === 'zanaris')!;
 
@@ -40,8 +42,7 @@ export function resolveActivity(s: LevelerSnapshot, plan: ActivityPlan, memory: 
 export function planNext(s: LevelerSnapshot, memory: SessionMemory, random: () => number = Math.random): Decision {
     if (!s.bankReady) return { kind: 'refresh' };
     if (enabledSkills.some(skill => !Number.isFinite(s.levels[skill]) || s.levels[skill] <= 0)) return { kind: 'blocked', reason: 'Skill levels have not loaded' };
-    if (!s.quests[LOST_CITY.name] && zanarisExitNeeds(s) && LOST_CITY.requirements.skills?.every(req => s.levels[req.skill] >= req.level)
-        && (memory.cooldowns['quest-zanaris'] ?? 0) <= s.now) {
+    if (!s.quests[LOST_CITY.name] && zanarisExitNeeds(s) && LOST_CITY.requirements.skills?.every(req => s.levels[req.skill] >= req.level) && (memory.cooldowns['quest-zanaris'] ?? 0) <= s.now) {
         const objective = trainingPriority(s.levels, s.target).skills[0] ?? 'attack';
         const decision = resolveActivity(s, questPlan(s, objective, LOST_CITY.id, LOST_CITY.name, true), memory, random);
         if (decision.kind === 'activity') return decision;
@@ -49,9 +50,11 @@ export function planNext(s: LevelerSnapshot, memory: SessionMemory, random: () =
     const unfinished = enabledSkills.filter(skill => s.levels[skill] < s.target);
     if (!unfinished.length) return { kind: 'complete' };
     const priority = trainingPriority(s.levels, s.target);
-    const ordered = unfinished.filter(skill => priority.skills.includes(skill))
+    const ordered = unfinished
+        .filter(skill => priority.skills.includes(skill))
         .map(skill => ({ skill, level: priority.balance ? s.levels[skill] : 0, score: memory.attempted[skill] ?? 0, tie: random() }))
-        .sort((a, b) => a.level - b.level || a.score - b.score || a.tie - b.tie).map(entry => entry.skill);
+        .sort((a, b) => a.level - b.level || a.score - b.score || a.tie - b.tie)
+        .map(entry => entry.skill);
     if (memory.objective && canResumeObjective(s.levels, s.target, memory.objective)) {
         ordered.splice(ordered.indexOf(memory.objective), 1);
         ordered.unshift(memory.objective);
@@ -59,7 +62,10 @@ export function planNext(s: LevelerSnapshot, memory: SessionMemory, random: () =
     const reasons: string[] = [];
     for (const objective of ordered) {
         const method = methodFor(s, objective, memory, random);
-        if (!method) { reasons.push(`No eligible method for ${objective}`); continue; }
+        if (!method) {
+            reasons.push(`No eligible method for ${objective}`);
+            continue;
+        }
         const decision = resolveActivity(s, method, memory, random, []);
         if (decision.kind === 'activity') return decision;
         if (decision.kind === 'blocked') reasons.push(decision.reason);
