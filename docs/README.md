@@ -30,6 +30,7 @@ pure Lost City or 2004scape projects and is not maintained for those targets.
 | [Bundled scripts](SCRIPTS.md) | catalog of the shipped bots and their settings (generated), [grinding herblore secondaries](how-to/grind-herblore-secondaries.md) |
 | [AccountLeveler methods](ACCOUNT_LEVELER_METHODS.md) | training thresholds, equipment, shops, resource dependencies and fallbacks |
 | [Testing](TESTING.md) | [suites](reference/test-suites.md), [why it is testable](decisions/testability.md), [writing a harness](how-to/write-a-harness.md), [seeding](reference/seeding-test-accounts.md), [the tools/e2e boundary](reference/live-harness-boundary.md), [case manifest](reference/e2e-manifest.md) |
+| [377 L1 milestone](e2e/rs2b0t-377-l1.md) | isolated login, movement, Guide dialogue, varp readback, logout, recording and replay |
 | [Dev and deploy](DEV.md) | the three run modes, then [live wall](how-to/run-the-live-wall.md), [build targets](reference/build-targets.md), [maintainer infra](how-to/maintainer-infra.md) |
 | [Loc identity](decisions/loc-identity-model.md) | why a loc is a placement, not an ID |
 | [377 data sources](decisions/data-377-sources.md) | the 377 source lines behind each hand-authored data edition |
