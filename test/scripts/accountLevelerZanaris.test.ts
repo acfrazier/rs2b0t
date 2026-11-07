@@ -5,13 +5,14 @@ import { Inventory } from '#/bot/api/inventory/Inventory.js';
 import { Skills } from '#/bot/api/skills/Skills.js';
 import { Execution } from '#/bot/api/execution/Execution.js';
 import { Quests } from '#/bot/api/ui/questlog/Quests.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'fflate';
 import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { auditDragonWeapons } from '#/bot/scripts/AccountLeveler/dragonWeapons.js';
 import { enabledSkills } from '#/bot/scripts/AccountLeveler/planner.js';
 import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
 import { skip377 } from '../lib/skip377.js';
+import { skipUnless } from '../lib/skipUnless.js';
 
 const skipped = skip377('test/scripts/accountLevelerZanaris.test.ts', '377 data gap: loc 2411 (zanarismarketdoor) and npc 33 (doorman) are declared in the 377 pack but placed in no 377 map file, so the Zanaris market gate this test crosses does not exist in the 377 world (grep of canon-1105 content/maps for ": 2411" and ": 33" finds none; Jakut spawns in m38_69)');
 
@@ -134,7 +135,8 @@ test('exit preparation banks a full pack before withdrawing its travel item', as
     } finally { for (const patch of patches) patch.mockRestore(); }
 });
 
-skipped.skipIf(!existsSync('out/collision.lcnav.gz'))('Zanaris travel stands are reachable on each side of the paid market gate', () => {
+// Why: `skipped` is bun's `test.skip`, which has no `.skipIf`, so the pack gate picks the test function instead of chaining on it; the gate stays so this case still prints its missing-pack skip once the 377 data gap closes and the skip377 call goes.
+(skipUnless('collision-pack') ? test.skip : skipped)('Zanaris travel stands are reachable on each side of the paid market gate', () => {
     const finder = new PathFinder(gunzipSync(readFileSync('out/collision.lcnav.gz')));
     const tile = (x: number, z: number) => ({ x, z, level: 0 });
     for (const [from, to] of [

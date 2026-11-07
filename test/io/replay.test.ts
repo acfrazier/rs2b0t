@@ -217,6 +217,9 @@ const recordingIndex = resolve('test/io/recordings/index.json');
 const missingIndex = !existsSync(recordingIndex);
 if (missingIndex) console.info('SKIP: test/io/replay.test.ts: recording index is not present');
 const missingCacheBundle = skipUnless('cache-bundle');
+// Why: each case below boots the production client from the recorded cache bundle and runs its mainloop; the full replay takes 5.3 s on Bun 1.4.4 and 6.5 s on CI's pinned 1.3.14, past bun's 5 s default, and bunfig has no test-timeout key, so the budget is per test here (as `inboundCoverage377.test.ts` does).
+// A timed-out replay keeps running into the later tests: under the 5 s default the login-key and login-block tests after it failed as well.
+const REPLAY_BUDGET_MS = 120_000;
 
 describe.skipIf(missingIndex || missingCacheBundle)('production replay runtime', () => {
     test('boots and replays every current-client recording through production mainloop', async () => {
@@ -252,7 +255,7 @@ describe.skipIf(missingIndex || missingCacheBundle)('production replay runtime',
                 gameSockets: false
             });
         }
-    });
+    }, REPLAY_BUDGET_MS);
 
     test('mismatched captured tiles and instance checkpoints fail real replay', async () => {
         const [fixture] = loadReplayFixtures();
@@ -269,7 +272,7 @@ describe.skipIf(missingIndex || missingCacheBundle)('production replay runtime',
             } : record);
             await expect(replayRecording(records, fixture.cacheBundle, fixture.protocol)).rejects.toThrow('differs from its captured adapter state');
         }
-    });
+    }, REPLAY_BUDGET_MS);
 
     test('reply 15 resumes the existing scene through production lostCon and then cleanly logs out', async () => {
         const [fixture] = loadReplayFixtures();
@@ -305,7 +308,7 @@ describe.skipIf(missingIndex || missingCacheBundle)('production replay runtime',
         const preserved = report.checkpoints.find(record => record.label === 'reconnect-preserved');
         expect(preserved?.state).toEqual(checkpoint.state);
         expect(preserved?.frames).toBe(0);
-    });
+    }, REPLAY_BUDGET_MS);
 
     test('a validly framed handler under-read propagates through replayRecording and production mainloop', async () => {
         const [fixture] = loadReplayFixtures();
@@ -323,7 +326,7 @@ describe.skipIf(missingIndex || missingCacheBundle)('production replay runtime',
         });
         expect(changed).toBe(true);
         await expect(replayRecording(records, fixture.cacheBundle, fixture.protocol)).rejects.toThrow(`packet ${message.id} declared`);
-    });
+    }, REPLAY_BUDGET_MS);
 });
 
 test('production HINT_ARROW consumes entity and clear padding without skipping the packet guard', async () => {

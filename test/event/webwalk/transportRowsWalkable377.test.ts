@@ -8,17 +8,21 @@ import { activateTransportRows } from '#/bot/event/webwalk/activateStateAware.js
 import stairs from '#/bot/event/webwalk/data/stairEdges.json';
 import { allDoorRows, allTransportRows } from '#/bot/event/webwalk/loadTransportGraph.js';
 
+import { skipUnless } from '../../lib/skipUnless.js';
+
 const PACK_PATH = path.join(process.cwd(), 'out/collision.lcnav.gz');
 
 // Why: PathFinder.addEdges drops a row whose stand or landing tile is not walkable in the pack, so a row that points at a blocked tile vanishes from every route without any failure; this test turns each silent drop into a named failure.
-describe.skipIf(!fs.existsSync(PACK_PATH))('377 nav rows that the pack would silently drop', () => {
-    const finder = new PathFinder(new Uint8Array(gunzipSync(new Uint8Array(fs.readFileSync(PACK_PATH)))));
+// The pack is read on first use, not in the describe callback: bun evaluates a skipped describe's callback to register its tests, so an eager read fails the file with ENOENT when the pack is absent.
+describe.skipIf(skipUnless('collision-pack'))('377 nav rows that the pack would silently drop', () => {
+    let loaded: PathFinder | undefined;
+    const pack = (): PathFinder => (loaded ??= new PathFinder(new Uint8Array(gunzipSync(new Uint8Array(fs.readFileSync(PACK_PATH))))));
 
     test('every active transport and stair row stands and lands on a walkable tile', () => {
         const active = activateTransportRows([...allTransportRows(), ...(stairs as TransportEdgeData[])]).filter(edge => !edge.disabledReason && edge.blacklist !== true);
         expect(active.length).toBeGreaterThan(1000);
         const dropped = active
-            .filter(edge => !finder.walkable(edge.from.x, edge.from.z, edge.from.level) || !finder.walkable(edge.to.x, edge.to.z, edge.to.level))
+            .filter(edge => !pack().walkable(edge.from.x, edge.from.z, edge.from.level) || !pack().walkable(edge.to.x, edge.to.z, edge.to.level))
             .map(edge => `${edge.debugName ?? edge.locName} ${edge.locId} ${edge.from.x},${edge.from.z},${edge.from.level} -> ${edge.to.x},${edge.to.z},${edge.to.level}`);
         expect(dropped).toEqual([]);
     });
@@ -34,7 +38,7 @@ describe.skipIf(!fs.existsSync(PACK_PATH))('377 nav rows that the pack would sil
         const dropped = allDoorRows()
             .filter(door => {
                 const [dx, dz] = step[door.dir] ?? [0, 0];
-                return !finder.walkable(door.x, door.z, door.level) || !finder.walkable(door.x + dx, door.z + dz, door.level);
+                return !pack().walkable(door.x, door.z, door.level) || !pack().walkable(door.x + dx, door.z + dz, door.level);
             })
             .map(door => `${door.locId} ${door.x},${door.z},${door.level} ${door.dir}`);
         expect(new Set(dropped)).toEqual(BLOCKED_IN_377);
