@@ -6,7 +6,7 @@ import { COW_LOCATIONS, isCowFieldLootTile } from '#/bot/data/cowKillerLocations
 import { FISHING_LOCATIONS } from '#/bot/data/fishingLocations.js';
 import { MINING_LOCATIONS } from '#/bot/data/miningLocations.js';
 import { WOODCUTTING_LOCATIONS } from '#/bot/data/woodcuttingLocations.js';
-import { ROCK_TYPES, resolveRockIds } from '#/bot/data/miningRocks.js';
+import { ROCK_TYPES } from '#/bot/data/miningRocks.js';
 import { DEFAULT_CAMP_RADIUS } from '#/bot/data/gatheringLocations.js';
 
 /**
@@ -165,7 +165,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
     // Why: a placement just outside the box is only this camp's miss when it is the nearest camp declaring the
     // same resource; a neighbour's vein (the Varrock mine north of Al Kharid's spot) is not ours.
     const owner = (resource: string, camp: { name: string; spot: { x: number; z: number } }, tile: { x: number; z: number }): boolean =>
-        MINING_LOCATIONS.filter(other => other.resources.includes(resource)).every(other => other.name === camp.name || cheb(other.spot.x, other.spot.z, tile.x, tile.z) >= cheb(camp.spot.x, camp.spot.z, tile.x, tile.z));
+        MINING_LOCATIONS.filter(other => other.resources?.includes(resource) ?? false).every(other => other.name === camp.name || cheb(other.spot.x, other.spot.z, tile.x, tile.z) >= cheb(camp.spot.x, camp.spot.z, tile.x, tile.z));
 
     // Their declared ores sit in hidden numbered rocks (rocks_14850-14859) with no ore table in the content's
     // mine.dbrow, so ROCK_TYPES cannot classify them; the camps stay in the data for the geography.
@@ -189,7 +189,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
         for (const camp of MINING_LOCATIONS) {
             const radius = camp.campRadius ?? DEFAULT_CAMP_RADIUS;
             const inside = (tile: { x: number; z: number }): boolean => cheb(camp.spot.x, camp.spot.z, tile.x, tile.z) <= radius;
-            for (const resource of camp.resources) {
+            for (const resource of camp.resources ?? []) {
                 const all = placedByOre.get(resource) ?? [];
                 const inBox = all.filter(inside);
                 // KNOWN GAP: the Wilderness mines' ore sits in hidden numbered rocks (rocks_14850-14859) and the
@@ -222,7 +222,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
         for (const camp of WOODCUTTING_LOCATIONS) {
             const radius = camp.campRadius ?? DEFAULT_CAMP_RADIUS;
             const inside = (tile: { x: number; z: number }): boolean => cheb(camp.spot.x, camp.spot.z, tile.x, tile.z) <= radius;
-            for (const resource of camp.resources) {
+            for (const resource of camp.resources ?? []) {
                 const names = new Set(treeNames[resource] ?? []);
                 const all = locs.filter(l => names.has(locNamesById.get(l.id) ?? ''));
                 const inBox = all.filter(inside);
@@ -236,7 +236,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
                     l =>
                         cheb(camp.spot.x, camp.spot.z, l.x, l.z) <= radius + 8 &&
                         !inside(l) &&
-                        WOODCUTTING_LOCATIONS.filter(other => other.resources.includes(resource)).every(other => other.name === camp.name || cheb(other.spot.x, other.spot.z, l.x, l.z) >= cheb(camp.spot.x, camp.spot.z, l.x, l.z))
+                        WOODCUTTING_LOCATIONS.filter(other => other.resources?.includes(resource) ?? false).every(other => other.name === camp.name || cheb(other.spot.x, other.spot.z, l.x, l.z) >= cheb(camp.spot.x, camp.spot.z, l.x, l.z))
                 );
                 expect(outside, `${camp.name}: ${resource} trees sit just outside the box: ${outside.map(l => `${l.x},${l.z}`).join(' ')}`).toEqual([]);
             }
@@ -255,7 +255,6 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
                 // a neighbour's fishery (the Ardougne castle garden spots near the Seers camp) is not ours.
                 const contested = FISHING_LOCATIONS.some(other => {
                     if (other === camp) return false;
-                    const otherRadius = other.campRadius ?? DEFAULT_CAMP_RADIUS;
                     return cheb(other.spot.x, other.spot.z, spot.x, spot.z) < cheb(camp.spot.x, camp.spot.z, spot.x, spot.z);
                 });
                 if (contested) continue;

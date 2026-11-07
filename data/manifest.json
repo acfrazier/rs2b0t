@@ -79,13 +79,13 @@
     },
     {
       "path": "data/377/src/bot/api/ai/clues/data/toolAcquire.ts",
-      "sha256": "4aa22762ee3518f71e3fcac9ff56e1b7fccba3d6f559914390d34d8aa065858d",
+      "sha256": "19053c74d1b5f24f552eeee19fbf3ae2f7711f7f2942a498d733e275a7c25d6f",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/src/bot/api/ai/clues/data/unreachable.ts",
-      "sha256": "5796ebb5805a1a3b46e33faf1382400be201c9660ef5db498c7f27edd76e8d08",
+      "sha256": "8c32508e23264f8e95514631d73b3603767be51fbfaa3d04d608436d4f056de1",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -205,7 +205,7 @@
     },
     {
       "path": "data/377/test/api/ai/clues/AcquireTools.test.ts",
-      "sha256": "7be6a9c86763098e9dd57dbc5d73ded7c64344bd62e4de29ea485e18417707a6",
+      "sha256": "30f8b034b4a0ba743192fce23722a165d25ac686efb8b53522068027cee51f66",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -229,13 +229,19 @@
     },
     {
       "path": "data/377/test/api/ai/clues/data/toolAcquire.test.ts",
-      "sha256": "ab5367f4dcb8f9331742c6df207893d830c255950be72fb2e290dd5d68f26116",
+      "sha256": "4fd2d00d0b0d5786a739e2c3553e7cfa71eb44e6250cf21437d1c9263c94fd07",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/test/api/ai/clues/hard-tier.test.ts",
       "sha256": "23efcda729653dd851ed4db36106366d79278619bed5cc1582c808bf2bdb27fd",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/api/ai/clues/kharaziJungle.test.ts",
+      "sha256": "4686fa698cb13203ed92935149f6e34ce52847e75a0cc73b37ed344543119d8e",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -248,6 +254,12 @@
     {
       "path": "data/377/test/api/market/catalog.test.ts",
       "sha256": "11a3a118c28c718e790af2a360862ff71081c2645ee906d9a74cf04b6cb5a1cf",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/data/FishingLocations.test.ts",
+      "sha256": "010a7bc19436e224757c64a13f0cb5d6bbb4f46b87f26581417e0c7ef14aadd6",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -265,7 +277,7 @@
     },
     {
       "path": "data/377/test/data/placementBoxes.test.ts",
-      "sha256": "5b006175ab03fa8aa0e90926df20dd3aaaffa99e7867a0e01a425d5cc38b3267",
+      "sha256": "36271cf25193ba0aed98fcac34066e78f3a63abd61198f3859210b10647bded5",
       "kind": "edition",
       "qualification": "offline"
     },

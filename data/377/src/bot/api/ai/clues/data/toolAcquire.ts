@@ -13,18 +13,16 @@ export function trailKit(scrollId: number | null): string[] {
 }
 
 /**
- * 377 ground spade spawns (content a15d0faa8): the 377 maps place five `spade` (obj 952) ground items
- * (`pack/obj.pack:953:952=spade`): East Ardougne (2566,3330) `maps/m40_52.jm2:7877`, south of Falador
- * (2981,3370) `maps/m46_52.jm2:14358`, Barbarian Village (3104,3359) `maps/m48_52.jm2:10665`, Varrock
- * palace upper floor (3234,3412,1) `maps/m50_53.jm2:12974` and the Karamja jungle (1951,4964)
- * `maps/m30_77.jm2:5620`. The 289 edition listed two spawns at (2574,3331) and (2981,3369); the 377
- * content placed the shop spades elsewhere, so both are re-derived from the 377 maps.
+ * Five 377 ground spade placements (obj 952; `pack/obj.pack:953:952=spade`), re-derived from the OBJ
+ * sections in `maps/*.jm2`: (1951,4964,0) `m30_77:5620`, (2566,3330,0) `m40_52:7877`,
+ * (2981,3370,0) `m46_52:14358`, (3120,3359,0) `m48_52:10665`, and (3218,3412,1) `m50_53:12974`.
+ * The 289 edition's two alternate spawns are not part of the 377 map placement set.
  */
 export const SPADE_SPAWNS: Tile[] = [
     new Tile(2566, 3330, 0),
     new Tile(2981, 3370, 0),
-    new Tile(3104, 3359, 0),
-    new Tile(3234, 3412, 1),
+    new Tile(3120, 3359, 0),
+    new Tile(3218, 3412, 1),
     new Tile(1951, 4964, 0)
 ];
 
