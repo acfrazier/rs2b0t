@@ -222,6 +222,12 @@
       "qualification": "offline"
     },
     {
+      "path": "data/377/test/api/ai/clues/data/clueGates.test.ts",
+      "sha256": "264ae437ce5075becf074f91cef4ccbc9f08d4be979151d13201247c933f3261",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
       "path": "data/377/test/api/ai/clues/data/toolAcquire.test.ts",
       "sha256": "ab5367f4dcb8f9331742c6df207893d830c255950be72fb2e290dd5d68f26116",
       "kind": "edition",
