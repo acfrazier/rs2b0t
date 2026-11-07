@@ -39,7 +39,8 @@ function argVal(name: string): string | undefined {
 }
 
 function loadStairPrices(): StairPriceTable {
-    const parsed: unknown = JSON.parse(fs.readFileSync(new URL('./stair-prices.json', import.meta.url), 'utf8'));
+    const pricesPath = path.join(process.env.NAV_DATA_ROOT ?? '.', 'tools/nav/stair-prices.json');
+    const parsed: unknown = JSON.parse(fs.readFileSync(pricesPath, 'utf8'));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         throw new Error('Invalid tools/nav/stair-prices.json schema');
     }

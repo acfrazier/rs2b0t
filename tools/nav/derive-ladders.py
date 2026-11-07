@@ -422,7 +422,13 @@ def has_runtime_destination_guard(body: str) -> bool:
     )
 
 
-def is_ladder_config(config) -> bool:
+# scripts/general_use/scripts/trapdoors.rs2:31-35 moves directly on Open in 377.
+SCRIPTED_DUNGEON_OPS = {"trapdoor_14879": 1}
+
+
+def is_ladder_config(config, revision: int = 289) -> bool:
+    if revision == 377 and config.debug_name in SCRIPTED_DUNGEON_OPS:
+        return True
     return bool(
         (enrichment.normalized(config.display_name) == "ladder" or "ladder" in config.debug_name.lower())
         and any(option and "climb" in option.lower() for option in config.options)
@@ -553,7 +559,7 @@ def main() -> None:
     placed_by_id: dict[int, list[EffectivePlacement]] = {}
     for placement in placements:
         placed_by_id.setdefault(placement.loc_id, []).append(placement)
-    ladder_configs = {loc_id: config for loc_id, config in configs.items() if loc_id in placed_by_id and is_ladder_config(config)}
+    ladder_configs = {loc_id: config for loc_id, config in configs.items() if loc_id in placed_by_id and is_ladder_config(config, revision)}
     ladder_ids = set(ladder_configs)
     ladder_debugs = {config.debug_name for config in ladder_configs.values()}
 
@@ -571,7 +577,8 @@ def main() -> None:
                 unsnappable_sources += 1
                 source_reason = "The ladder has no walkable interaction tile within two squares in this collision pack."
             for op, action in enumerate(config.options, start=1):
-                if not action or "climb" not in action.lower():
+                scripted_dungeon = revision == 377 and SCRIPTED_DUNGEON_OPS.get(config.debug_name) == op
+                if not action or ("climb" not in action.lower() and not scripted_dungeon):
                     continue
                 interactions += 1
                 body = handlers.get((config.debug_name, op), "")

@@ -34,7 +34,7 @@ def selected_revision() -> int:
 
 
 def load_stair_prices() -> dict:
-    path = Path(__file__).with_name("stair-prices.json")
+    path = Path(os.environ.get("NAV_DATA_ROOT", ".")) / "tools/nav/stair-prices.json"
     table = json.loads(path.read_text(encoding="utf-8"))
     if table.get("schemaVersion") != 1 or table.get("baseTicks") != 1 or not isinstance(table.get("handlers"), dict):
         raise RuntimeError(f"Invalid {path} schema")
@@ -110,6 +110,9 @@ MAP_FILE_RE = re.compile(r"^m(\d+)_(\d+)\.jm2$")
 LOC_LINE_RE = re.compile(
     r"^(\d+)\s+(\d+)\s+(\d+):\s+(\d+)\s+(\d+)(?:\s+(\d+))?\s*$"
 )
+
+# scripts/general_use/scripts/manholes.rs2:1-10 opens 881 as 882 before descent.
+OPEN_LOC_DEBUGS = {"manholeclosed": "manholeopen"}
 
 
 def clean_value(value: str) -> str:
@@ -250,7 +253,7 @@ def resolve_source_loc(
         variants = [placed_config]
         # Why: the map places the closed trapdoor; resolve its open config for the climb action.
         if wanted_action not in {normalized(option) for option in option_values(placed_config)}:
-            open_debug = placed_config.debug_name + "_open"
+            open_debug = OPEN_LOC_DEBUGS.get(placed_config.debug_name, placed_config.debug_name + "_open")
             variants.extend(config for config in configs.values() if config.debug_name == open_debug)
 
         for config in variants:
@@ -346,9 +349,11 @@ def closed_open_loc_ids(
 
     # Placement and action config share an id; it may already be the open form.
     debug = (placed.debug_name if placed else action_config.debug_name) or ""
-    if debug.endswith("_open"):
-        open_id = placement_loc_id
+    base = next((closed for closed, opened in OPEN_LOC_DEBUGS.items() if opened == debug), None)
+    if base is None and debug.endswith("_open"):
         base = debug[: -len("_open")]
+    if base is not None:
+        open_id = placement_loc_id
         for cfg in configs.values():
             if cfg.debug_name == base:
                 closed_id = cfg.loc_id
@@ -356,7 +361,7 @@ def closed_open_loc_ids(
         return closed_id, open_id
 
     # Closed placement; look for conventional open partner.
-    open_debug = debug + "_open"
+    open_debug = OPEN_LOC_DEBUGS.get(debug, debug + "_open")
     for cfg in configs.values():
         if cfg.debug_name == open_debug:
             open_id = cfg.loc_id

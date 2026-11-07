@@ -22,7 +22,7 @@
     "tools/combat/gen-dropdb.ts": "c168de0e955f30b3468fb9d7218e66dadf4df549cebd29d8cf4625f70cb9023c",
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
-    "tools/gen-377-data.sh": "352049538f400d0ea2c5aeae92d73271a8cf45af2b5a15aca930d4975ce3d834",
+    "tools/gen-377-data.sh": "214a987daa89f5dcaaef149b5d0a6421b93532af917d981f9ed30ab2f363569b",
     "tools/gen-377-manifest.ts": "641a69921540b195a51d737d10c43a8a1765ea1f768b8aa18c6802c90498c380",
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
@@ -34,11 +34,11 @@
     "tools/map/build-basemap.ts": "f90956e475ef0a71da30629225dc3c5b40b7e2c1a07c55309fc6de1165ee14dc",
     "tools/map/encodePng.ts": "ebf62672a4035f6b0a7cfe451cb3d856dfe82201cc3b830c4eec9f4b6159f961",
     "tools/nav/build-collision.ts": "84af9f74ac800e16cf29f9665576069346cedac043056e04d00a9cca09210bcb",
-    "tools/nav/derive-doors.ts": "0d1e622f047c9932976adc18e282fb618eff054666c0ea85f565cd5b19882d0f",
-    "tools/nav/derive-ladders.py": "68c118763ec08bb66e12c65e2655e29c9b6f2330c86b3320a858609589b6e407",
-    "tools/nav/derive-stairs.ts": "eb83f5ab589f7293d3cf0fbf984a413486fa64e9b4ea05aaa62663a7284693c4",
-    "tools/nav/derive-transports.sh": "a9b62ed612cc4b464bbe87c456e10e8f115966941237e791dfe268a781674b7d",
-    "tools/nav/enrich-transports.py": "37a753bc64a4636f021ad9bc4640f145d91598fa164ed119e0521554dd76472f",
+    "tools/nav/derive-doors.ts": "36e6bb5114e227d797a7f7e81fac281157d8ff1cfccd4824295d74d4f66bdfa2",
+    "tools/nav/derive-ladders.py": "96263e7d865e923be22030e0da3dbe6f580d9f5122a9499649a30df164588526",
+    "tools/nav/derive-stairs.ts": "72db7026ab46c7722676f793afeca78c90fcbda7382da2d9c6779aed3df67136",
+    "tools/nav/derive-transports.sh": "57e8df7c2818ff8184edd48a1b8733012204dd2211acd21d6341a5853bc40ac1",
+    "tools/nav/enrich-transports.py": "7d0b68e611b0c693904f9c28879abf4660bed83b090862ea6771dbb6374489ae",
     "tools/nav/lib.ts": "93f5d22f03c65f8be03e95319085a16b0da62acdaa9753af81c777cb9c476a22",
     "tools/nav/stairsParse.ts": "9369171ffbee7ec995d8da4444a0f11da8ed145ad4154a694dd47668b9eeec06",
     "tools/patches/worldmap-377.patch": "0ac9dbe029993299bf4a2579944b24ff57f68611d4b54906990f329229ccf223",
@@ -114,13 +114,13 @@
     },
     {
       "path": "data/377/src/bot/event/webwalk/data/stairEdges.json",
-      "sha256": "cdd8adafc3a2e62af89c4d9d92f48061d43f74597ef393ea26f09d7ed01ce9de",
+      "sha256": "4c1ff89e8c13be38db1ebcd2787039d9b1107bcbdda4dad60edba36088656745",
       "kind": "generated",
       "qualification": "offline"
     },
     {
       "path": "data/377/src/bot/event/webwalk/data/transports.json",
-      "sha256": "4578579f0332094ecb4e23b6c4a082ac7604ba8f937bbf465be3097648698508",
+      "sha256": "b403b9c90f47ba2a0a6e43a532dd74644b7e357c3a56d65abe73a9d642de0fd0",
       "kind": "generated",
       "qualification": "offline"
     },
@@ -132,13 +132,13 @@
     },
     {
       "path": "data/377/src/bot/event/webwalk/teleportCatalog.ts",
-      "sha256": "eaa06a1dcb642bdab097b34a8dd0d98993516080d87b595dc66138cc18b97fa8",
+      "sha256": "78b48071a49d3aeb8afb9b56cfb359c47215e45d73bead463f8472f1cacf24f7",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/src/bot/event/webwalk/travelCatalog.ts",
-      "sha256": "81598cb6c2f4df8512a8731bab0f0f3b9d07a2f6d9bc25e1286c012d9bdfd09d",
+      "sha256": "23fc5d9e298e8b80c9ea1aadd605b72ef308a3ac782b7caf0b1a96e2e3e30490",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -156,19 +156,19 @@
     },
     {
       "path": "data/377/test/event/webwalk/routeCorpus377.test.ts",
-      "sha256": "3c36a1cab87d8e39d48223ef7bee1713d5a2e29ac800a3ec2d78ce691010332a",
+      "sha256": "97cb393b4effb811bf66f769e160d574f29c698e788ea6840d8992bd59ff0e41",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/test/event/webwalk/sinclairMansionLadder.test.ts",
-      "sha256": "85c408bc4d2389f130679c9792da27a7cebba8a3893f10bdf8107b1bc6a33f98",
+      "sha256": "08c459e3833435ede80d1ac804c48bad53fec831ca57acaf655c9c8c6d512450",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/tools/nav/door-categories.json",
-      "sha256": "e847368c1a27ce1c87dd3fdd5545cdd743b8b5e7233d8cdfa1001f7f782da720",
+      "sha256": "d29199f42958ab83af2bba05ae0d461852992d7323ee2f7ad1cdbbcc6d86a3be",
       "kind": "nav-input",
       "qualification": "offline"
     },
@@ -180,13 +180,13 @@
     },
     {
       "path": "data/377/tools/nav/stair-prices.json",
-      "sha256": "320aa8734ff3f0507e19b5f9af3b7fad82e1d5e342f5790ddb5300f124239237",
+      "sha256": "6b70fdc7a5e548beefc5bf34a7d3d73748895ecc52d82c251bf4c83ba98a75bc",
       "kind": "nav-input",
       "qualification": "offline"
     },
     {
       "path": "out/collision.lcnav.gz",
-      "sha256": "ed64309ee43a7eb117f101cd542ceedb2bbf5db7dbaad18cab7415ce0baf5a99",
+      "sha256": "ccebd03c96ec984a2aaa99165cbde0d78ebfebb5459104fdd8c9b4c8a0478015",
       "kind": "out",
       "qualification": "offline",
       "stagedPath": "data/377/out/collision.lcnav.gz"

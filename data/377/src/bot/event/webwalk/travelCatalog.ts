@@ -296,7 +296,7 @@ export function wildyLeverEdges(): TransportEdgeData[] {
     ];
 }
 
-// scripts/areas/area_mage_arena/scripts/mage_arena.rs2:91-106: inbound needs the miniquest and unrestricted gear; outbound exits north, and planning checks membership and Entrana-restricted gear because the journal has no `magearena` quest state.
+// Why: magearena has no journal state, so planning checks membership and gear (scripts/areas/area_mage_arena/scripts/mage_arena.rs2:91-106).
 
 /** Mage Arena outdoor barrier edges. */
 export function mageArenaBarrierEdges(): TransportEdgeData[] {

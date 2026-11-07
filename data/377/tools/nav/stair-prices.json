@@ -332,6 +332,7 @@
     },
     "grandtree_laddermiddle": {
       "extraTicks": 1,
+      "locIds": [2884],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:133"
     },
     "hauntedmine_ladder": {
@@ -442,7 +443,7 @@
     "ladder": {
       "extraTicks": 1,
       "locIds": [
-        1746
+        1747
       ],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:51"
     },
@@ -560,14 +561,17 @@
     },
     "ladder_broken": {
       "extraTicks": 0,
+      "locIds": [1752],
       "source": "scripts/quests/quest_dragon/scripts/melzars_maze.rs2:36"
     },
     "laddermiddle": {
       "extraTicks": 1,
+      "locIds": [1748],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:59"
     },
     "laddertop": {
       "extraTicks": 1,
+      "locIds": [1746],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:43"
     },
     "laddertop_norim": {
@@ -715,12 +719,19 @@
       ],
       "source": "scripts/ladders+stairs/scripts/ladders.rs2:175"
     },
+    "manholeopen": {
+      "extraTicks": 0,
+      "locIds": [882],
+      "source": "scripts/general_use/scripts/manholes.rs2:8-10"
+    },
     "ranging_ladder_down": {
       "extraTicks": 1,
+      "locIds": [2512],
       "source": "scripts/minigames/game_ranging/scripts/ranging_guild_tower.rs2:48"
     },
     "ranging_ladder_up": {
       "extraTicks": 1,
+      "locIds": [2511],
       "source": "scripts/minigames/game_ranging/scripts/ranging_guild_tower.rs2:3"
     },
     "rantzogrecaveentrance": {
@@ -956,7 +967,13 @@
     },
     "stairs": {
       "extraTicks": 1,
+      "locIds": [1722],
       "source": "scripts/ladders+stairs/scripts/stairs.rs2:2"
+    },
+    "trapdoor_14879": {
+      "extraTicks": 0,
+      "locIds": [14879],
+      "source": "scripts/general_use/scripts/trapdoors.rs2:31-35"
     },
     "thrttavernbasementladder": {
       "extraTicks": 1,
@@ -1129,6 +1146,7 @@
     },
     "volcano_entrance": {
       "extraTicks": 1,
+      "locIds": [492],
       "source": "scripts/areas/area_karamja/scripts/misc_locs.rs2:3"
     },
     "watchladderdown": {
@@ -1175,6 +1193,7 @@
     },
     "zq_logbalance": {
       "extraTicks": 1,
+      "locIds": [2332],
       "source": "scripts/skill_agility/scripts/shortcuts.rs2:47"
     },
     "zqclimbingrocks": {
