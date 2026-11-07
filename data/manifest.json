@@ -197,6 +197,12 @@
       "qualification": "pending"
     },
     {
+      "path": "data/377/test/api/ai/clues/AcquireTools.test.ts",
+      "sha256": "7be6a9c86763098e9dd57dbc5d73ded7c64344bd62e4de29ea485e18417707a6",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
       "path": "data/377/test/api/ai/clues/clue-audit.test.ts",
       "sha256": "f27c121d756a27c123571e3bd06511509f7334cb1d395da558d1768bb72a6b41",
       "kind": "edition",
