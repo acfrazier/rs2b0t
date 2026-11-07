@@ -42,7 +42,9 @@ export const ITEM_ALIASES: Readonly<Record<number, ItemAlias>> = {
     // Strung and unstrung amulets share a name; use natural label order.
     // 377 collision groups (staged nameCollisions.ts) keep every pair: Gold [1673,1692], Sapphire [1675,1694],
     // Emerald [1677,1696,+6041 magic strung], Ruby [1679,1698], Diamond [1681,1700],
-    // Dragonstone ammy [1683,1702]: the 377 name for the 289 "Dragonstoneamulet" group (`all.obj` `name=Dragonstone ammy` :22547).
+    // Dragonstone ammy [1683,1702] — the 377 name for the 289 "Dragonstoneamulet" group (`all.obj` `name=Dragonstone ammy` :22547).
+    // The Emerald group has three members, which defeats the two-way worn/unworn split, so 1696 keeps the
+    // generated "Strung emerald amulet" label instead of the bare hand label and stays uniquely resolvable.
     1673: { words: ['unstrung'], label: 'Gold amulet (u)' },
     1675: { words: ['unstrung'], label: 'Sapphire amulet (u)' },
     1677: { words: ['unstrung'], label: 'Emerald amulet (u)' },
@@ -51,7 +53,6 @@ export const ITEM_ALIASES: Readonly<Record<number, ItemAlias>> = {
     1683: { words: ['unstrung'], label: 'Dragonstone amulet (u)' },
     1692: { words: ['strung'], label: 'Gold amulet' },
     1694: { words: ['strung'], label: 'Sapphire amulet' },
-    1696: { words: ['strung'], label: 'Emerald amulet' },
     1698: { words: ['strung'], label: 'Ruby amulet' },
     1700: { words: ['strung'], label: 'Diamond amulet' },
     1702: { words: ['strung'], label: 'Dragonstone amulet' }

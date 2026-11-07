@@ -120,7 +120,7 @@
     },
     {
       "path": "data/377/src/bot/data/itemAliases.ts",
-      "sha256": "dacd1bd21d3114ebcd385ef36dcb97253227293cdd52cbd2d01068940193b16e",
+      "sha256": "e2c7b03665995110571f4dae7e0b94d5d96ca31eca3b101e415f2eca0615fe3e",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -222,7 +222,7 @@
     },
     {
       "path": "data/377/test/api/market/catalog.test.ts",
-      "sha256": "ba8526f658929a96d0e91a621f7146566c92c003bda283756194c63e3ca3ce3e",
+      "sha256": "9fef63f57dab7f692149fc2981d8d7bcde5d52a7e72dded2d44548ccf862f5b9",
       "kind": "edition",
       "qualification": "offline"
     },
