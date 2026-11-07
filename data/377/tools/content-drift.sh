@@ -9,7 +9,13 @@
 # rescue teleports (the camp box test), and the quest scripts L2 will qualify.
 set -u
 BRANCH="${1:-$HOME/experiments/FR-vault/vendor/content}"
-PINNED="${2:-/Volumes/dev-scratch/fairy-ring-worktrees/canon-1105/content}"
+# The pinned content the manifest records; pass it as the second argument or set CONTENT_DIR (the
+# analysis knob), e.g. the canon content checkout. No path default lives in this file (public repo).
+PINNED="${2:-${CONTENT_DIR:-}}"
+if [ -z "$PINNED" ]; then
+  echo "usage: tools/content-drift.sh [branch-content-root] <pinned-content-root> (or set CONTENT_DIR)" >&2
+  exit 2
+fi
 DIRS=(skill_mining skill_runecraft minigames/game_trail quests/quest_cook quests/quest_sheep quests/quest_priest \
   quests/quest_runemysteries quests/quest_romeojuliet quests/quest_waterfall \
   quests/quest_vampire quests/quest_haunted quests/quest_doric quests/quest_squire \

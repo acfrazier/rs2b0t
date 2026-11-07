@@ -1,6 +1,6 @@
 /**
- * 377 sources (content a15d0faa8): the cow spawns are the 377 map placements of the Cow-named npcs —
- * `pack/npc.pack` cow 81 (:82), cow2 397 (:398), cow3 1767 (:1769), calves 1766/1768 — placed in
+ * 377 sources (content a15d0faa8): the cow spawns are the 377 map placements of the Cow-named npcs:
+ * `pack/npc.pack` cow 81 (:82), cow2 397 (:398), cow3 1767 (:1769), calves 1766/1768. They are placed in
  * `maps/m50_51.jm2:7962-7980` (Lumbridge field), `maps/m49_51.jm2:7393-7416` (north-west field),
  * `maps/m47_51.jm2:7577-7589` (south of Falador) and `maps/m41_52.jm2:7825` area (East Ardougne; the ten
  * id-81 spawns the test enumerates). The tiles are identical to the 289 scouting, re-verified against the

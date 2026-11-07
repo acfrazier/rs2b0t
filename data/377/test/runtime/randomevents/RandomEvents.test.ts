@@ -1,0 +1,229 @@
+import { expect, test, describe } from 'bun:test';
+import { PLANT_REACH, eventNpcTargetsAnotherPlayer, pickEventNear, GearLossTracker, handleLocation, isEntHijack, isHostileEventNpc, pickSacrificial, RandomEvents } from '#/bot/runtime/randomevents/RandomEvents.js';
+
+describe('handleLocation', () => {
+    test('worn handle wins (the wielded-pick case the old scan missed)', () => {
+        expect(handleLocation(['Iron ore'], ['Pickaxe handle'])).toBe('worn');
+        expect(handleLocation(['Pickaxe handle'], ['Pickaxe handle'])).toBe('worn');
+    });
+
+    test('inventory handle (tool was carried, not wielded)', () => {
+        expect(handleLocation(['Axe handle', 'Logs'], [])).toBe('inventory');
+        expect(handleLocation(['Pickaxe handle'], ['Amulet of power'])).toBe('inventory');
+    });
+
+    test('null when no handle anywhere', () => {
+        expect(handleLocation(['Iron ore', null], ['Rune pickaxe'])).toBeNull();
+    });
+});
+
+describe('pickSacrificial', () => {
+    test('most-duplicated non-protected item wins (the mined ore)', () => {
+        expect(pickSacrificial(['Rune pickaxe', 'Iron ore', 'Iron ore', 'Uncut sapphire', 'Iron ore'])).toBe('Iron ore');
+    });
+
+    test('never drops tools or the event pieces', () => {
+        expect(pickSacrificial(['Pickaxe head', 'Pickaxe handle', 'Rune pickaxe', 'Bronze axe', 'Hammer', 'Knife', 'Tinderbox'])).toBeNull();
+        expect(pickSacrificial(['Fishing rod', 'Small net', 'Harpoon', 'Chisel'])).toBeNull();
+    });
+
+    test('null-safe and null on empty', () => {
+        expect(pickSacrificial([null, null])).toBeNull();
+        expect(pickSacrificial([])).toBeNull();
+    });
+});
+
+describe('GearLossTracker', () => {
+    test('dropped consumables are never stolen fishing tools', () => {
+        const t = new GearLossTracker();
+        t.update(['Feather', 'Fishing bait'], false, 0, true, 1);
+        t.update([], false, 600, true, 2);
+        expect(t.recentlyLost('feather', 600)).toBe(false);
+        expect(t.recentlyLost('fishing bait', 600)).toBe(false);
+    });
+
+    test('tools dropped away from fishing spots are not recovered', () => {
+        const t = new GearLossTracker();
+        t.update(['Harpoon'], false, 0, false, 1);
+        t.update([], false, 600, false, 2);
+        expect(t.recentlyLost('harpoon', 600)).toBe(false);
+    });
+
+    test('a spot hop permits recovery for one game tick, including repeated scans', () => {
+        const t = new GearLossTracker();
+        t.update(['Harpoon'], false, 0, true, 1);
+        t.update([], false, 600, false, 2);
+        t.update([], false, 650, false, 2);
+        expect(t.recentlyLost('harpoon', 650)).toBe(true);
+        t.update([], false, 1200, false, 3);
+        expect(t.recentlyLost('harpoon', 1200)).toBe(false);
+    });
+
+    test('returning to water does not recover a tool dropped after the latch expired', () => {
+        const t = new GearLossTracker();
+        t.update(['Harpoon'], false, 0, true, 1);
+        t.update(['Harpoon'], false, 600, false, 2);
+        t.update([], false, 1200, false, 3);
+        t.update([], false, 1800, true, 4);
+        expect(t.recentlyLost('harpoon', 1800)).toBe(false);
+    });
+
+    test('gear vanishing from the pack records a recent loss', () => {
+        const t = new GearLossTracker(90_000);
+        t.update(['Harpoon', 'Big fishing net'], false, 1000, true, 1000);
+        t.update(['Harpoon'], false, 2000, true, 2000);
+        expect(t.recentlyLost('big fishing net', 2500)).toBe(true);
+        expect(t.recentlyLost('harpoon', 2500)).toBe(false);
+    });
+
+    test('losses expire after the window (the ground drop despawns)', () => {
+        const t = new GearLossTracker(90_000);
+        t.update(['Harpoon'], false, 0, true, 0);
+        t.update([], false, 1000, true, 1000);
+        expect(t.recentlyLost('harpoon', 91_001)).toBe(false);
+    });
+
+    test('bank/shop suppression covers the open AND the following update (deposits are noticed after the bank closes)', () => {
+        const t = new GearLossTracker(90_000);
+        t.update(['Lobster pot'], false, 0, true, 0);
+        t.update(['Lobster pot'], true, 1000, true, 1000);
+        t.update([], false, 2000, true, 2000);
+        expect(t.recentlyLost('lobster pot', 2500)).toBe(false);
+    });
+
+    test('a knock-off never seen as held records nothing (guild ground spawns)', () => {
+        const t = new GearLossTracker(90_000);
+        t.update([], false, 0, true, 0);
+        t.update([], false, 1000, true, 1000);
+        expect(t.recentlyLost('big fishing net', 1500)).toBe(false);
+    });
+});
+
+describe('isHostileEventNpc', () => {
+    const ids = [391, 392, 393, 394, 395, 396, 408, 411, 413, 414, 415, 416, 417, 418,
+        419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434,
+        435, 436, 438, 439, 440, 441, 442, 443];
+    const hostile = (id: number, faceEntity = 32771, distance = 4, inCombat = false) => ({
+        id, inCombat, distance, faceEntity
+    });
+
+    test.each(ids)('NPC %i waits for damage even when adjacent, targeting us, or in combat', id => {
+        expect(isHostileEventNpc(hostile(id, -1, 1), false)).toBe(false);
+        expect(isHostileEventNpc(hostile(id), false)).toBe(false);
+        expect(isHostileEventNpc(hostile(id, 32771, 1, true), false)).toBe(false);
+    });
+
+    test.each(ids)('NPC %i triggers after damaging us without needing to receive a hit itself', id => {
+        expect(isHostileEventNpc(hostile(id), true)).toBe(true);
+    });
+
+    test.each(ids)('NPC %i triggers after damage even with missing or stale facing information', id => {
+        expect(isHostileEventNpc(hostile(id, -1), true)).toBe(true);
+        expect(isHostileEventNpc(hostile(id, 32777, 1, true), true)).toBe(true);
+    });
+
+    test('the hostile must be within range', () => {
+        expect(isHostileEventNpc(hostile(431, 32771, 8), true)).toBe(true);
+        expect(isHostileEventNpc(hostile(431, 32771, 9), true)).toBe(false);
+    });
+
+    test.each([1, 407, 409, 412, 437, 444, 452, 453])('non-hostile NPC %i never triggers evasion', id => {
+        expect(isHostileEventNpc(hostile(id), true)).toBe(false);
+    });
+});
+
+describe('eventNpcTargetsAnotherPlayer', () => {
+    test('a random following another player is theirs', () => {
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: 32777 }, 3)).toBe(true);
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: 32768 }, 3)).toBe(true);
+    });
+
+    test('a random following us is ours', () => {
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: 32771 }, 3)).toBe(false);
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: 32768 }, 0)).toBe(false);
+    });
+
+    test('no facing at all is ours, so a spawn tick without the mask is still answered', () => {
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: -1 }, 3)).toBe(false);
+    });
+
+    test('an npc face target is not a player, so it never disowns the event', () => {
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: 9 }, 3)).toBe(false);
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: 32767 }, 3)).toBe(false);
+    });
+
+    test('an unknown slot of our own keeps the event rather than abandoning it', () => {
+        expect(eventNpcTargetsAnotherPlayer({ faceEntity: 32777 }, -1)).toBe(false);
+    });
+});
+
+describe('isEntHijack', () => {
+    // 377 ent ids: macro_ent_willow1 1736 and macro_ent_yew 1740 (pack/npc.pack:1737,1741); the 289 pack's 444/452 are gone.
+    const ent = (over: Partial<{ id: number; index: number; distance: number }> = {}) => ({
+        id: 1736,
+        index: 12,
+        distance: 1,
+        ...over
+    });
+
+    test('facing the Ent while chopping it is a hijack', () => {
+        expect(isEntHijack(ent(), 12, true)).toBe(true);
+        expect(isEntHijack(ent({ id: 1740, index: 7 }), 7, true)).toBe(true);
+    });
+
+    test('a neighbour loc chop (not facing the Ent) is not a hijack', () => {
+        expect(isEntHijack(ent(), -1, true)).toBe(false);
+        expect(isEntHijack(ent(), 99, true)).toBe(false);
+    });
+
+    test('standing next to an Ent after cancelling is not a hijack', () => {
+        expect(isEntHijack(ent(), 12, false)).toBe(false);
+    });
+
+    test('an Ent more than one tile away is not our loc', () => {
+        expect(isEntHijack(ent({ distance: 2 }), 12, true)).toBe(false);
+    });
+
+    test('tree spirit and suit of armour ids are outside the Ent range', () => {
+        expect(isEntHijack(ent({ id: 443 }), 12, true)).toBe(false);
+        expect(isEntHijack(ent({ id: 453 }), 12, true)).toBe(false);
+    });
+});
+
+describe('ignored randoms (#597)', () => {
+    test('setIgnoredRandoms matches names case-insensitively', () => {
+        RandomEvents.setIgnoredRandoms(['Swarm']);
+        expect(RandomEvents.isIgnored('swarm')).toBe(true);
+        expect(RandomEvents.isIgnored('SWARM')).toBe(true);
+        expect(RandomEvents.isIgnored('genie')).toBe(false);
+        RandomEvents.setIgnoredRandoms([]);
+        expect(RandomEvents.isIgnored('swarm')).toBe(false);
+    });
+
+    test('a live provider is re-read so arena entry can start ignoring Swarm', () => {
+        let inArena = false;
+        RandomEvents.setIgnoredRandoms(() => (inArena ? ['swarm'] : []));
+        expect(RandomEvents.isIgnored('swarm')).toBe(false);
+        inArena = true;
+        expect(RandomEvents.isIgnored('swarm')).toBe(true);
+        RandomEvents.setIgnoredRandoms([]);
+    });
+});
+
+// Why: the plant spawns within one tile of its target and never moves, and clicking someone else's answers "It's not here for you", so a wide reach can only ever walk the run to a plant it cannot pick. At Seers bank an eight-tile reach took the ones spawning on the woodcutters.
+describe('the strange plant reach', () => {
+    test('covers the tile it spawns on and a step or two of drift', () => {
+        expect(pickEventNear({ name: 'strange plant', distance: 1 })).toBe(true);
+        expect(pickEventNear({ name: 'strange plant', distance: PLANT_REACH })).toBe(true);
+    });
+
+    test('stops well short of the next bank fixture, so a plant that is not ours is left alone', () => {
+        expect(PLANT_REACH).toBeLessThan(8);
+        expect(pickEventNear({ name: 'strange plant', distance: PLANT_REACH + 1 })).toBe(false);
+        expect(pickEventNear({ name: 'strange plant', distance: 8 })).toBe(false);
+    });
+
+    test('names only the plant, since the other pickables are not this event', () => {
+        expect(pickEventNear({ name: 'evil chicken', distance: 1 })).toBe(false);
+    });
+});

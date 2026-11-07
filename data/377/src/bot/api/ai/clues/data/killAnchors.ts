@@ -4,8 +4,8 @@ import Tile from '#/bot/geometry/Tile.js';
  * Hunt anchors for the kill-for-key medium riddles, one tile beside each killer's placed spawn.
  *
  * 377 sources (content a15d0faa8):
- * - The five riddles and their key drops: `scripts/minigames/game_trail/scripts/medium/trail_clue_medium.rs2:29-37` —
- *   `npc_type = black_heather` :29, `npc_type = guarddog` :31, `npc_type = ardougne_guard` :33,
+ * - The five riddles and their key drops: `scripts/minigames/game_trail/scripts/medium/trail_clue_medium.rs2:29-37`,
+ *   with `npc_type = black_heather` :29, `npc_type = guarddog` :31, `npc_type = ardougne_guard` :33,
  *   `npc_category = chicken` :35, `compare(npc_name, "Man")` :37.
  * - Clue item ids from `pack/obj.pack` (`2832:2831=trail_clue_medium_riddle001` … `2841:2840=trail_clue_medium_riddle005_key`), also carried in the staged cluedb keyFrom rows.
  * - The killer spawns are the 377 map placements: `maps/m47_57.jm2:7825` (black_heather 202 @ 3039,3700),

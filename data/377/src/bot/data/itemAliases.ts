@@ -42,7 +42,7 @@ export const ITEM_ALIASES: Readonly<Record<number, ItemAlias>> = {
     // Strung and unstrung amulets share a name; use natural label order.
     // 377 collision groups (staged nameCollisions.ts) keep every pair: Gold [1673,1692], Sapphire [1675,1694],
     // Emerald [1677,1696,+6041 magic strung], Ruby [1679,1698], Diamond [1681,1700],
-    // Dragonstone ammy [1683,1702] — the 377 name for the 289 "Dragonstoneamulet" group (`all.obj` `name=Dragonstone ammy` :22547).
+    // Dragonstone ammy [1683,1702]: the 377 name for the 289 "Dragonstoneamulet" group (`all.obj` `name=Dragonstone ammy` :22547).
     1673: { words: ['unstrung'], label: 'Gold amulet (u)' },
     1675: { words: ['unstrung'], label: 'Sapphire amulet (u)' },
     1677: { words: ['unstrung'], label: 'Emerald amulet (u)' },
@@ -58,7 +58,7 @@ export const ITEM_ALIASES: Readonly<Record<number, ItemAlias>> = {
 };
 
 /** Shorthand a customer types instead of the display name, keyed by the lowercased name. */
-// Common trade shorthand; every key must be a name the 377 content actually repeats (a collision group name).
+// Common trade shorthand; every key must be a name the 377 content repeats (a collision group name).
 // The 289 dragonhide-family shorthand keys are gone with their 377 collision groups; the Dragonstone shorthand
 // retargets to the 377 group name "Dragonstone ammy" (`all.obj` `name=Dragonstone ammy` :22547).
 export const NAME_SYNONYMS: Readonly<Record<string, readonly string[]>> = {

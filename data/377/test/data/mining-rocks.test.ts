@@ -24,7 +24,7 @@ function locPackNames(): Map<string, number> {
     return names;
 }
 
-/** Rock loc ids the 377 maps actually place, parsed from the text `==== LOC ====` sections. */
+/** Rock loc ids the 377 maps place, parsed from the text `==== LOC ====` sections. */
 function placedRockIds(): Set<number> {
     const placed = new Set<number>();
     const maps = join(CONTENT, 'maps');
@@ -76,7 +76,7 @@ test('resolveRockIds maps selected names to their ids (case-insensitive)', () =>
     const coal = resolveRockIds(['COAL']);
     expect(iron.size).toBeGreaterThan(0);
     expect(coal.size).toBeGreaterThan(0);
-    // 377 migration pin: the selector must reach the new-series rocks, not only the 289 classic block —
+    // 377 migration pin: the selector must reach the new-series rocks, not only the 289 classic block;
     // iron 9717 and coal 11930 come from the 377 tables (mine.dbrow:68-70 and :84-86 via loc.pack).
     expect([...iron]).toContain(9717);
     expect([...coal]).toContain(11930);

@@ -13,7 +13,7 @@ import { DEFAULT_CAMP_RADIUS } from '#/bot/data/gatheringLocations.js';
  * The 377 placement-derived camp boxes (pitfall 18).
  *
  * Why: a camp box is the area the script hunts/gathers inside, so it must still cover what the 377 content
- * actually places — the P9 lesson (`IMPDORIC-377-1106`): undersized boxes turn a spawn/teleport outside the
+ * places. The P9 lesson (`IMPDORIC-377-1106`): undersized boxes turn a spawn/teleport outside the
  * box into a `NoTarget` that looks like a capability bug. This derives each box's required coverage from the
  * 377 sources at run time instead of restating tiles:
  * - loc resources (rocks, trees): every placement of a declared resource type near the camp lies inside the
@@ -21,7 +21,7 @@ import { DEFAULT_CAMP_RADIUS } from '#/bot/data/gatheringLocations.js';
  * - npc resources (fishing spots): the spots are the direct targets and do not wander (`wanderrange=0` in
  *   `scripts/_unpack/377/all.npc`), so every spot placement near the camp lies inside the camp box;
  * - cow fields: the leash is a loot leash, not a spawn fence (a southern Lumbridge cow may die outside it by
- *   design), so the field must keep a farmed herd — at least three Cow-named spawns inside the leash — and
+ *   design), so the field must keep a farmed herd (at least three Cow-named spawns inside the leash), and
  *   the per-field enumerations stay pinned in CowKillerLocations.test.ts;
  * - named script teleports: the desert-rescue teleport landings (`quests/quest_desertrescue/configs/
  *   desertrescue.constant:45-46`) must land inside their camp boxes, the one 377 script teleport into a camp.
@@ -169,7 +169,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
                 const all = placedByOre.get(resource) ?? [];
                 const inBox = all.filter(inside);
                 expect(inBox.length > 0, `${camp.name}: no ${resource} placement inside the ${radius}-tile box at ${camp.spot.x},${camp.spot.z}`).toBe(true);
-                // A placement just outside the box that the bot could never mine from inside is stale data:
+                // A placement outside the box that the bot could never mine from inside is stale data:
                 // the box must cover every near-field placement of a declared ore (boundary = radius + 8).
                 const outside = all.filter(l => cheb(camp.spot.x, camp.spot.z, l.x, l.z) <= radius + 8 && !inside(l));
                 expect(outside, `${camp.name}: ${resource} placements sit just outside the box: ${outside.map(l => `${l.x},${l.z}`).join(' ')}`).toEqual([]);

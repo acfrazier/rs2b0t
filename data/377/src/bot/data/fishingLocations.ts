@@ -1,9 +1,9 @@
 /**
- * 377 sources (content a15d0faa8): the fishing spots are the 377 map placements of the "Fishing spot" npcs —
+ * 377 sources (content a15d0faa8): the fishing spots are the 377 map placements of the "Fishing spot" npcs;
  * the pack numbers them per mapsquare (`pack/npc.pack` `328:327=0_48_50_saltfish` … `953:952=0_48_48_newbiefishing`),
  * placed in `maps/m48_50.jm2:7388,7391` (Draynor), `maps/m44_53.jm2:5571-5578` (Catherby),
  * `maps/m42_55.jm2:6592-6596` (Seers fly fishing), `maps/m48_53.jm2:9010-9011` (Barbarian Village),
- * `maps/m45_49.jm2` (Musa Point) and `maps/m44_46.jm2:…` (Shilo Village river) — full decode in
+ * `maps/m45_49.jm2` (Musa Point) and `maps/m44_46.jm2` (Shilo Village river). Full decode in
  * RS2B0T-377-S9-1106/placements-fishspots.txt. Every spot sits inside its camp's box, so the tiles and radii
  * the 289 scouting set still hold; the bait vendors and bank tiles are shared city facts.
  */
