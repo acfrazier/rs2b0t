@@ -26,7 +26,7 @@
     "tools/gen-377-manifest.ts": "641a69921540b195a51d737d10c43a8a1765ea1f768b8aa18c6802c90498c380",
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
-    "tools/items/gen-namecollisions.ts": "fe0ceeaff2d68927f5c8de18848c83acecb0376d27a36127a9b3330beb424dcd",
+    "tools/items/gen-namecollisions.ts": "f062bc92e0dd72affa37fe199b179852bcabea75610497f5442d12a3585e4fb4",
     "tools/items/gen-untradeable.ts": "2f97f8ba7a122d367d40ce016cf8a259f01d69442ba5f50e8718f395f8f270bb",
     "tools/items/parse.ts": "1e0f0cb50afdc4edd7519d158967095d2433cdd1e49f3e725b9f373780f57549",
     "tools/lib/content.ts": "ebd229b1ffe38c9e5162eb15a06f89171747db84ca1152724e118c586f5220c4",
@@ -144,9 +144,9 @@
     },
     {
       "path": "data/377/src/bot/data/nameCollisions.ts",
-      "sha256": "5bff3fc3088064efab997a2b268f6e48eaa3bcdcca8797902dbedb3fe7868fc5",
+      "sha256": "2e3360b091ee102d81123dfabb792ad910f3779603609f5df745c15edc216164",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "offline"
     },
     {
       "path": "data/377/src/bot/data/runeCraftLocations.ts",
