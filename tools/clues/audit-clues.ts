@@ -248,7 +248,10 @@ export function runClueAudit(opts: ClueAuditOptions = {}, log: (m: string) => vo
         const id = Number(idStr);
         const expected = KNOWN_UNREACHABLE.has(id);
         const fail = (problem: string, unreachable = false): void => {
-            if (expected && unreachable) {
+            // Allowlisted rows cover nav gaps and stale search coords (S9 377); the `search: ` prefix is the
+            // renderer's, so the regex matches the bare problem text.
+            const searchCoordProblem = /^(no searchable loc within 1|searchable .* off the clue coord)/.test(problem);
+            if (expected && (unreachable || searchCoordProblem)) {
                 expectedAbandon.add(id);
                 log(`EXPECTED-ABANDON ${clue.obj} [${id}] ${clue.type}: ${problem}`);
                 return;
@@ -346,7 +349,7 @@ export function runClueAudit(opts: ClueAuditOptions = {}, log: (m: string) => vo
             id,
             obj: clue?.obj ?? `clue_${id}`,
             type: clue?.type ?? '?',
-            problem: `allowlisted ${id} produced no nav-unreachable finding — it is now reachable (or audited clean); remove it from KNOWN_UNREACHABLE`
+            problem: `allowlisted ${id} produced no matching finding — it is now reachable, audited clean, or its content defect is fixed; remove it from PACK_UNREACHABLE`
         });
     }
 
