@@ -108,39 +108,87 @@
     },
     {
       "path": "data/377/src/bot/event/webwalk/data/doors.json",
-      "sha256": "6d5fe992c5c829a2f1ce2fd8fa8fb1e0cb2fa8d3762233df16f9445fe850c6f5",
+      "sha256": "4ece60a5e81d25b39e0eaad4b67beb47ea69bfae17a5e8465fd1b70dee2c9d7d",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "offline"
     },
     {
       "path": "data/377/src/bot/event/webwalk/data/stairEdges.json",
-      "sha256": "4c1ff89e8c13be38db1ebcd2787039d9b1107bcbdda4dad60edba36088656745",
+      "sha256": "cdd8adafc3a2e62af89c4d9d92f48061d43f74597ef393ea26f09d7ed01ce9de",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "offline"
     },
     {
       "path": "data/377/src/bot/event/webwalk/data/transports.json",
       "sha256": "4578579f0332094ecb4e23b6c4a082ac7604ba8f937bbf465be3097648698508",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/specialRequires.ts",
+      "sha256": "d028956edc3214b5eb11703dc120b2cd2ce329f48e893c9649e773593a1e14d7",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/teleportCatalog.ts",
+      "sha256": "eaa06a1dcb642bdab097b34a8dd0d98993516080d87b595dc66138cc18b97fa8",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/travelCatalog.ts",
+      "sha256": "81598cb6c2f4df8512a8731bab0f0f3b9d07a2f6d9bc25e1286c012d9bdfd09d",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/event/webwalk/contract.test.ts",
+      "sha256": "e75d202938ee47bf0cc00cf69c1f3c975070344d5b006796196b5f1570ed37ec",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/event/webwalk/jewelleryAndStateAware.test.ts",
+      "sha256": "0347bc27ea95f84039fed1ca68f610c90c49f5c886fdc23735832b3519503618",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/event/webwalk/routeCorpus377.test.ts",
+      "sha256": "3c36a1cab87d8e39d48223ef7bee1713d5a2e29ac800a3ec2d78ce691010332a",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/event/webwalk/sinclairMansionLadder.test.ts",
+      "sha256": "85c408bc4d2389f130679c9792da27a7cebba8a3893f10bdf8107b1bc6a33f98",
+      "kind": "edition",
+      "qualification": "offline"
     },
     {
       "path": "data/377/tools/nav/door-categories.json",
       "sha256": "e847368c1a27ce1c87dd3fdd5545cdd743b8b5e7233d8cdfa1001f7f782da720",
       "kind": "nav-input",
-      "qualification": "pending"
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/tools/nav/mainland-routes.json",
+      "sha256": "123e1597ac8ce6ea97667922109a435f2ac8f495aae222c56f6b101f7b81248e",
+      "kind": "nav-input",
+      "qualification": "offline"
     },
     {
       "path": "data/377/tools/nav/stair-prices.json",
-      "sha256": "21a0f9810e1517b6058e5f28b72ede1d06b87667ed0a47552d3f45757b8a91ba",
+      "sha256": "320aa8734ff3f0507e19b5f9af3b7fad82e1d5e342f5790ddb5300f124239237",
       "kind": "nav-input",
-      "qualification": "pending"
+      "qualification": "offline"
     },
     {
       "path": "out/collision.lcnav.gz",
       "sha256": "ed64309ee43a7eb117f101cd542ceedb2bbf5db7dbaad18cab7415ce0baf5a99",
       "kind": "out",
-      "qualification": "pending",
+      "qualification": "offline",
       "stagedPath": "data/377/out/collision.lcnav.gz"
     },
     {
