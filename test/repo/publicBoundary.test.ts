@@ -180,12 +180,12 @@ afterAll(() => {
 });
 
 describe('publicBoundary', () => {
-    test('the index passes with exactly the 14 frozen entries', () => {
+    test('the index passes with exactly the 12 remaining frozen entries', () => {
         const findings = indexFindings(process.cwd());
         const allow = readAllowlist(ALLOWLIST);
 
-        expect(findings).toHaveLength(14);
-        expect(allow).toHaveLength(14);
+        expect(findings).toHaveLength(12);
+        expect(allow).toHaveLength(12);
         for (const entry of allow) expect(REASONS).toContain(entry.reason);
         expect(violations(findings, allow)).toEqual([]);
     });

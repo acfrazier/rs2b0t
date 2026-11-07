@@ -183,6 +183,31 @@ test -n "$(ls "$OUT_DIR"/worldmap-basemap.*.png 2>/dev/null)" || {
     echo "no basemap files under $OUT_DIR" >&2
     exit 1
 }
+echo "== navigation bake (REVISION=$REVISION, staged under $STAGE/) =="
+NAV_DATA_ROOT="$STAGE"
+NAV_DATA_DIR="$NAV_DATA_ROOT/src/bot/event/webwalk/data"
+NAV_WORK="$WORK/nav"
+mkdir -p "$NAV_DATA_DIR" "$NAV_DATA_ROOT/tools/nav" "$NAV_DATA_ROOT/out" "$NAV_WORK"
+cp tools/nav/door-categories.json "$NAV_DATA_ROOT/tools/nav/door-categories.json"
+cp tools/nav/stair-prices.json "$NAV_DATA_ROOT/tools/nav/stair-prices.json"
+# The 377 bake starts from the checked-in 289 transport seed, then regenerates both graphs.
+cp src/bot/event/webwalk/data/transports.json "$NAV_DATA_DIR/transports.json"
+cp src/bot/event/webwalk/data/stairEdges.json "$NAV_DATA_DIR/stairEdges.json"
+rm -f "$NAV_DATA_ROOT/out/collision.lcnav" "$NAV_DATA_ROOT/out/collision.lcnav.gz"
+REVISION=$REVISION ENGINE_DIR="$ENGINE" "$BUN_BIN" tools/nav/build-collision.ts \
+    --engine "$ENGINE" \
+    --out "$NAV_WORK/collision.lcnav" 2>&1 | tee "$WORK/logs/nav-collision.log"
+cp "$NAV_WORK/collision.lcnav.gz" "$NAV_DATA_ROOT/out/collision.lcnav.gz"
+REVISION=$REVISION ENGINE_DIR="$ENGINE" CONTENT_DIR="$WORK/source/content" \
+    "$BUN_BIN" tools/nav/derive-doors.ts \
+    --engine "$ENGINE" \
+    --content "$WORK/source/content" \
+    --out "$NAV_DATA_DIR/doors.json" 2>&1 | tee "$WORK/logs/nav-doors.log"
+REVISION=$REVISION ENGINE_DIR="$ENGINE" CONTENT_DIR="$WORK/source/content" \
+NAV_DATA_ROOT="$NAV_DATA_ROOT" NAV_PACK_PATH="$NAV_DATA_ROOT/out/collision.lcnav.gz" \
+BUN_BIN="$BUN_BIN" PYTHON_BIN="${PYTHON_BIN:-python3}" \
+    sh tools/nav/derive-transports.sh 2>&1 | tee "$WORK/logs/nav-transports.log"
+
 
 echo "== manifest =="
 ARTIFACT_ARGS=()
@@ -196,10 +221,17 @@ for path in \
     src/bot/data/cookSurfaceLocs.ts \
     src/bot/api/ai/clues/data/cluedb.ts \
     src/bot/api/ai/clues/data/puzzlePieces.ts \
-    src/bot/data/ifIds.ts
+    src/bot/data/ifIds.ts \
+    src/bot/event/webwalk/data/doors.json \
+    src/bot/event/webwalk/data/stairEdges.json \
+    src/bot/event/webwalk/data/transports.json
 do
     ARTIFACT_ARGS+=(--artifact "$STAGE/$path=generated")
 done
+ARTIFACT_ARGS+=(--artifact "$STAGE/tools/nav/door-categories.json=nav-input")
+ARTIFACT_ARGS+=(--artifact "$STAGE/tools/nav/stair-prices.json=nav-input")
+ARTIFACT_ARGS+=(--artifact "$STAGE/out/collision.lcnav.gz=out")
+
 GEN_ARGS=()
 for gen in \
     tools/shops/gen-shopdb.ts tools/shops/parse.ts \
@@ -211,7 +243,9 @@ for gen in \
     tools/map/build-basemap.ts tools/map/encodePng.ts \
     tools/nav/lib.ts tools/nav/stairsParse.ts \
     tools/lib/content.ts tools/lib/genout.ts \
-    tools/gen-377-manifest.ts tools/gen-377-data.sh tools/patches/worldmap-377.patch
+    tools/gen-377-manifest.ts tools/gen-377-data.sh tools/patches/worldmap-377.patch \
+    tools/nav/build-collision.ts tools/nav/derive-doors.ts tools/nav/derive-stairs.ts \
+    tools/nav/derive-ladders.py tools/nav/enrich-transports.py tools/nav/derive-transports.sh
 do
     GEN_ARGS+=(--generator "$gen")
 done

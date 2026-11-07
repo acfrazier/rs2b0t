@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { homedir } from 'node:os';
 
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import CollisionEngine from '#/bot/event/webwalk/rsmod/CollisionEngine.js';
 import { changeLandCollision, changeLocCollision, changeRoofCollision } from '#/bot/event/webwalk/rsmod/collision.js';
 import { CollisionFlag, CollisionType } from '#/bot/event/webwalk/rsmod/flags.js';
@@ -375,9 +377,10 @@ function verify(baked: BakedMapsquare[], collision: CollisionEngine, locs: { con
     return v.failures;
 }
 
-function parseArgs(): { engine: string; members: boolean; out: string; verify: boolean } {
+function parseArgs(): { engine: string; members: boolean; out: string; verify: boolean; revision: number } {
     const args = process.argv.slice(2);
-    let engine = '/Users/elliotninjaone/code/lostcity-dev/engine';
+    let engine = process.env.ENGINE_DIR ?? path.join(homedir(), 'code', 'rs2b2t-engine');
+    const revision = process.env.REVISION === undefined ? CLIENT_VERSION : Number(process.env.REVISION);
     let members = true;
     let out = 'out/collision.lcnav';
     let verifyFlag = true;
@@ -398,7 +401,7 @@ function parseArgs(): { engine: string; members: boolean; out: string; verify: b
             process.exit(2);
         }
     }
-    return { engine, members, out, verify: verifyFlag };
+    return { engine, members, out, verify: verifyFlag, revision };
 }
 
 function main(): void {
@@ -406,9 +409,10 @@ function main(): void {
     const started = performance.now();
 
     console.log(`engine: ${opts.engine}`);
+    console.log(`revision: ${opts.revision}`);
     console.log(`members: ${opts.members}`);
 
-    const locs = loadLocTypes(opts.engine);
+    const locs = loadLocTypes(opts.engine, opts.revision);
     console.log(`loc types: ${locs.configs.length}`);
 
     const builder = new CollisionBuilder(opts.members, locs.configs);

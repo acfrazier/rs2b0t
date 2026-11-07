@@ -5,9 +5,30 @@ import { homedir } from 'node:os';
 import { gunzipSync } from 'fflate';
 
 import { PathFinder, type NavPoint, type TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 import { Reader, bridgedLevel, forEachLoc, loadLocTypes, loadMapsquares, parseLands } from './lib.js';
 import { parseSwitchStairs } from './stairsParse.js';
+
+interface HandlerOptionPrice {
+    extraTicks: number;
+    source: string;
+}
+
+interface HandlerPrice {
+    extraTicks?: number;
+    source?: string;
+    locIds?: number[];
+    opPrices?: Record<string, HandlerOptionPrice>;
+}
+
+interface StairPriceTable {
+    schemaVersion: 1;
+    baseTicks: 1;
+    handlers: Record<string, HandlerPrice>;
+}
+
+type PricedTransportEdgeData = TransportEdgeData & { extraTicks?: number };
 
 // First stage of transport generation: bare source edges only.
 // tools/nav/derive-transports.sh runs this, then ladder derivation, then LostCity loc enrichment.
@@ -17,10 +38,90 @@ function argVal(name: string): string | undefined {
     return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
+function loadStairPrices(): StairPriceTable {
+    const parsed: unknown = JSON.parse(fs.readFileSync(new URL('./stair-prices.json', import.meta.url), 'utf8'));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error('Invalid tools/nav/stair-prices.json schema');
+    }
+    const table = parsed as StairPriceTable;
+    if (table.schemaVersion !== 1 || table.baseTicks !== 1 || !table.handlers || typeof table.handlers !== 'object' || Array.isArray(table.handlers)) {
+        throw new Error('Invalid tools/nav/stair-prices.json schema');
+    }
+    for (const [handler, rawPrice] of Object.entries(table.handlers)) {
+        if (!handler || !rawPrice || typeof rawPrice !== 'object' || Array.isArray(rawPrice)) {
+            throw new Error(`Invalid stair price for handler '${handler}'`);
+        }
+        const price = rawPrice as HandlerPrice;
+        const hasDefault = price.extraTicks !== undefined || price.source !== undefined;
+        if (
+            hasDefault &&
+            (typeof price.extraTicks !== 'number' ||
+                !Number.isInteger(price.extraTicks) ||
+                price.extraTicks < 0 ||
+                typeof price.source !== 'string' ||
+                !price.source)
+        ) {
+            throw new Error(`Invalid stair price for handler '${handler}'`);
+        }
+        if (!hasDefault && (!price.opPrices || Object.keys(price.opPrices).length === 0)) {
+            throw new Error(`Handler '${handler}' has no default or op-specific stair price`);
+        }
+        if (price.opPrices !== undefined) {
+            if (!price.opPrices || typeof price.opPrices !== 'object' || Array.isArray(price.opPrices) || Object.keys(price.opPrices).length === 0) {
+                throw new Error(`Invalid op-specific stair prices for handler '${handler}'`);
+            }
+            for (const [op, opPrice] of Object.entries(price.opPrices)) {
+                if (
+                    !/^[1-5]$/.test(op) ||
+                    !opPrice ||
+                    typeof opPrice !== 'object' ||
+                    typeof opPrice.extraTicks !== 'number' ||
+                    !Number.isInteger(opPrice.extraTicks) ||
+                    opPrice.extraTicks < 0 ||
+                    typeof opPrice.source !== 'string' ||
+                    !opPrice.source
+                ) {
+                    throw new Error(`Invalid op-specific stair price for handler '${handler}' option ${op}`);
+                }
+            }
+        }
+        if (
+            price.locIds !== undefined &&
+            (!Array.isArray(price.locIds) || price.locIds.some(id => !Number.isInteger(id) || id < 0))
+        ) {
+            throw new Error(`Invalid loc IDs for stair price handler '${handler}'`);
+        }
+    }
+    return table;
+}
+
+export function movementExtraTicks(prices: StairPriceTable | null, debugName: string, op: number): number | undefined {
+    if (prices === null) {
+        return undefined;
+    }
+    const price = prices.handlers[debugName];
+    if (!price) {
+        throw new Error(`Unpriced stair movement handler '${debugName}'`);
+    }
+    if (price.opPrices) {
+        const optionPrice = price.opPrices[String(op)];
+        if (!optionPrice) {
+            throw new Error(`Unpriced stair movement handler '${debugName}' option ${op}`);
+        }
+        return optionPrice.extraTicks;
+    }
+    if (price.extraTicks === undefined) {
+        throw new Error(`Unpriced stair movement handler '${debugName}'`);
+    }
+    return price.extraTicks;
+}
+
 const engine = argVal('--engine') ?? process.env.ENGINE_DIR ?? path.join(homedir(), 'code', 'rs2b2t-engine');
 const content = argVal('--content') ?? process.env.CONTENT_DIR ?? path.join(homedir(), 'code', 'rs2b2t-content');
 const out = argVal('--out') ?? 'src/bot/event/webwalk/data/stairEdges.json';
 const packPath = argVal('--pack') ?? 'out/collision.lcnav.gz';
+const dataDir = argVal('--data-dir') ?? path.join('src', 'bot', 'event', 'webwalk', 'data');
+const revision = process.env.REVISION === undefined ? CLIENT_VERSION : Number(process.env.REVISION);
 
 const LADDER_LOC_IDS = new Set([1746, 1747, 1748, 1749, 1750]);
 
@@ -32,8 +133,12 @@ const DISABLED_AUTO_REVERSES = new Map<string, string>([
     ['2631,3325,0>2631,3321,1', 'Handelmort Mansion stairs are trapped: quest_totem.rs2 drops anyone who has not Investigated them into the Ardougne sewers for a fifth of their hitpoints. defs/tribaltotem.ts disarms and climbs them itself.']
 ]);
 
-function edge(from: NavPoint, to: NavPoint, locName: string, action: string): TransportEdgeData {
-    return { from, to, locName, action, kind: 'stair' };
+function edge(from: NavPoint, to: NavPoint, locName: string, action: string, extraTicks?: number): PricedTransportEdgeData {
+    const result: PricedTransportEdgeData = { from, to, locName, action, kind: 'stair' };
+    if (extraTicks !== undefined) {
+        result.extraTicks = extraTicks;
+    }
+    return result;
 }
 
 function offsets(R: number): [number, number][] {
@@ -210,9 +315,9 @@ function pivotBoth(finder: PathFinder, x: number, z: number, a: number, b: numbe
     return fallback;
 }
 
-function snapAndReverse(finder: PathFinder, curated: TransportEdgeData[], raw: TransportEdgeData[]): { edges: TransportEdgeData[]; dropped: number; supersededDropped: number } {
+function snapAndReverse(finder: PathFinder, curated: PricedTransportEdgeData[], raw: PricedTransportEdgeData[], selectedRevision: number): { edges: PricedTransportEdgeData[]; dropped: number; supersededDropped: number } {
     // Why: reverse landing tiles are unknown; moving them to the approach side can disconnect pockets such as Yanille and south Falador.
-    const snapped: { edge: TransportEdgeData; landing: NavPoint }[] = [];
+    const snapped: { edge: PricedTransportEdgeData; landing: NavPoint }[] = [];
     let dropped = 0;
     for (const e of raw) {
         let f: NavPoint | null;
@@ -235,9 +340,9 @@ function snapAndReverse(finder: PathFinder, curated: TransportEdgeData[], raw: T
         snapped.push({ edge: { ...e, from: f, to: t }, landing });
     }
     const seen = new Set<string>();
-    const edges: TransportEdgeData[] = [];
-    const key = (e: TransportEdgeData): string => `${e.from.x},${e.from.z},${e.from.level}>${e.to.x},${e.to.z},${e.to.level}`;
-    const add = (e: TransportEdgeData): void => {
+    const edges: PricedTransportEdgeData[] = [];
+    const key = (e: PricedTransportEdgeData): string => `${e.from.x},${e.from.z},${e.from.level}>${e.to.x},${e.to.z},${e.to.level}`;
+    const add = (e: PricedTransportEdgeData): void => {
         const k = key(e);
         if (!seen.has(k)) {
             seen.add(k);
@@ -249,8 +354,8 @@ function snapAndReverse(finder: PathFinder, curated: TransportEdgeData[], raw: T
     }
     for (const { edge: e, landing } of snapped) {
         if (changesFloor(e) && /-(up|down)/i.test(e.action)) {
-            const reverse: TransportEdgeData = { from: e.to, to: landing, locName: e.locName, action: reverseAction(e.action), kind: edgeKind(e) };
-            const disabledReason = DISABLED_AUTO_REVERSES.get(key(reverse));
+            const reverse: PricedTransportEdgeData = { from: e.to, to: landing, locName: e.locName, action: reverseAction(e.action), kind: edgeKind(e), extraTicks: e.extraTicks };
+            const disabledReason = selectedRevision === 289 ? DISABLED_AUTO_REVERSES.get(key(reverse)) : undefined;
             add(disabledReason ? { ...reverse, disabledReason } : reverse);
         }
     }
@@ -282,8 +387,19 @@ function snapAndReverse(finder: PathFinder, curated: TransportEdgeData[], raw: T
 }
 
 function main(): void {
-    const { configs } = loadLocTypes(engine);
-    const edges: TransportEdgeData[] = [];
+    const { configs } = loadLocTypes(engine, revision);
+    const prices = revision === 377 ? loadStairPrices() : null;
+    const edges: PricedTransportEdgeData[] = [];
+
+    if (prices) {
+        for (const [handler, price] of Object.entries(prices.handlers)) {
+            for (const locId of price.locIds ?? []) {
+                if (configs[locId]?.debugname !== handler) {
+                    throw new Error(`stair price handler '${handler}' does not match loc config ${locId}`);
+                }
+            }
+        }
+    }
 
     const byDebug = new Map<string, (typeof configs)[number]>();
     for (const c of configs) {
@@ -295,13 +411,14 @@ function main(): void {
     let stairsCases = 0;
     let stairsSkipped = 0;
     for (const s of parseSwitchStairs(stairsText)) {
+        const extraTicks = movementExtraTicks(prices, s.debugname, s.op);
         const def = byDebug.get(s.debugname);
         const action = def?.op?.[s.op - 1];
         if (!def || !action) {
             stairsSkipped++;
             continue;
         }
-        edges.push(edge(s.from, s.to, def.name ?? s.debugname, action));
+        edges.push(edge(s.from, s.to, def.name ?? s.debugname, action, extraTicks));
         stairsCases++;
     }
 
@@ -311,7 +428,7 @@ function main(): void {
         const baseZ = mz << 6;
         const lands = parseLands(new Reader(land));
         forEachLoc(new Reader(loc), inst => {
-            if (!LADDER_LOC_IDS.has(inst.locId)) {
+            if (revision !== 289 || !LADDER_LOC_IDS.has(inst.locId)) {
                 return;
             }
             const def = configs[inst.locId];
@@ -343,11 +460,9 @@ function main(): void {
         packBytes = gunzipSync(packBytes);
     }
     const finder = new PathFinder(packBytes);
-    const dataDir = path.join('src', 'bot', 'event', 'webwalk', 'data');
-    const curatedTransports = JSON.parse(fs.readFileSync(path.join(dataDir, 'transports.json'), 'utf8')) as TransportEdgeData[];
+    const curatedTransports = JSON.parse(fs.readFileSync(path.join(dataDir, 'transports.json'), 'utf8')) as PricedTransportEdgeData[];
     const rawCount = edges.length;
-    const { edges: finalEdges, dropped, supersededDropped } = snapAndReverse(finder, curatedTransports, edges);
-
+    const { edges: finalEdges, dropped, supersededDropped } = snapAndReverse(finder, curatedTransports, edges, revision);
     finalEdges.sort((a, b) => a.from.level - b.from.level || a.from.x - b.from.x || a.from.z - b.from.z || a.to.level - b.to.level || a.to.x - b.to.x || a.to.z - b.to.z);
 
     const json = '[\n' + finalEdges.map(e => '    ' + JSON.stringify(e)).join(',\n') + '\n]\n';
@@ -367,24 +482,26 @@ function main(): void {
         console.log(`wrote ${out}: ${stats}`);
     }
 
-    const cheb = (p: NavPoint, x: number, z: number): number => Math.max(Math.abs(p.x - x), Math.abs(p.z - z));
-    const expect: { name: string; fl: number; tl: number; x: number; z: number }[] = [
-        { name: 'Lumbridge Castle South (stairs.rs2)', fl: 0, tl: 1, x: 3205, z: 3209 },
-        { name: 'Varrock East bank (stairs.rs2)', fl: 0, tl: 1, x: 3255, z: 3420 },
-        { name: 'Lumbridge tower ladder (1747)', fl: 0, tl: 1, x: 3229, z: 3213 },
-        { name: 'Catherby ladder (1747)', fl: 0, tl: 1, x: 2807, z: 3454 }
-    ];
-    let failures = 0;
-    for (const e of expect) {
-        const hit = finalEdges.some(x => x.from.level === e.fl && x.to.level === e.tl && cheb(x.from, e.x, e.z) <= 3 && cheb(x.to, e.x, e.z) <= 3 && finder.walkable(x.from.x, x.from.z, x.from.level) && finder.walkable(x.to.x, x.to.z, x.to.level));
-        console.log(`${hit ? 'PASS' : 'FAIL'} ${e.name} — walkable ${e.fl}->${e.tl} edge near ${e.x},${e.z}`);
-        if (!hit) {
-            failures++;
+    if (revision === 289) {
+        const cheb = (p: NavPoint, x: number, z: number): number => Math.max(Math.abs(p.x - x), Math.abs(p.z - z));
+        const expect: { name: string; fl: number; tl: number; x: number; z: number }[] = [
+            { name: 'Lumbridge Castle South (stairs.rs2)', fl: 0, tl: 1, x: 3205, z: 3209 },
+            { name: 'Varrock East bank (stairs.rs2)', fl: 0, tl: 1, x: 3255, z: 3420 },
+            { name: 'Lumbridge tower ladder (1747)', fl: 0, tl: 1, x: 3229, z: 3213 },
+            { name: 'Catherby ladder (1747)', fl: 0, tl: 1, x: 2807, z: 3454 }
+        ];
+        let failures = 0;
+        for (const e of expect) {
+            const hit = finalEdges.some(x => x.from.level === e.fl && x.to.level === e.tl && cheb(x.from, e.x, e.z) <= 3 && cheb(x.to, e.x, e.z) <= 3 && finder.walkable(x.from.x, x.from.z, x.from.level) && finder.walkable(x.to.x, x.to.z, x.to.level));
+            console.log(`${hit ? 'PASS' : 'FAIL'} ${e.name} — walkable ${e.fl}->${e.tl} edge near ${e.x},${e.z}`);
+            if (!hit) {
+                failures++;
+            }
         }
-    }
-    if (failures > 0) {
-        process.exitCode = 1;
+        if (failures > 0) {
+            process.exitCode = 1;
+        }
     }
 }
 
-main();
+if (import.meta.main) main();

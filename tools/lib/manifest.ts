@@ -18,11 +18,13 @@ export const ARTIFACT_KINDS: readonly ArtifactKind[] = ['generated', 'edition', 
 export const QUALIFICATIONS: readonly Qualification[] = ['pending', 'offline', 'qualified'];
 
 export interface ManifestArtifact {
-    /** Repo-relative path; staged artifacts carry the `data/377/` prefix until the cutover. */
+    /** Repo-relative final path; staged kinds carry a `data/377/` path until the cutover. */
     path: string;
     sha256: string;
     kind: ArtifactKind;
     qualification: Qualification;
+    /** For an `out` artifact staged before cutover, its temporary source path under `data/377/`. */
+    stagedPath?: string;
 }
 
 export interface Manifest {
@@ -53,7 +55,7 @@ const ENGINE_KEYS = ['commit', 'archives'];
 const ARCHIVE_KEYS = ['config', 'interface'];
 const CONTENT_KEYS = ['commit'];
 const TOOLCHAIN_KEYS = ['node', 'bun'];
-const ARTIFACT_KEYS = ['path', 'sha256', 'kind', 'qualification'];
+const ARTIFACT_KEYS = ['path', 'sha256', 'kind', 'qualification', 'stagedPath'];
 
 function fail(where: string, message: string): never {
     throw new ManifestError(`${MANIFEST_PATH}: ${where}: ${message}`);
@@ -108,7 +110,7 @@ function parseArtifact(value: unknown, index: number, cutover: boolean, seen: Se
     const where = `artifacts[${index}]`;
     const entry = asObject(value, where);
     onlyKeys(entry, ARTIFACT_KEYS, where);
-    requireKeys(entry, ARTIFACT_KEYS, where);
+    requireKeys(entry, ['path', 'sha256', 'kind', 'qualification'], where);
 
     const path = checkRepoPath(entry.path, `${where}.path`);
     if (seen.has(path)) fail(where, `duplicate artifact path '${path}'`);
@@ -131,11 +133,24 @@ function parseArtifact(value: unknown, index: number, cutover: boolean, seen: Se
     }
     if (cutover && staged) fail(`${where}.path`, `'${path}' still points into ${STAGING_ROOT}/ after the cutover`);
 
+    let stagedPath: string | undefined;
+    if (entry.stagedPath !== undefined) {
+        stagedPath = checkRepoPath(entry.stagedPath, `${where}.stagedPath`);
+        if (kind !== 'out') fail(`${where}.stagedPath`, 'is only valid for an out artifact');
+        if (cutover) fail(`${where}.stagedPath`, `still points into ${STAGING_ROOT}/ after the cutover`);
+        if (!path.startsWith('out/') || !stagedPath.startsWith(`${STAGING_ROOT}/out/`)) {
+            fail(`${where}.stagedPath`, 'must stage an out artifact under data/377/out/ while keeping its final out/ path');
+        }
+        if (seen.has(stagedPath)) fail(where, `duplicate staged artifact path '${stagedPath}'`);
+        seen.add(stagedPath);
+    }
+
     return {
         path,
         sha256,
         kind: kind as ArtifactKind,
-        qualification: qualification as Qualification
+        qualification: qualification as Qualification,
+        ...(stagedPath === undefined ? {} : { stagedPath })
     };
 }
 
@@ -234,9 +249,9 @@ export function engineArchiveProblems(root: string, engineDir: string): string[]
     return problems;
 }
 
-/** Why: out artifacts (`out/`) are untracked by design, so a hosted runner never has the file;
- *  a listed `out` row whose file is absent is a printed skip, not a failure, and its hash is
- *  still verified whenever the file exists. Every other kind must exist wherever it is checked.
+/** Why: out artifacts (`out/`) are untracked by design, so a hosted runner never has the file.
+ *  An out artifact with `stagedPath` is the exception: verify its staged source until cutover,
+ *  even when a different revision's live `out/` file is present.
  */
 export interface VerifyReport {
     problems: string[];
@@ -265,10 +280,14 @@ export function verifyManifestReport(root = process.cwd()): VerifyReport {
     }
 
     for (const artifact of manifest.artifacts) {
-        const abs = join(root, artifact.path);
+        const checkedPath = artifact.stagedPath ?? artifact.path;
+        const abs = join(root, checkedPath);
         if (!existsSync(abs)) {
             if (artifact.kind === 'out') {
-                skipped.push(`SKIP: ${artifact.path}: out artifact is not tracked; hash verified only when the file is present`);
+                const where = artifact.stagedPath === undefined ? '' : ` (staged at ${artifact.stagedPath})`;
+                skipped.push(`SKIP: ${artifact.path}: out artifact is not tracked${where}; hash verified only when the file is present`);
+            } else if (artifact.stagedPath !== undefined) {
+                problems.push(`artifact '${artifact.path}' staged at '${artifact.stagedPath}' is missing`);
             } else {
                 problems.push(`artifact '${artifact.path}' is listed but missing`);
             }
@@ -282,7 +301,7 @@ export function verifyManifestReport(root = process.cwd()): VerifyReport {
 
     const stagingExists = existsSync(join(root, STAGING_ROOT));
     if (manifest.cutover && stagingExists) problems.push(`${STAGING_ROOT}/ still exists after the cutover`);
-    if (!manifest.cutover && !stagingExists && manifest.artifacts.some(a => a.kind !== 'out' && a.kind !== 'recording')) {
+    if (!manifest.cutover && !stagingExists && manifest.artifacts.some(a => a.stagedPath !== undefined || (a.kind !== 'out' && a.kind !== 'recording'))) {
         problems.push(`${STAGING_ROOT}/ is missing while staged artifacts are listed`);
     }
 

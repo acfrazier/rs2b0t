@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Iterable
 
 
+
 def load_enrichment_module():
     path = Path(__file__).with_name("enrich-transports.py")
     spec = importlib.util.spec_from_file_location("transport_enrichment", path)
@@ -439,7 +440,7 @@ APPROACH_OVERRIDES: dict[tuple[int, int, int], tuple[int, int]] = {
 }
 
 
-def make_edge(config, placement: EffectivePlacement, action: str, source: Target, target: Target, disabled_reason: str | None) -> dict:
+def make_edge(config, placement: EffectivePlacement, action: str, source: Target, target: Target, disabled_reason: str | None, extra_ticks: int | None = None) -> dict:
     override = APPROACH_OVERRIDES.get((placement.x, placement.z, source.level))
     if override is not None:
         source = Target(override[0], override[1], source.level)
@@ -456,6 +457,8 @@ def make_edge(config, placement: EffectivePlacement, action: str, source: Target
         "debugName": config.debug_name,
         "options": enrichment.option_values(config) or [action],
     }
+    if extra_ticks is not None:
+        edge["extraTicks"] = extra_ticks
     if disabled_reason:
         edge["disabledReason"] = disabled_reason
     return edge
@@ -540,6 +543,8 @@ def main() -> None:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
+    revision = enrichment.selected_revision()
+    prices = enrichment.load_stair_prices() if revision == 377 else None
     configs = enrichment.load_loc_configs(args.content)
     placements = load_effective_placements(args.engine)
     handlers, _ = load_handlers(args.content)
@@ -576,8 +581,9 @@ def main() -> None:
                     raw_targets = [normal if collision.walkable(normal.x, normal.z, normal.level) else fallback]
                     disabled_reason = None
                 disabled_reason = disabled_reason or source_reason
+                price = enrichment.extra_ticks(prices, config.debug_name, op) if body else None
                 if not raw_targets:
-                    generated.append(make_edge(config, placement, action, source, source, disabled_reason))
+                    generated.append(make_edge(config, placement, action, source, source, disabled_reason, price))
                     continue
                 for raw_target in raw_targets:
                     target = snap(collision, raw_target)
@@ -586,8 +592,7 @@ def main() -> None:
                         unsnappable += 1
                         target = raw_target
                         reason = reason or "The scripted destination has no walkable tile within two squares in this collision pack."
-                    generated.append(make_edge(config, placement, action, source, target, reason))
-
+                    generated.append(make_edge(config, placement, action, source, target, reason, price))
     data_dir = args.rs2b0t / "src" / "bot" / "event" / "webwalk" / "data"
     transport_path = data_dir / "transports.json"
     stair_path = data_dir / "stairEdges.json"

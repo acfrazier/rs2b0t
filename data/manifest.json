@@ -22,8 +22,8 @@
     "tools/combat/gen-dropdb.ts": "c168de0e955f30b3468fb9d7218e66dadf4df549cebd29d8cf4625f70cb9023c",
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
-    "tools/gen-377-data.sh": "1489dd214367ae88f573e2e65f12b6e2934d030024675e0e0cde21dabe3ea30a",
-    "tools/gen-377-manifest.ts": "ff0d387c3e974754e312e3d88ba976704ccb1d38c8c5e645c00083d48ff51532",
+    "tools/gen-377-data.sh": "352049538f400d0ea2c5aeae92d73271a8cf45af2b5a15aca930d4975ce3d834",
+    "tools/gen-377-manifest.ts": "b8b97f313cec9bab691f6ba3507539c6c90fefcbcce8a52c1b7193684ca05552",
     "tools/gen-ifids.ts": "af570c66ec2ff2411737d6dd649619ee1cd80fb7700d148c3b6f2683357cc187",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
     "tools/items/gen-namecollisions.ts": "fe0ceeaff2d68927f5c8de18848c83acecb0376d27a36127a9b3330beb424dcd",
@@ -33,6 +33,12 @@
     "tools/lib/genout.ts": "e2de3ebfced6186aea69d04e57e7924f353d8000676552b926d59c9b1f1f4836",
     "tools/map/build-basemap.ts": "f90956e475ef0a71da30629225dc3c5b40b7e2c1a07c55309fc6de1165ee14dc",
     "tools/map/encodePng.ts": "ebf62672a4035f6b0a7cfe451cb3d856dfe82201cc3b830c4eec9f4b6159f961",
+    "tools/nav/build-collision.ts": "84af9f74ac800e16cf29f9665576069346cedac043056e04d00a9cca09210bcb",
+    "tools/nav/derive-doors.ts": "0d1e622f047c9932976adc18e282fb618eff054666c0ea85f565cd5b19882d0f",
+    "tools/nav/derive-ladders.py": "68c118763ec08bb66e12c65e2655e29c9b6f2330c86b3320a858609589b6e407",
+    "tools/nav/derive-stairs.ts": "eb83f5ab589f7293d3cf0fbf984a413486fa64e9b4ea05aaa62663a7284693c4",
+    "tools/nav/derive-transports.sh": "a9b62ed612cc4b464bbe87c456e10e8f115966941237e791dfe268a781674b7d",
+    "tools/nav/enrich-transports.py": "37a753bc64a4636f021ad9bc4640f145d91598fa164ed119e0521554dd76472f",
     "tools/nav/lib.ts": "93f5d22f03c65f8be03e95319085a16b0da62acdaa9753af81c777cb9c476a22",
     "tools/nav/stairsParse.ts": "9369171ffbee7ec995d8da4444a0f11da8ed145ad4154a694dd47668b9eeec06",
     "tools/patches/worldmap-377.patch": "0ac9dbe029993299bf4a2579944b24ff57f68611d4b54906990f329229ccf223",
@@ -99,6 +105,43 @@
       "sha256": "f8e5faa0364a126f3704ecaee7f9c3637da8bb67ed2b57689667495227bd0781",
       "kind": "generated",
       "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/data/doors.json",
+      "sha256": "6d5fe992c5c829a2f1ce2fd8fa8fb1e0cb2fa8d3762233df16f9445fe850c6f5",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/data/stairEdges.json",
+      "sha256": "4c1ff89e8c13be38db1ebcd2787039d9b1107bcbdda4dad60edba36088656745",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/data/transports.json",
+      "sha256": "4578579f0332094ecb4e23b6c4a082ac7604ba8f937bbf465be3097648698508",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/tools/nav/door-categories.json",
+      "sha256": "e847368c1a27ce1c87dd3fdd5545cdd743b8b5e7233d8cdfa1001f7f782da720",
+      "kind": "nav-input",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/tools/nav/stair-prices.json",
+      "sha256": "21a0f9810e1517b6058e5f28b72ede1d06b87667ed0a47552d3f45757b8a91ba",
+      "kind": "nav-input",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/collision.lcnav.gz",
+      "sha256": "ed64309ee43a7eb117f101cd542ceedb2bbf5db7dbaad18cab7415ce0baf5a99",
+      "kind": "out",
+      "qualification": "pending",
+      "stagedPath": "data/377/out/collision.lcnav.gz"
     },
     {
       "path": "out/worldmap-basemap.e6315f93c51abd46.png",

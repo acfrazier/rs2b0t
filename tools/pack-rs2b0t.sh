@@ -42,7 +42,7 @@ if grep -lE "tap-377|jpeg-js" out/*.js >/dev/null 2>&1; then
 fi
 
 # the nav worker needs the baked collision pack; build it once if absent
-[ -f out/collision.lcnav.gz ] || bun tools/nav/build-collision.ts --engine "$ENGINE"
+[ -f out/collision.lcnav.gz ] || bun tools/nav/build-collision.ts --engine "$ENGINE" --out out/collision.lcnav
 # classic basemap for the map picker; copied below only when the bake produced one
 [ -f out/worldmap-basemap.manifest.json ] || bun tools/map/build-basemap.ts --engine "$ENGINE"
 

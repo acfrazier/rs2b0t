@@ -61,18 +61,6 @@
             "reason": "synthetic-credential-fixture"
         },
         {
-            "path": "tools/nav/build-collision.ts",
-            "needle": "/Users/",
-            "match": "    let engine = '/Users/elliotninjaone/code/lostcity-dev/engine';",
-            "reason": "upstream-home-path"
-        },
-        {
-            "path": "tools/nav/derive-doors.ts",
-            "needle": "/Users/",
-            "match": "    let engine = '/Users/elliotninjaone/code/lostcity-dev/engine';",
-            "reason": "upstream-home-path"
-        },
-        {
             "path": "tools/nav/probe-locs.ts",
             "needle": "/Users/",
             "match": "let engine = '/Users/elliotninjaone/code/lostcity-dev/engine';",

@@ -1,33 +1,33 @@
-/** Update `data/manifest.json` for a staged 377 data build (P4a): the engine and content commits
- *  the data came from, the engine's `data/pack/client/{config,interface}` archive hashes, the
- *  toolchain that built them, every generator script's hash, and one artifact row per staged
- *  generated module and per `out/` basemap file.
+/** Update `data/manifest.json` for staged 377 data builds: engine and content provenance, toolchain,
+ *  generator script hashes, and artifact hashes.
  *  Why: the manifest is the only record tying an artifact to its generator, engine and content
  *  commit (pitfall 10/11); `tools/lib/manifest.ts verify` enforces it everywhere.
  *
  *  Merge semantics: scalar fields and the listed rows are replaced; artifact rows this run does
- *  not name (another slice's, e.g. P4b's nav rows) are preserved untouched. Artifacts are sorted
- *  by path so the written bytes are deterministic across runs.
+ *  not name (another slice's) are preserved untouched. Staged `out` rows use their final `out/`
+ *  path and a `stagedPath` source under `data/377/`. Artifacts are sorted by path.
  *
  *  Usage:
  *    bun tools/gen-377-manifest.ts --revision 377 \
  *      --engine-dir <dir> --engine-commit <sha40> --content-commit <sha40> \
  *      --node <version> --bun <version> \
- *      [--generator <repo path>]… [--artifact <repo path>=<kind>[:<qualification>]]…
- *      [--out-dir <dir>]   where `out/`-kind files are hashed from (default: repo `out/`)
+ *      [--generator <repo path>]… [--artifact <repo path>=<kind>[:<qualification>]]… \
+ *      [--out-dir <dir>] [--seed-manifest <previous generated manifest>]
  *
- *  Kinds: generated | edition | nav-input | recording | out (staged kinds must sit under data/377/
- *  before the cutover; `out` rows are hash-checked when the file exists and printed as skips when
- *  it does not). Qualification defaults to `pending`.
+ *  A staged artifact is named by its `data/377/<repo path>` source; an `out` artifact there is
+ *  recorded at its post-cutover `out/` path. `--seed-manifest` supplies the previous generated
+ *  manifest only when the current file cannot be parsed (for merge-conflict regeneration).
  */
-import { existsSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 
 import {
     ARTIFACT_KINDS,
     QUALIFICATIONS,
+    parseManifest,
     readManifest,
     sha256File,
+    STAGING_ROOT,
     writeManifest,
     type ArtifactKind,
     type Manifest,
@@ -45,6 +45,7 @@ interface Args {
     generators: string[];
     artifacts: { path: string; kind: ArtifactKind; qualification: Qualification }[];
     outDir: string;
+    seedManifest: string | null;
 }
 
 function parseArgs(): Args {
@@ -58,7 +59,8 @@ function parseArgs(): Args {
         bun: null,
         generators: [],
         artifacts: [],
-        outDir: 'out'
+        outDir: 'out',
+        seedManifest: null
     };
     const need = (i: number, flag: string): string => {
         const value = argv[i];
@@ -115,6 +117,9 @@ function parseArgs(): Args {
             case '--out-dir':
                 args.outDir = need(++i, flag);
                 break;
+            case '--seed-manifest':
+                args.seedManifest = need(++i, flag);
+                break;
             default:
                 console.error(`unknown arg: ${flag}`);
                 process.exit(2);
@@ -127,13 +132,21 @@ function parseArgs(): Args {
     return args;
 }
 
-/** Hash one artifact source and record it under its repo-relative path. */
+/** Hash one artifact source and record it under its final repo-relative path. */
 function artifactRow(spec: { path: string; kind: ArtifactKind; qualification: Qualification }, sourceRoot: string): ManifestArtifact {
     const abs = join(sourceRoot, spec.path);
     if (!existsSync(abs) || !statSync(abs).isFile()) {
         throw new Error(`artifact source missing: ${spec.path} (under ${sourceRoot})`);
     }
-    return { path: spec.path, sha256: sha256File(abs), kind: spec.kind, qualification: spec.qualification };
+    const stagedOut = spec.kind === 'out' && spec.path.startsWith(`${STAGING_ROOT}/out/`);
+    const path = stagedOut ? relative(STAGING_ROOT, spec.path).split('\\').join('/') : spec.path;
+    return {
+        path,
+        sha256: sha256File(abs),
+        kind: spec.kind,
+        qualification: spec.qualification,
+        ...(stagedOut ? { stagedPath: spec.path } : {})
+    };
 }
 
 function main(): void {
@@ -142,16 +155,20 @@ function main(): void {
     try {
         manifest = readManifest();
     } catch {
-        manifest = {
-            schemaVersion: 1,
-            revision: args.revision,
-            cutover: false,
-            engine: { commit: null, archives: { config: null, interface: null } },
-            content: { commit: null },
-            toolchain: { node: null, bun: null },
-            generators: {},
-            artifacts: []
-        };
+        if (args.seedManifest !== null) {
+            manifest = parseManifest(JSON.parse(readFileSync(args.seedManifest, 'utf8')));
+        } else {
+            manifest = {
+                schemaVersion: 1,
+                revision: args.revision,
+                cutover: false,
+                engine: { commit: null, archives: { config: null, interface: null } },
+                content: { commit: null },
+                toolchain: { node: null, bun: null },
+                generators: {},
+                artifacts: []
+            };
+        }
     }
 
     manifest.revision = args.revision;
@@ -186,9 +203,9 @@ function main(): void {
 
     // Rows named this run are replaced; rows for other slices' artifacts survive. This tool owns
     // every `out/worldmap-*` row, so one whose file this bake did not produce is stale.
-    const named = new Set([...args.artifacts.map(a => a.path), ...outRows.map(a => a.path)]);
-    const kept = manifest.artifacts.filter(a => !named.has(a.path) && !a.path.startsWith('out/worldmap-'));
     const fresh = args.artifacts.map(spec => artifactRow(spec, process.cwd()));
+    const named = new Set([...fresh.map(a => a.path), ...outRows.map(a => a.path)]);
+    const kept = manifest.artifacts.filter(a => !named.has(a.path) && !a.path.startsWith('out/worldmap-'));
     manifest.artifacts = [...kept, ...fresh, ...outRows].sort((a, b) => a.path.localeCompare(b.path));
 
     writeManifest(process.cwd(), manifest);

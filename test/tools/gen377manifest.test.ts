@@ -12,6 +12,7 @@ import { readManifest, sha256File, writeManifest } from '../../tools/lib/manifes
 import type { Manifest } from '../../tools/lib/manifest.js';
 
 const SCRIPT = join(import.meta.dir, '..', '..', 'tools', 'gen-377-manifest.ts');
+const HASH_A = 'a'.repeat(64);
 
 const TEMP: string[] = [];
 function tempDir(): string {
@@ -100,6 +101,26 @@ describe('gen-377-manifest', () => {
             { path: 'out/worldmap-basemap.abc.png', sha256: rerunHash, kind: 'out', qualification: 'pending' }
         ]);
     });
+    test('records a staged out artifact at its final path and hashes the staged source', () => {
+        const root = tempDir();
+        seed(root, emptyManifest());
+        const stagedPath = 'data/377/out/collision.lcnav.gz';
+        const stagedHash = put(root, stagedPath, '377 collision pack\n');
+        put(root, 'out/collision.lcnav.gz', '289 collision pack\n');
+
+        const result = run(root, ['--revision', '377', '--artifact', `${stagedPath}=out`]);
+        expect(result.code).toBe(0);
+        expect(readManifest(root).artifacts).toEqual([
+            {
+                path: 'out/collision.lcnav.gz',
+                sha256: stagedHash,
+                kind: 'out',
+                qualification: 'pending',
+                stagedPath
+            }
+        ]);
+    });
+
 
     test('rows for another slice survive a run that does not name them', () => {
         const root = tempDir();
@@ -135,6 +156,25 @@ describe('gen-377-manifest', () => {
         });
         expect(artifacts.find(a => a.path.endsWith('itemdb.ts'))?.sha256).toBe(freshHash);
     });
+    test('uses a generated seed manifest to resolve an invalid merge result', () => {
+        const root = tempDir();
+        const seedRoot = tempDir();
+        const carriedArtifact = {
+            path: 'data/377/src/bot/data/p4a.ts',
+            sha256: HASH_A,
+            kind: 'generated' as const,
+            qualification: 'pending' as const
+        };
+        seed(seedRoot, { ...emptyManifest(), artifacts: [carriedArtifact] });
+        mkdirSync(join(root, 'data'), { recursive: true });
+        writeFileSync(join(root, 'data/manifest.json'), '<<<<<<< HEAD\n');
+        mkdirSync(join(root, 'out'), { recursive: true });
+
+        const result = run(root, ['--revision', '377', '--seed-manifest', join(seedRoot, 'data/manifest.json')]);
+        expect(result.code).toBe(0);
+        expect(readManifest(root).artifacts).toEqual([carriedArtifact]);
+    });
+
 
     test('a missing artifact source fails the run', () => {
         const root = tempDir();

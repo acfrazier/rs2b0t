@@ -15,7 +15,7 @@ bun run build:bot
 
 # the nav worker needs the baked collision pack; build it once if absent
 if [ ! -f out/collision.lcnav.gz ]; then
-    bun tools/nav/build-collision.ts --engine "$ENGINE"
+    bun tools/nav/build-collision.ts --engine "$ENGINE" --out out/collision.lcnav
 fi
 
 # classic worldmap basemap + Key overlays (schema >= 2: terrain + key/multi/free)
