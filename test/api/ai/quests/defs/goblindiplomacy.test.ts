@@ -15,8 +15,10 @@ const npcOf = (s: ReturnType<typeof decide>): string => (s.kind === 'talk' ? s.s
 const useProduct = (s: ReturnType<typeof decide>): string => (s.kind === 'useOn' ? (s.product ?? '') : `<${s.kind}>`);
 const customName = (s: ReturnType<typeof goblinMailGatherStep>): string => (s.kind === 'custom' ? s.name : `<${s.kind}>`);
 
+const realFood = QuestFood.name;
+
 afterEach(() => {
-    QuestFood.name = null;
+    QuestFood.name = realFood;
 });
 
 describe('goblindiplomacy decide', () => {

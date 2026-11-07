@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import {
     ALL_BALL_IDS,
     DEATH_ITEM,
@@ -427,23 +427,30 @@ describe('decide', () => {
 describe('the dice interface never outlives a gamble round', () => {
     // Why: `death_dice` is on the engine's do-not-auto-close list, so a round that bailed with it up left a main modal nothing would shut and the run sat in Harold's room.
     // Why: `delayUntil` polls a game clock that never ticks in a unit test, so it answers the predicate directly.
-    (Execution as unknown as { delayUntil: (c: () => boolean) => Promise<boolean> }).delayUntil =
-        async (check: () => boolean) => check();
+    beforeEach(() => {
+        spyOn(Execution, 'delayUntil').mockImplementation(async (check: () => boolean) => check());
+    });
+
+    afterEach(() => {
+        mock.restore();
+    });
 
     const stubClient = (mainSeq: number[]) => {
         let call = 0;
-        (reader as unknown as { modals: () => { main: number } }).modals = () => ({
-            main: mainSeq[Math.min(call++, mainSeq.length - 1)]
-        });
+        spyOn(reader, 'modals').mockImplementation(() => ({
+            main: mainSeq[Math.min(call++, mainSeq.length - 1)],
+            side: -1,
+            chat: -1
+        }));
     };
 
     test('an open dice interface is closed', async () => {
         stubClient([DEATH_DICE_MAIN, DEATH_DICE_MAIN, -1]);
         let closed = false;
-        (actions as unknown as { closeModal: () => boolean }).closeModal = () => {
+        spyOn(actions, 'closeModal').mockImplementation(() => {
             closed = true;
             return true;
-        };
+        });
         await closeDiceIfOpen(() => {});
         expect(closed).toBe(true);
     });
@@ -451,10 +458,10 @@ describe('the dice interface never outlives a gamble round', () => {
     test('a closed interface is left alone', async () => {
         stubClient([-1]);
         let touched = false;
-        (actions as unknown as { closeModal: () => boolean }).closeModal = () => {
+        spyOn(actions, 'closeModal').mockImplementation(() => {
             touched = true;
             return true;
-        };
+        });
         await closeDiceIfOpen(() => {});
         expect(touched).toBe(false);
     });
@@ -462,10 +469,10 @@ describe('the dice interface never outlives a gamble round', () => {
     test('another quest modal is not closed by this', async () => {
         stubClient([8119]);
         let touched = false;
-        (actions as unknown as { closeModal: () => boolean }).closeModal = () => {
+        spyOn(actions, 'closeModal').mockImplementation(() => {
             touched = true;
             return true;
-        };
+        });
         await closeDiceIfOpen(() => {});
         expect(touched).toBe(false);
     });

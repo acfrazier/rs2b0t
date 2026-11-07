@@ -15,6 +15,7 @@ import { Input } from '#/bot/input/Input.js';
 const originals = {
     bankIsOpen: Bank.isOpen,
     bankOpenNearest: Bank.openNearest,
+    bankOpenBooth: Bank.openBooth,
     bankOpenNearestAccess: Bank.openNearestAccess,
     bankDepositAllMatching: Bank.depositAllMatching,
     delayTicks: Execution.delayTicks,
@@ -32,6 +33,7 @@ afterEach(() => {
     (Bank as any).isOpen = originals.bankIsOpen;
     (Bank as any).openNearest = originals.bankOpenNearest;
     (Bank as any).openNearestAccess = originals.bankOpenNearestAccess;
+    (Bank as any).openBooth = originals.bankOpenBooth;
     (Bank as any).depositAllMatching = originals.bankDepositAllMatching;
     (Execution as any).delayTicks = originals.delayTicks;
     (Execution as any).delayUntil = originals.delayUntil;

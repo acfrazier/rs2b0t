@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from 'bun:test';
+import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { Paint } from '#/bot/paint/Paint.js';
 import { cycleOption, paintState } from '#/bot/paint/paintLogic.js';
 import { WALK_OPTIONS } from '#/bot/api/map/WalkDestinations.js';
@@ -25,6 +25,11 @@ beforeEach(() => {
         regions = r.map(x => ({ id: x.id, x: x.x, y: x.y, w: x.w, h: x.h }));
         publish(r);
     };
+});
+
+afterEach(() => {
+    // The override is an own property shadowing the PaintState method; deleting it uncovers the method again.
+    Reflect.deleteProperty(paintState, 'publishRegions');
 });
 
 test('cycleOption steps forward and wraps', () => {

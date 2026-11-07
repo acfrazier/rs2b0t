@@ -1,4 +1,4 @@
-import { afterEach, expect, mock, test } from 'bun:test';
+import { afterAll, afterEach, expect, mock, test } from 'bun:test';
 import IfType from '#/client/config/IfType.js';
 import JString from '#/client/datastruct/JString.js';
 import Packet from '#/client/io/Packet.js';
@@ -8,8 +8,11 @@ import ObjType from '#/client/config/ObjType.js';
 import VarpType from '#/client/config/VarpType.js';
 import WordPack from '#/client/wordfilter/WordPack.js';
 import { getClient377State } from '#/client/shell/Client377State.js';
+import * as webDns from '#/client/util/WebDns.js';
 
 const dnsLookupRequests: string[] = [];
+// Copied before the mock replaces the module's exports, so afterAll can put the original lookup back for later files.
+const originalWebDns = { ...webDns };
 // Mock before loading Client: WebDns is captured when the module evaluates.
 mock.module('#/client/util/WebDns.js', () => ({
     reverseDnsLookup: async (ip: string): Promise<(string | null)[]> => {
@@ -17,6 +20,9 @@ mock.module('#/client/util/WebDns.js', () => ({
         return [];
     }
 }));
+afterAll(() => {
+    mock.module('#/client/util/WebDns.js', () => originalWebDns);
+});
 const { Client } = await import('#/client/shell/Client.js');
 type ClientInstance = InstanceType<typeof Client>;
 
