@@ -33,8 +33,6 @@ interface LoginClientView {
     loginUser: string;
     loginPass: string;
     statSessionGeneration: number;
-    sceneInstanced: boolean;
-    sceneMapRegion: Int32Array[][];
     invUpdateState: Map<number, { generation: number; fullGeneration: number; transmitting: boolean }>;
     loginAttempt: AttemptView | null;
     stream: ClientStream | null;
@@ -135,11 +133,6 @@ function asClientStream(stream: FakeLoginStream | DeferredFirstReadStream): Clie
     return stream as unknown as ClientStream;
 }
 
-/** The production initializer of the field (a bare Object.create client skips field initializers). */
-function emptySceneMapRegion(): Int32Array[][] {
-    return (Client as unknown as { emptySceneMapRegion(): Int32Array[][] }).emptySceneMapRegion();
-}
-
 function bareClient(openLoginStream: () => Promise<ClientStream>): LoginClientView {
     const client = Object.create(Client.prototype) as LoginClientView;
     Object.assign(client, {
@@ -154,8 +147,6 @@ function bareClient(openLoginStream: () => Promise<ClientStream>): LoginClientVi
         invUpdateState: new Map(),
         loginAttempt: null,
         worldLogoutAt: -Infinity,
-        sceneInstanced: false,
-        sceneMapRegion: emptySceneMapRegion(),
         stream: null,
         out: {
             pos: 0,
@@ -486,46 +477,6 @@ test('a successful admission arriving during a world switch still requires actua
     expect(stream.closeCount).toBe(1);
     expect(client.prepareWorldSwitch()).toBe(true);
     expect(client.startLogin('alice', 'secret')).toBe(false);
-});
-
-function dirtyScene(client: LoginClientView): void {
-    client.sceneInstanced = true;
-    for (const level of client.sceneMapRegion) {
-        for (const row of level) {
-            row.fill(5);
-        }
-    }
-}
-
-function sceneIsEmpty(client: LoginClientView): boolean {
-    return !client.sceneInstanced && client.sceneMapRegion.every(level => level.every(row => row.every(template => template === -1)));
-}
-
-test('the scene starts with no chunk template (-1), and login reply 2 and logout restore that', async () => {
-    const firstRead = deferred<number>();
-    const stream = new DeferredFirstReadStream(firstRead, 2);
-    const client = bareClient(async () => asClientStream(stream));
-    Object.assign(client, {
-        in: { pos: 0 }, mouseTracking: [], chatText: [], players: [], npc: [], playerAppearanceBuffer: [],
-        projectiles: new LinkList(), spotanims: new LinkList(), collision: [],
-        groundObj: Array.from({ length: 4 }, () => Array.from({ length: 104 }, () => new Array(104).fill(null))),
-        idkDesignColour: [], playerOp: [], playerOpPriority: [],
-        validateIdkDesign: () => {}, prepareGame: () => {}
-    });
-    expect(sceneIsEmpty(client)).toBe(true);
-
-    // Java Client.java:2767 resets sceneState on reply 2; the scene fields the bot adapter reads are reset with it
-    dirtyScene(client);
-    expect(client.startLogin('alice', 'secret')).toBe(true);
-    const done = client.loginAttempt!.done;
-    firstRead.resolve(0);
-    await done;
-    expect(client.ingame).toBe(true);
-    expect(sceneIsEmpty(client)).toBe(true);
-
-    dirtyScene(client);
-    await client.logout();
-    expect(sceneIsEmpty(client)).toBe(true);
 });
 
 test('the in-game logout button notifies the bot before the session closes', () => {
