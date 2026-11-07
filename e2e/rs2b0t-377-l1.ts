@@ -4,11 +4,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Browser, Page } from 'playwright-core';
-import { deployIsolatedClient, launchBrowser, type IsolatedClient } from './lib/harness.js';
+import { GlobalRegistrator } from '@happy-dom/global-registrator';
+import { cheatQuiet, deployIsolatedClient, launchBrowser, type IsolatedClient } from './lib/harness.js';
 import { action, cleanLogout, cycles, installObserver, login, observe, quiescent, readValue, walk, type Npc } from './tap-377/capture-page.js';
 import { startTap, type TapSession } from '../tools/tap-377/tap.js';
 import { loadEngineProtocol } from '../tools/tap-377/protocol.js';
 import { parseCacheBundle, parseRecording } from '../tools/tap-377/check-recording.js';
+import { MiniMenuAction } from '../src/client/shell/MiniMenuAction.js';
 
 // The isolated browser bundle owns these in-process objects; Playwright cannot retain their TypeScript types.
 interface L1Window {
@@ -21,6 +23,8 @@ interface L1Window {
             ingame: boolean;
             loginUser: string;
             loginPass: string;
+            loginMes1: string;
+            loginMes2: string;
             localPlayer: unknown;
             useMode: number;
             targetMode: number;
@@ -85,9 +89,13 @@ async function until(page: Page, predicate: () => Promise<boolean>, label: strin
     throw new Error(`L1 assertion timed out: ${label}`);
 }
 
+async function dialogueText(page: Page): Promise<string> {
+    return (await readValue<string[]>(page, 'chatModalTexts')).join(' ');
+}
+
 async function serverVar(page: Page, name: string): Promise<number> {
     const before = await readValue<{ text: string }[]>(page, 'chat', 100);
-    await action(page, 'cheat', `getvar ${name}`);
+    assert(await cheatQuiet(page, `getvar ${name}`, 0), 'L1 getvar command refused');
     let value: number | undefined;
     await until(
         page,
@@ -144,8 +152,13 @@ async function replay(): Promise<void> {
     const protocol = await loadEngineProtocol(required('engine'));
     // The runtime imports bun:test and DOM-dependent client modules. Only the preloaded replay subprocess may load it.
     const { replayRecording } = await import('../test/io/replay/runtime.js');
-    const report = await replayRecording(parseRecording(readFileSync(join(output, 'session.jsonl'), 'utf8')), parseCacheBundle(readFileSync(join(output, 'cache.json'), 'utf8')), protocol);
-    writeFileSync(join(output, 'replay.json'), JSON.stringify(report, null, 2) + '\n');
+    try {
+        const report = await replayRecording(parseRecording(readFileSync(join(output, 'session.jsonl'), 'utf8')), parseCacheBundle(readFileSync(join(output, 'cache.json'), 'utf8')), protocol);
+        writeFileSync(join(output, 'replay.json'), JSON.stringify(report, null, 2) + '\n');
+    } finally {
+        // The standalone runner owns the preloaded DOM, unlike a bun:test suite.
+        await GlobalRegistrator.unregister();
+    }
 }
 
 async function live(): Promise<void> {
@@ -153,10 +166,15 @@ async function live(): Promise<void> {
     mkdirSync(output, { recursive: true });
     const engine = required('engine'),
         content = required('content');
+    const designAccept = readFileSync(join(content, 'pack/interface.pack'), 'utf8').match(/^(\d+)=player_kit:accept$/m);
+    assert(designAccept, 'L1 fixture: missing player_kit:accept component');
     const account = `l1x${randomBytes(4).toString('hex')}`,
-        secret = randomBytes(12).toString('hex');
+        secret = randomBytes(8).toString('hex');
     const tag = account;
     const receipt: Record<string, unknown> = { status: 'FAIL', account, tag, clientCommit: revision(process.cwd()), contentCommit: revision(content), steps: [] };
+    receipt.cellSha256 = createHash('sha256')
+        .update(readFileSync(import.meta.path))
+        .digest('hex');
     const steps = receipt.steps as { label: string; state: unknown }[];
     let deployment: IsolatedClient | undefined, tap: TapSession | undefined;
     let browser: Browser | undefined;
@@ -195,7 +213,7 @@ async function live(): Promise<void> {
         await login(page, account, secret);
         await sceneReady(page);
         if ((await observe(page)).main !== -1) {
-            await action(page, 'designAccept');
+            await action(page, 'ifButton', Number(designAccept[1]));
             await until(page, async () => (await observe(page)).main === -1, 'appearance accepted');
         }
         const first = await checkpoint('login-scene');
@@ -208,13 +226,15 @@ async function live(): Promise<void> {
         assert.equal(await serverVar(page, 'tutorial'), 1);
         const guide = (await readValue<Npc[]>(page, 'npcs')).find(npc => npc.name === 'RuneScape Guide');
         assert(guide, 'L1 fixture: Guide absent');
-        await action(page, 'npcOp', guide.index, 1);
-        await until(page, () => readValue<boolean>(page, 'dialogOpen'), 'Guide dialogue');
-        steps.push({ label: 'guide-talk', state: await readValue<string>(page, 'chatBodyText') });
+        await action(page, 'menuAction', MiniMenuAction.OP_NPC1, guide.index, 0, 0);
+        await until(page, async () => (await observe(page)).chat !== -1, 'Guide dialogue');
+        steps.push({ label: 'guide-talk', state: await dialogueText(page) });
         let finishedGuide = false;
         for (let n = 0; n < 16; n++) {
-            const before = await readValue<string>(page, 'chatBodyText');
+            await until(page, async () => (await readValue<number>(page, 'chatContinueComId')) >= 0 || (await readValue<unknown[]>(page, 'chatOptions')).length > 0, 'Guide controls ready');
+            const before = await dialogueText(page);
             const choices = await readValue<{ text: string; comId: number }[]>(page, 'chatOptions');
+            steps.push({ label: 'guide-dialogue', state: { text: before, choices } });
             if (choices.length) {
                 const decline = choices.find(choice => choice.text === 'No, thank you.');
                 assert(decline, 'L1 oracle: unexpected Guide options');
@@ -224,14 +244,14 @@ async function live(): Promise<void> {
                 finishedGuide = true;
                 break;
             }
-            await until(page, async () => (await readValue<string>(page, 'chatBodyText')) !== before, 'Guide transition');
+            await until(page, async () => (await dialogueText(page)) !== before, 'Guide transition');
         }
         assert(finishedGuide, 'L1 Guide dialogue exceeded its transition bound');
         assert.equal(await serverVar(page, 'tutorial'), 4);
         assert.equal(await readValue<number>(page, 'varp', TUTORIAL_OVERLAY), 1);
         assert.equal(await serverVar(page, 'tutorial_progress_overlay'), 1);
         steps.push({ label: 'server-and-client-varp', state: { tutorial: 4, overlayId: TUTORIAL_OVERLAY, clientOverlay: 1, serverOverlay: 1 } });
-        await checkpoint('guide-varp-applied');
+        await checkpoint('tutorial-varp-applied');
         await page.screenshot({ path: join(output, 'scene.png') });
         await page.evaluate(() => {
             const g = globalThis as unknown as L1Window;
@@ -295,6 +315,18 @@ async function live(): Promise<void> {
         receipt.status = 'PASS';
     } catch (error) {
         receipt.stage = stage;
+        receipt.diagnostics = tap?.diagnostics;
+        const failedPage = browser?.contexts()[0]?.pages()[0];
+        if (failedPage) {
+            receipt.failureState = await observe(failedPage).catch(() => null);
+            receipt.loginBanner = await failedPage
+                .evaluate(() => {
+                    const g = globalThis as unknown as L1Window;
+                    const c = g.rs2b0t.client;
+                    return [c.loginMes1, c.loginMes2];
+                })
+                .catch(() => null);
+        }
         receipt.failure = error instanceof Error ? error.message.replaceAll(output, '<evidence>').replaceAll(engine, '<engine>').replaceAll(content, '<content>') : 'unknown failure';
         throw error;
     } finally {
@@ -307,5 +339,9 @@ async function live(): Promise<void> {
     console.log('L1 PASS');
 }
 
-if (values.replay) await replay();
-else await live();
+if (values.replay) {
+    await replay();
+    // Standalone Bun replay retains this VM after runtime and DOM cleanup, even with no reported active resources.
+    // Exit only after the runtime assertions, report write, and teardown all succeeded.
+    process.exit(0);
+} else await live();
