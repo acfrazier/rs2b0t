@@ -44,9 +44,9 @@ export const OUTBOUND_CENSUS: readonly OutboundSpec[] = [
     { name: 'EVENT_MOUSE_CLICK', id: 19, length: 4, javaLine: 3123, disposition: 'emitted', note: 'p4 packed click; layout unchanged from 289' },
     { name: 'EVENT_MOUSE_MOVE', id: 171, length: -1, javaLine: 3040, disposition: 'emitted', note: 'variable body; layout matches Java' },
     { name: 'EVENT_APPLET_FOCUS', id: 187, length: 1, javaLine: 3149, disposition: 'emitted', note: 'p1 focus' },
-    { name: 'EVENT_CAMERA_POSITION', id: 140, length: 4, javaLine: 3140, disposition: 'emitted', note: 'T1: Java p2_alt1/p2_alt1; Client-TS and engine EventCameraPositionDecoder use plain g2' },
-    { name: 'EVENT_HAS_WINDOW', id: 78, length: 4, javaLine: 3655, disposition: 'platform-absent', note: 'Java sends p4(1057001181) only when frame != null; browser has no Frame' },
-    { name: 'EVENT_SYNTH_ERROR', id: 80, length: 2, javaLine: 3844, disposition: 'emitted', note: 'p2(waveId & 0x7fff) if reporterror, else p2(-1); browser takes the else' },
+    { name: 'EVENT_CAMERA_POSITION', id: 140, length: 4, javaLine: 3140, disposition: 'emitted', note: 'Java p2_alt1/p2_alt1 (Client.java:3141-3142). Engine and Client-TS plain g2 are fixed separately (JAVA-OUTBOUND-1107)' },
+    { name: 'EVENT_HAS_WINDOW', id: 78, length: 4, javaLine: 3655, disposition: 'platform-absent', note: 'Java sends p4(1057001181) only when frame != null (Client.java:3655); browser has no Frame, so the writer is not exported' },
+    { name: 'EVENT_SYNTH_ERROR', id: 80, length: 2, javaLine: 3844, disposition: 'emitted', note: 'p2(waveIds[wave] & 0x7fff). Client.java:3842-3845; signlink.reporterror is true (signlink.java:49) so p2(-1) is unreachable. Guard is Client.java:3826' },
     { name: 'ANTICHEAT_OPLOGIC1', id: 95, length: 4, javaLine: 10345, disposition: 'emitted', note: 'OPOBJ2, oplogic1 >= 120, p4(0)' },
     { name: 'ANTICHEAT_OPLOGIC2', id: 165, length: 1, javaLine: 9700, disposition: 'emitted', note: 'OPHELD4, oplogic2 >= 62, p1(206)' },
     { name: 'ANTICHEAT_OPLOGIC3', id: 157, length: 4, javaLine: 9971, disposition: 'emitted', note: 'OPNPC3, oplogic3 >= 143, p4(0)' },
@@ -57,7 +57,7 @@ export const OUTBOUND_CENSUS: readonly OutboundSpec[] = [
     { name: 'ANTICHEAT_CYCLELOGIC3', id: 197, length: 4, javaLine: 6696, disposition: 'emitted', note: 'reboot-timer overlay, cyclelogic3 > 112, p4(0)' },
     { name: 'ANTICHEAT_CYCLELOGIC4', id: 173, length: 3, javaLine: 3748, disposition: 'emitted', note: 'minimap build, cyclelogic4 > 177, p3(2657152)' },
     { name: 'ANTICHEAT_CYCLELOGIC5', id: 248, length: 0, javaLine: 6170, disposition: 'emitted', note: 'pushProjectiles, cyclelogic5 > 51' },
-    { name: 'ANTICHEAT_CYCLELOGIC6', id: 22, length: 2, javaLine: 4561, disposition: 'emitted', note: 'T1: Client-TS never sends it; Java handleChatModeInput field456 > 161, p2(38304)' },
+    { name: 'ANTICHEAT_CYCLELOGIC6', id: 22, length: 2, javaLine: 4561, disposition: 'emitted', note: 'p2(38304) only after a chat-mode left click. Client.java:4513-4564' },
     { name: 'OPOBJ1', id: 77, length: 6, javaLine: 10042, disposition: 'emitted', note: 'p2_alt2 x, p2 z, p2_alt3 obj; no anticheat' },
     { name: 'OPOBJ2', id: 100, length: 6, javaLine: 10350, disposition: 'emitted', note: 'p2 x, p2_alt2 z, p2_alt3 obj' },
     { name: 'OPOBJ3', id: 71, length: 6, javaLine: 10066, disposition: 'emitted', note: 'p2_alt3 obj, p2_alt3 x, p2_alt2 z' },
@@ -103,7 +103,7 @@ export const OUTBOUND_CENSUS: readonly OutboundSpec[] = [
     { name: 'CLOSE_MODAL', id: 110, length: 0, javaLine: 4569, disposition: 'emitted', note: 'opcode only' },
     { name: 'RESUME_P_COUNTDIALOG', id: 75, length: 4, javaLine: 4896, disposition: 'emitted', note: 'p4; engine reads g4s' },
     { name: 'TUT_CLICKSIDE', id: 119, length: 1, javaLine: 5841, disposition: 'emitted', note: 'p1 tab' },
-    { name: 'RESUME_P_NAMEDIALOG', id: 206, length: 8, javaLine: 4917, disposition: 'needs-field', note: 'p8 userhash; SC-i must add chatbackInputOpen before the call site' },
+    { name: 'RESUME_P_NAMEDIALOG', id: 206, length: 8, javaLine: 4917, disposition: 'needs-field', note: 'p8 userhash (Client.java:4917). SC-i must add chatbackInputOpen: === 2 sends this and clears the field; === 1 is the count dialog already on dialogInputOpen; === 3 edits text and sends nothing (Client.java:4924-4933). Not exported until that field exists' },
     { name: 'MAP_BUILD_COMPLETE', id: 6, length: 0, javaLine: 3500, disposition: 'emitted', note: 'opcode only' },
     { name: 'MOVE_OPCLICK', id: 247, length: -1, javaLine: 7194, disposition: 'emitted', note: 'p2_alt3 x, p1 ctrl, p2_alt3 z, then p1 dx p1_alt3 dz' },
     { name: 'SEND_SNAPSHOT', id: 184, length: 10, javaLine: 12049, disposition: 'emitted', note: 'p8 name, p1 reason, p1 mute' },
@@ -117,7 +117,7 @@ export const OUTBOUND_CENSUS: readonly OutboundSpec[] = [
     { name: 'FRIENDLIST_DEL', id: 141, length: 8, javaLine: 12482, disposition: 'emitted', note: 'p8' },
     { name: 'FRIENDLIST_ADD', id: 120, length: 8, javaLine: 12461, disposition: 'emitted', note: 'p8' },
     { name: 'CLIENT_CHEAT', id: 56, length: -1, javaLine: 4972, disposition: 'emitted', note: 'p1(length-1) pjstr(substring(2)) of the :: line' },
-    { name: 'MESSAGE_PUBLIC', id: 49, length: -1, javaLine: 5037, disposition: 'emitted', note: 'T1: Java p1_alt2 colour, p1_alt1 effect; Client-TS and engine MessagePublicDecoder use plain g1' },
+    { name: 'MESSAGE_PUBLIC', id: 49, length: -1, javaLine: 5037, disposition: 'emitted', note: 'Java p1_alt2 colour, p1_alt1 effect (Client.java:5041-5042). Recorded Client-TS 00 00 is a pre-fix capture, not ground truth; JAVA-OUTBOUND-1107 fixes the engine' },
     { name: 'MOVE_GAMECLICK', id: 28, length: -1, javaLine: 7184, disposition: 'emitted', note: 'p2_alt3 x, p1 ctrl, p2_alt3 z, then p1 dx p1_alt3 dz' }
 ];
 
@@ -159,16 +159,20 @@ export function writeEventAppletFocus(out: Packet, opcode: number, focused: numb
     out.p1(focused);
 }
 
-/** Java p2_alt1 pitch, p2_alt1 yaw. Engine reads plain g2; that mismatch is a T1. */
+/** Java p2_alt1 pitch, p2_alt1 yaw (Client.java:3141-3142). Engine plain g2 is JAVA-OUTBOUND-1107. */
 export function writeEventCameraPosition(out: Packet, opcode: number, pitch: number, yaw: number): void {
     out.p1Enc(opcode);
     out.p2_alt1(pitch);
     out.p2_alt1(yaw);
 }
 
-export function writeEventHasWindow(out: Packet, opcode: number): void {
+/** Java Client.java:3040. The callback writes samples; the length byte is filled after it returns. */
+export function writeEventMouseMove(out: Packet, opcode: number, writeSamples: (out: Packet) => void): void {
     out.p1Enc(opcode);
-    out.p4(1057001181);
+    out.p1(0);
+    const start = out.pos;
+    writeSamples(out);
+    out.psize1(out.pos - start);
 }
 
 export function writeEventSynthError(out: Packet, opcode: number, waveId: number): void {
@@ -498,11 +502,6 @@ export function writeResumePCountDialog(out: Packet, opcode: number, value: numb
     out.p4(value);
 }
 
-export function writeResumePNameDialog(out: Packet, opcode: number, userhash: bigint): void {
-    out.p1Enc(opcode);
-    out.p8(userhash);
-}
-
 export function writeTutClickSide(out: Packet, opcode: number, tab: number): void {
     out.p1Enc(opcode);
     out.p1(tab);
@@ -535,7 +534,7 @@ export function writeFriendListDel(out: Packet, opcode: number, userhash: bigint
     out.p8(userhash);
 }
 
-export function writeIdkSaveDesign(out: Packet, opcode: number, genderMale: boolean, kits: readonly number[], colours: readonly number[]): void {
+export function writeIdkSaveDesign(out: Packet, opcode: number, genderMale: boolean, kits: ArrayLike<number>, colours: ArrayLike<number>): void {
     out.p1Enc(opcode);
     out.p1(genderMale ? 0 : 1);
     for (let i = 0; i < 7; i++) {
@@ -570,7 +569,7 @@ export function writeClientCheat(out: Packet, opcode: number, typed: string): vo
 }
 
 /**
- * Java colour/effect bytes are p1_alt2 / p1_alt1. Client-TS and the engine read plain g1.
+ * Java colour/effect bytes are p1_alt2 / p1_alt1 (Client.java:5041-5042).
  * `pack` writes the wordpack into `out` (equivalent to Java's side buffer + pdata).
  */
 export function writeMessagePublic(out: Packet, opcode: number, colour: number, effect: number, pack: (out: Packet) => void): void {
@@ -583,23 +582,69 @@ export function writeMessagePublic(out: Packet, opcode: number, colour: number, 
     out.psize1(out.pos - start);
 }
 
-/** Java public-chat effect prefixes. Client-TS only has wave=1 and scroll=2; that is a T1. */
-export function publicChatEffect(text: string): { effect: number; rest: string } {
-    const lower = text.toLowerCase();
-    if (lower.startsWith('wave:')) {
-        return { effect: 1, rest: text.substring(5) };
+/**
+ * Java Client.java:4976-5034. Case-insensitive else-if. `wave2:` is checked before `wave:`
+ * so the longer prefix is not shadowed. Remainder case is preserved (substring of the original).
+ */
+export function parsePublicChat(text: string): { colour: number; effect: number; rest: string } {
+    const colourLower = text.toLowerCase();
+    let colour = 0;
+    let rest = text;
+    if (colourLower.startsWith('yellow:')) {
+        colour = 0;
+        rest = text.substring(7);
+    } else if (colourLower.startsWith('red:')) {
+        colour = 1;
+        rest = text.substring(4);
+    } else if (colourLower.startsWith('green:')) {
+        colour = 2;
+        rest = text.substring(6);
+    } else if (colourLower.startsWith('cyan:')) {
+        colour = 3;
+        rest = text.substring(5);
+    } else if (colourLower.startsWith('purple:')) {
+        colour = 4;
+        rest = text.substring(7);
+    } else if (colourLower.startsWith('white:')) {
+        colour = 5;
+        rest = text.substring(6);
+    } else if (colourLower.startsWith('flash1:')) {
+        colour = 6;
+        rest = text.substring(7);
+    } else if (colourLower.startsWith('flash2:')) {
+        colour = 7;
+        rest = text.substring(7);
+    } else if (colourLower.startsWith('flash3:')) {
+        colour = 8;
+        rest = text.substring(7);
+    } else if (colourLower.startsWith('glow1:')) {
+        colour = 9;
+        rest = text.substring(6);
+    } else if (colourLower.startsWith('glow2:')) {
+        colour = 10;
+        rest = text.substring(6);
+    } else if (colourLower.startsWith('glow3:')) {
+        colour = 11;
+        rest = text.substring(6);
     }
-    if (lower.startsWith('wave2:')) {
-        return { effect: 2, rest: text.substring(6) };
+
+    const effectLower = rest.toLowerCase();
+    let effect = 0;
+    if (effectLower.startsWith('wave2:')) {
+        effect = 2;
+        rest = rest.substring(6);
+    } else if (effectLower.startsWith('wave:')) {
+        effect = 1;
+        rest = rest.substring(5);
+    } else if (effectLower.startsWith('shake:')) {
+        effect = 3;
+        rest = rest.substring(6);
+    } else if (effectLower.startsWith('scroll:')) {
+        effect = 4;
+        rest = rest.substring(7);
+    } else if (effectLower.startsWith('slide:')) {
+        effect = 5;
+        rest = rest.substring(6);
     }
-    if (lower.startsWith('shake:')) {
-        return { effect: 3, rest: text.substring(6) };
-    }
-    if (lower.startsWith('scroll:')) {
-        return { effect: 4, rest: text.substring(7) };
-    }
-    if (lower.startsWith('slide:')) {
-        return { effect: 5, rest: text.substring(6) };
-    }
-    return { effect: 0, rest: text };
+    return { colour, effect, rest };
 }

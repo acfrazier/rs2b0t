@@ -68,6 +68,9 @@ describe('dragInvSlot', () => {
         expect(actions.dragInvSlot(5382, 3, 0, 1)).toBe(true);
         expect(slots(com).slice(0, 4)).toEqual([40, 10, 20, 30]);
         expect(sent(client)[3]).toBe((1 + 128) & 0xff);
+        // p2_alt1(3) is [3, 0]. p2(3) is [0, 3].
+        expect(sent(client)[6]).toBe(3);
+        expect(sent(client)[7]).toBe(0);
     });
 
     test('mode 1 shifts left to right as well', () => {
