@@ -1,11 +1,20 @@
 import { filesUnder } from '../lib/content.js';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { resolveOut } from '../lib/genout.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const CONTENT = process.env.CONTENT_DIR ?? join(homedir(), 'code', 'rs2b2t-content');
-const OUT = 'src/bot/data/dropdb.ts';
-const DROP_DIR = join(CONTENT, 'scripts', 'drop tables', 'scripts');
+const OUT = resolveOut('src/bot/data/dropdb.ts');
+// Why: the 377 content renamed the directory (`drop_tables`); the generator reads whichever the
+// content checkout carries, so the same tool regenerates either revision's data.
+const dropScripts = ['drop_tables', 'drop tables']
+    .map(dir => join(CONTENT, 'scripts', dir, 'scripts'))
+    .find(dir => existsSync(dir));
+if (dropScripts === undefined) {
+    throw new Error(`no drop-table scripts under ${join(CONTENT, 'scripts', '{drop_tables,drop tables}')}`);
+}
+const DROP_DIR: string = dropScripts;
 // Why: the King Black Dragon's table is an ai_queue3 block inside its area script, not a file under drop tables.
 const AREA_DIR = join(CONTENT, 'scripts', 'areas');
 
@@ -153,6 +162,7 @@ if (process.argv.includes('--check')) {
     }
     console.log(`${OUT} is up to date`);
 } else {
+    mkdirSync(dirname(OUT), { recursive: true });
     writeFileSync(OUT, text);
     console.log(`wrote ${OUT} (${(text.match(/^ {4}"/gm) ?? []).length} monsters)`);
 }

@@ -1,0 +1,60 @@
+# Interface components the bot addresses by number, named from the revision's interface.pack.
+# tools/gen-ifids.ts resolves every entry to its component id; `--check` fails when a name is
+# missing from the pack. Maintained by hand: add the pack name when bot code must address a
+# component, and SC-i/S7b replace the numeric literal with the generated constant.
+#
+# Trade
+tradeside
+tradeside:inv
+trademain
+trademain:inv
+trademain:otherinv
+trademain:otherplayer
+trademain:accept
+trademain:decline
+tradeconfirm
+tradeconfirm:inv1
+tradeconfirm:inv2
+tradeconfirm:otherinv1
+tradeconfirm:otherinv2
+tradeconfirm:inv_nothing
+tradeconfirm:otherinv_nothing
+tradeconfirm:accept
+# Duel stake screens
+duel_select_type
+duel_select_type:inv
+duel_select_type:otherinv
+duel_confirm
+duel_confirm:inv
+duel_confirm:otherinv
+duel_confirm:com_103
+duel_confirm:com_104
+# Login welcome screen (a generated interface name in the pack)
+inter_129
+# Bank
+bank_main:com_93
+bank_main:com_94
+bank_main:com_99
+bank_main:com_100
+# Shop
+shop_template
+shop_template:inv
+shop_template_side:inv
+# Magic autocast panel (ssb buttons are root + index, spelldb)
+staff_spells
+# Prayer
+prayer:prayer_thickskin
+prayer:prayer_strengthburst
+prayer:prayer_clarity
+prayer:prayer_rockskin
+prayer:prayer_superhumanstrength
+prayer:prayer_improvedreflexes
+prayer:prayer_rapidrestore
+prayer:prayer_rapidheal
+prayer:prayer_protectitems
+prayer:prayer_steelskin
+prayer:prayer_ultimatestrength
+prayer:prayer_incrediblereflexes
+prayer:prayer_protectfrommagic
+prayer:prayer_protectfrommissiles
+prayer:prayer_protectfrommelee

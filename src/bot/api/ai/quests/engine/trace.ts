@@ -58,10 +58,6 @@ export class StepTracker {
         return this.attempt;
     }
 
-    attempts(): number {
-        return this.attempt;
-    }
-
     elapsed(now: number): number {
         return now - this.since;
     }

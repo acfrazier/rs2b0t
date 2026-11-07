@@ -1,11 +1,12 @@
 import { filesUnder } from '../lib/content.js';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { resolveOut } from '../lib/genout.js';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { joinShopDb, parseInvShops, parseNpcKeepers, parseObjDefs, type ParsedInv, type ParsedKeeper, type ParsedObj } from './parse.js';
 
 const CONTENT = process.env.CONTENT_DIR ?? join(homedir(), 'code', 'rs2b2t-engine', '..', 'rs2b2t-content');
-const OUT = 'src/bot/data/shopdb.ts';
+const OUT = resolveOut('src/bot/data/shopdb.ts');
 
 
 function generate(): string {
@@ -46,6 +47,7 @@ if (process.argv.includes('--check')) {
     }
     console.log(`ok: ${OUT} matches the content pack`);
 } else {
+    mkdirSync(dirname(OUT), { recursive: true });
     writeFileSync(OUT, fresh);
     console.log(`wrote ${OUT}`);
 }

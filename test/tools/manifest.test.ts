@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ManifestError, engineArchiveProblems, parseManifest, readManifest, sha256File, verifyManifest, writeManifest } from '../../tools/lib/manifest.js';
+import { ManifestError, engineArchiveProblems, parseManifest, readManifest, sha256File, verifyManifest, verifyManifestReport, writeManifest } from '../../tools/lib/manifest.js';
 import type { Manifest } from '../../tools/lib/manifest.js';
 
 const HASH_A = 'a'.repeat(64);
@@ -134,6 +134,36 @@ describe('manifest verify', () => {
             artifacts: [{ path: 'data/377/gone.ts', sha256: HASH_A, kind: 'generated', qualification: 'pending' }]
         });
         expect(verifyManifest(root)).toEqual([expect.stringContaining('is listed but missing')]);
+    });
+
+    test('a missing out artifact is a printed skip, not a failure', () => {
+        const root = tempDir();
+        mkdirSync(join(root, 'data'), { recursive: true });
+        writeManifest(root, {
+            ...empty(),
+            artifacts: [{ path: 'out/basemap.x.png', sha256: HASH_A, kind: 'out', qualification: 'pending' }]
+        });
+        // Untracked by design: no problem, the CLI prints the skip line.
+        expect(verifyManifest(root)).toEqual([]);
+        expect(verifyManifestReport(root).skipped).toEqual([
+            'SKIP: out/basemap.x.png: out artifact is not tracked; hash verified only when the file is present'
+        ]);
+    });
+
+    test('a present out artifact is still hash-checked', () => {
+        const root = tempDir();
+        mkdirSync(join(root, 'data'), { recursive: true });
+        const hash = put(root, 'out/basemap.x.png', 'png-bytes\n');
+        writeManifest(root, {
+            ...empty(),
+            artifacts: [{ path: 'out/basemap.x.png', sha256: hash, kind: 'out', qualification: 'pending' }]
+        });
+        expect(verifyManifestReport(root)).toEqual({ problems: [], skipped: [] });
+
+        put(root, 'out/basemap.x.png', 'other-bytes\n');
+        const report = verifyManifestReport(root);
+        expect(report.problems).toEqual([expect.stringContaining("artifact 'out/basemap.x.png' changed")]);
+        expect(report.skipped).toEqual([]);
     });
 
     test('the staging tree must agree with cutover', () => {

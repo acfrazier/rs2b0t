@@ -1,11 +1,12 @@
 import { filesUnder } from '../lib/content.js';
+import { resolveOut } from '../lib/genout.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { joinItemDb, parseItemDefs, parseObjPack, type ParsedItem } from './parse.js';
 
 const CONTENT = process.env.CONTENT_DIR ?? join(homedir(), 'code', 'rs2b2t-content');
-const OUT = 'src/bot/data/itemdb.ts';
+const OUT = resolveOut('src/bot/data/itemdb.ts');
 
 
 function generate(): string {
