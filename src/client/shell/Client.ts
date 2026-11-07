@@ -82,6 +82,7 @@ const LOCAL_PLAYER_INDEX = 2047;
 
 const MAX_CHATS = 50;
 const CHAT_COLOURS = [Colour.YELLOW, Colour.RED, Colour.GREEN, Colour.CYAN, Colour.MAGENTA, Colour.WHITE];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const SCROLLBAR_TRACK = 0x23201b;
 const SCROLLBAR_GRIP_FOREGROUND = 0x4d4233;
@@ -122,6 +123,17 @@ interface LoginAttempt {
 interface LoginStart {
     accepted: boolean;
     done: Promise<void>;
+}
+
+interface Client377State {
+    fullscreenInterfaceId0: number;
+    fullscreenInterfaceId1: number;
+    chatbackInputOpen: number;
+    currentDay: number;
+    previousLoginDay: number;
+    daysSincePasswordChanged: number;
+    recoveriesLastChangedDay: number;
+    daysOfMembersRemaining: number;
 }
 
 export class Client extends GameShell {
@@ -10811,6 +10823,1022 @@ export class Client extends GameShell {
         }
     }
 
+    private handleIfOpenChat(): boolean {
+        const comId: number = this.in.g2();
+        this.ifAnimReset(comId);
+
+        const state = this as unknown as Client377State;
+        if (this.sideModalId !== -1) {
+            this.sideModalId = -1;
+            this.redrawSide = true;
+            this.redrawIcons = true;
+        }
+        if (state.fullscreenInterfaceId0 !== -1) {
+            state.fullscreenInterfaceId0 = -1;
+            this.redrawFrame = true;
+        }
+        if (state.fullscreenInterfaceId1 !== -1) {
+            state.fullscreenInterfaceId1 = -1;
+        }
+        if (this.mainModalId !== -1) {
+            this.mainModalId = -1;
+        }
+        if (this.chatModalId !== comId) {
+            this.chatModalId = comId;
+        }
+        this.resumedPauseButton = false;
+        this.redrawChat = true;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfOpenMainSide(): boolean {
+        const mainComId: number = this.in.g2_alt2();
+        const sideComId: number = this.in.g2_alt3();
+        const state = this as unknown as Client377State;
+
+        if (this.chatModalId !== -1) {
+            this.chatModalId = -1;
+            this.redrawChat = true;
+        }
+        if (state.fullscreenInterfaceId0 !== -1) {
+            state.fullscreenInterfaceId0 = -1;
+            this.redrawFrame = true;
+        }
+        if (state.fullscreenInterfaceId1 !== -1) {
+            state.fullscreenInterfaceId1 = -1;
+        }
+        if (this.mainModalId !== mainComId) {
+            this.mainModalId = mainComId;
+        }
+        if (this.sideModalId !== sideComId) {
+            this.sideModalId = sideComId;
+        }
+
+        if (this.dialogInputOpen || state.chatbackInputOpen !== 0) {
+            this.dialogInputOpen = false;
+            state.chatbackInputOpen = 0;
+            this.redrawChat = true;
+        }
+
+        this.redrawSide = true;
+        this.redrawIcons = true;
+        this.resumedPauseButton = false;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfClose(): boolean {
+        const state = this as unknown as Client377State;
+        this.modalCloseGeneration++;
+        if (this.sideModalId !== -1) {
+            this.sideModalId = -1;
+            this.redrawSide = true;
+            this.redrawIcons = true;
+        }
+        if (this.chatModalId !== -1) {
+            this.chatModalId = -1;
+            this.redrawChat = true;
+        }
+        if (state.fullscreenInterfaceId0 !== -1) {
+            state.fullscreenInterfaceId0 = -1;
+            this.redrawFrame = true;
+        }
+        if (state.fullscreenInterfaceId1 !== -1) {
+            state.fullscreenInterfaceId1 = -1;
+        }
+        if (this.mainModalId !== -1) {
+            this.mainModalId = -1;
+        }
+        if (this.dialogInputOpen || state.chatbackInputOpen !== 0) {
+            this.dialogInputOpen = false;
+            state.chatbackInputOpen = 0;
+            this.redrawChat = true;
+        }
+        this.resumedPauseButton = false;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetIcon(): boolean {
+        const tab: number = this.in.g1_alt3();
+        let comId: number = this.in.g2_alt2();
+        if (comId === 65535) {
+            comId = -1;
+        }
+        if (tab >= 0 && tab < this.sideIcon.length && this.sideIcon[tab] !== comId) {
+            this.sideIcon[tab] = comId;
+        }
+        this.redrawSide = true;
+        this.redrawIcons = true;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfOpenMain(): boolean {
+        const comId: number = this.in.g2_alt3();
+        const state = this as unknown as Client377State;
+        this.ifAnimReset(comId);
+
+        if (this.sideModalId !== -1) {
+            this.sideModalId = -1;
+            this.redrawSide = true;
+            this.redrawIcons = true;
+        }
+        if (this.chatModalId !== -1) {
+            this.chatModalId = -1;
+            this.redrawChat = true;
+        }
+        if (state.fullscreenInterfaceId0 !== -1) {
+            state.fullscreenInterfaceId0 = -1;
+            this.redrawFrame = true;
+        }
+        if (state.fullscreenInterfaceId1 !== -1) {
+            state.fullscreenInterfaceId1 = -1;
+        }
+        if (this.mainModalId !== comId) {
+            this.mainModalId = comId;
+        }
+        if (this.dialogInputOpen || state.chatbackInputOpen !== 0) {
+            this.dialogInputOpen = false;
+            state.chatbackInputOpen = 0;
+            this.redrawChat = true;
+        }
+        this.resumedPauseButton = false;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfOpenSide(): boolean {
+        const comId: number = this.in.g2_alt3();
+        const state = this as unknown as Client377State;
+        this.ifAnimReset(comId);
+
+        if (this.chatModalId !== -1) {
+            this.chatModalId = -1;
+            this.redrawChat = true;
+        }
+        if (state.fullscreenInterfaceId0 !== -1) {
+            state.fullscreenInterfaceId0 = -1;
+            this.redrawFrame = true;
+        }
+        if (state.fullscreenInterfaceId1 !== -1) {
+            state.fullscreenInterfaceId1 = -1;
+        }
+        if (this.mainModalId !== -1) {
+            this.mainModalId = -1;
+        }
+        if (this.sideModalId !== comId) {
+            this.sideModalId = comId;
+        }
+        if (this.dialogInputOpen || state.chatbackInputOpen !== 0) {
+            this.dialogInputOpen = false;
+            state.chatbackInputOpen = 0;
+            this.redrawChat = true;
+        }
+        this.redrawSide = true;
+        this.redrawIcons = true;
+        this.resumedPauseButton = false;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfShowIcon(): boolean {
+        this.activeIcon = this.in.g1_alt2();
+        this.redrawSide = true;
+        this.redrawIcons = true;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfOpenOverlay(): boolean {
+        const comId: number = this.in.g2b();
+        if (comId >= 0) {
+            this.ifAnimReset(comId);
+        }
+        if (this.mainOverlayId !== comId) {
+            this.mainOverlayId = comId;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetColour(): boolean {
+        const comId: number = this.in.g2();
+        const colour: number = this.in.g2_alt2();
+        const r: number = (colour >> 10) & 0x1f;
+        const g: number = (colour >> 5) & 0x1f;
+        const b: number = colour & 0x1f;
+        IfType.list[comId]!.colour = (r << 19) + (g << 11) + (b << 3);
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetHide(): boolean {
+        const hide: boolean = this.in.g1() === 1;
+        const comId: number = this.in.g2();
+        IfType.list[comId]!.hide = hide;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetObject(): boolean {
+        const zoom: number = this.in.g2();
+        const objId: number = this.in.g2_alt1();
+        const comId: number = this.in.g2_alt3();
+        const com = IfType.list[comId]!;
+        if (objId === 65535) {
+            com.model1Type = 0;
+            this.ptype = -1;
+            return true;
+        }
+
+        const type = ObjType.list(objId);
+        com.model1Type = 4;
+        com.model1Id = objId;
+        com.modelXAn = type.xan2d;
+        com.modelYAn = type.yan2d;
+        com.modelZoom = ((type.zoom2d * 100) / zoom) | 0;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetModel(): boolean {
+        const modelId: number = this.in.g2_alt3();
+        const comId: number = this.in.g2_alt3();
+        const com = IfType.list[comId]!;
+        com.model1Type = 1;
+        com.model1Id = modelId;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetAnim(): boolean {
+        const comId: number = this.in.g2_alt3();
+        const seqId: number = this.in.g2b_alt2();
+        const com = IfType.list[comId];
+        if (com && (com.modelAnim !== seqId || seqId === -1)) {
+            com.modelAnim = seqId;
+            com.animFrame = 0;
+            com.animCycle = 0;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetPlayerHead(): boolean {
+        const comId: number = this.in.g2_alt3();
+        if (this.localPlayer) {
+            const com = IfType.list[comId]!;
+            com.model1Type = 3;
+            if (!this.localPlayer.transmog) {
+                com.model1Id =
+                    (this.localPlayer.appearance[11] << 5) +
+                    (this.localPlayer.appearance[8] << 10) +
+                    (this.localPlayer.appearance[0] << 15) +
+                    (this.localPlayer.colour[0] << 25) +
+                    (this.localPlayer.colour[4] << 20) +
+                    this.localPlayer.appearance[1];
+            } else {
+                com.model1Id = (this.localPlayer.transmog.id + 305419896) | 0;
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetText(): boolean {
+        const comId: number = this.in.g2_alt3();
+        const text: string = this.in.gjstr();
+        const com = IfType.list[comId];
+        if (com) {
+            com.text = text;
+            if (com.layerId === this.sideIcon[this.activeIcon]) {
+                this.redrawSide = true;
+            }
+            if (com.layerId === this.chatModalId || this.chatModalId === comId) {
+                this.redrawChat = true;
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetNpcHead(): boolean {
+        const npcId: number = this.in.g2_alt2();
+        const comId: number = this.in.g2_alt1();
+        const com = IfType.list[comId]!;
+        com.model1Type = 2;
+        com.model1Id = npcId;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetPosition(): boolean {
+        const y: number = this.in.g2b_alt1();
+        const x: number = this.in.g2b_alt1();
+        const comId: number = this.in.g2();
+        const com = IfType.list[comId];
+        if (com) {
+            com.x = x;
+            com.y = y;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetScrollPos(): boolean {
+        const comId: number = this.in.g2();
+        let pos: number = this.in.g2_alt3();
+        const com = IfType.list[comId];
+        if (com && com.type === ComponentType.TYPE_LAYER) {
+            if (pos < 0) {
+                pos = 0;
+            }
+            if (pos > com.scrollHeight - com.height) {
+                pos = com.scrollHeight - com.height;
+            }
+            com.scrollPos = pos;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleTutFlash(): boolean {
+        this.tutFlashIcon = this.in.g1();
+        if (this.tutFlashIcon === this.activeIcon) {
+            this.activeIcon = this.tutFlashIcon === 3 ? 1 : 3;
+            this.redrawSide = true;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleTutOpen(): boolean {
+        const comId: number = this.in.g2b_alt1();
+        if (this.tutComId !== comId) {
+            this.tutComId = comId;
+        }
+        this.redrawChat = true;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateInvStopTransmit(): boolean {
+        const comId: number = this.in.g2_alt1();
+        const inv = IfType.list[comId];
+        if (inv?.linkObjType) {
+            for (let i: number = 0; i < inv.linkObjType.length; i++) {
+                inv.linkObjType[i] = 0;
+                if (inv.linkObjNumber) {
+                    inv.linkObjNumber[i] = 0;
+                }
+            }
+            const previous = this.invUpdateState.get(comId);
+            this.invUpdateState.set(comId, {
+                generation: (previous?.generation ?? 0) + 1,
+                fullGeneration: 0,
+                transmitting: false
+            });
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateInvFull(): boolean {
+        this.redrawSide = true;
+        const comId: number = this.in.g2();
+        const inv = IfType.list[comId];
+        if (!inv || !inv.linkObjType || !inv.linkObjNumber) {
+            this.in.pos = this.psize;
+            this.ptype = -1;
+            return true;
+        }
+
+        const size: number = this.in.g2();
+        for (let i: number = 0; i < size; i++) {
+            inv.linkObjType[i] = this.in.g2_alt3();
+            let count: number = this.in.g1_alt2();
+            if (count === 255) {
+                count = this.in.g4_alt1();
+            }
+            inv.linkObjNumber[i] = count;
+        }
+        for (let i: number = size; i < inv.linkObjType.length; i++) {
+            inv.linkObjType[i] = 0;
+            inv.linkObjNumber[i] = 0;
+        }
+
+        const generation = (this.invUpdateState.get(comId)?.generation ?? 0) + 1;
+        this.invUpdateState.set(comId, { generation, fullGeneration: generation, transmitting: true });
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateInvPartial(): boolean {
+        this.redrawSide = true;
+        const comId: number = this.in.g2();
+        const inv = IfType.list[comId];
+        if (!inv || !inv.linkObjType || !inv.linkObjNumber) {
+            this.in.pos = this.psize;
+            this.ptype = -1;
+            return true;
+        }
+
+        while (this.in.pos < this.psize) {
+            const slot: number = this.in.gsmart();
+            const id: number = this.in.g2();
+            let count: number = this.in.g1();
+            if (count === 255) {
+                count = this.in.g4();
+            }
+            if (slot >= 0 && slot < inv.linkObjType.length) {
+                inv.linkObjType[slot] = id;
+                inv.linkObjNumber[slot] = count;
+            }
+        }
+
+        const previous = this.invUpdateState.get(comId);
+        this.invUpdateState.set(comId, {
+            generation: (previous?.generation ?? 0) + 1,
+            fullGeneration: previous?.fullGeneration ?? 0,
+            transmitting: true
+        });
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleVarpSmall(): boolean {
+        const varpId: number = this.in.g2_alt2();
+        const value: number = this.in.g1b_alt3();
+        this.varServ[varpId] = value;
+        if (this.var[varpId] !== value) {
+            this.var[varpId] = value;
+            this.clientVar(varpId);
+            this.redrawSide = true;
+            if (this.tutComId !== -1) {
+                this.redrawChat = true;
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleVarpLarge(): boolean {
+        const value: number = this.in.g4_alt3();
+        const varpId: number = this.in.g2_alt1();
+        this.varServ[varpId] = value;
+        if (this.var[varpId] !== value) {
+            this.var[varpId] = value;
+            this.clientVar(varpId);
+            this.redrawSide = true;
+            if (this.tutComId !== -1) {
+                this.redrawChat = true;
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleVarpSync(): boolean {
+        for (let i: number = 0; i < this.var.length; i++) {
+            if (this.var[i] !== this.varServ[i]) {
+                this.var[i] = this.varServ[i];
+                this.clientVar(i);
+                this.redrawSide = true;
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateStat(): boolean {
+        this.redrawSide = true;
+        const stat: number = this.in.g1_alt2();
+        this.statBaseLevel[stat] = this.in.g1();
+        this.statXP[stat] = this.in.g4();
+        this.statSeenGeneration[stat] = this.statSessionGeneration;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleMessageGame(): boolean {
+        const message: string = this.in.gjstr();
+        if (message.endsWith(':tradereq:')) {
+            const player: string = message.substring(0, message.indexOf(':'));
+            const username = JString.toUserhash(player);
+            let ignored = false;
+            for (let i: number = 0; i < this.ignoreCount; i++) {
+                if (this.ignoreUserhash[i] === username) {
+                    ignored = true;
+                    break;
+                }
+            }
+            if (!ignored && this.chatDisabled === 0) {
+                this.addChat(4, 'wishes to trade with you.', player);
+            }
+        } else if (message.endsWith(':duelreq:')) {
+            const player: string = message.substring(0, message.indexOf(':'));
+            const username = JString.toUserhash(player);
+            let ignored = false;
+            for (let i: number = 0; i < this.ignoreCount; i++) {
+                if (this.ignoreUserhash[i] === username) {
+                    ignored = true;
+                    break;
+                }
+            }
+            if (!ignored && this.chatDisabled === 0) {
+                this.addChat(8, 'wishes to duel with you.', player);
+            }
+        } else if (message.endsWith(':chalreq:')) {
+            const player: string = message.substring(0, message.indexOf(':'));
+            const username = JString.toUserhash(player);
+            let ignored = false;
+            for (let i: number = 0; i < this.ignoreCount; i++) {
+                if (this.ignoreUserhash[i] === username) {
+                    ignored = true;
+                    break;
+                }
+            }
+            if (!ignored && this.chatDisabled === 0) {
+                const body: string = message.substring(message.indexOf(':') + 1, message.length - 9);
+                this.addChat(8, body, player);
+            }
+        } else {
+            this.addChat(0, message, '');
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateIgnoreList(): boolean {
+        this.ignoreCount = (this.psize / 8) | 0;
+        for (let i: number = 0; i < this.ignoreCount; i++) {
+            this.ignoreUserhash[i] = this.in.g8();
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleChatFilterSettings(): boolean {
+        this.chatPublicMode = this.in.g1();
+        this.chatPrivateMode = this.in.g1();
+        this.chatTradeMode = this.in.g1();
+        this.redrawChatMode = true;
+        this.redrawChat = true;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleMessagePrivate(): boolean {
+        const from: bigint = this.in.g8();
+        const messageId: number = this.in.g4();
+        const staffModLevel: number = this.in.g1();
+        let ignored = false;
+        for (let i: number = 0; i < 100; i++) {
+            if (this.privateMessageIds[i] === messageId) {
+                ignored = true;
+                break;
+            }
+        }
+        if (staffModLevel <= 1) {
+            for (let i: number = 0; i < this.ignoreCount; i++) {
+                if (this.ignoreUserhash[i] === from) {
+                    ignored = true;
+                    break;
+                }
+            }
+        }
+        if (!ignored && this.chatDisabled === 0) {
+            try {
+                this.privateMessageIds[this.privateMessageCount] = messageId;
+                this.privateMessageCount = (this.privateMessageCount + 1) % 100;
+                let text: string = WordPack.unpack(this.in, this.psize - 13);
+                if (staffModLevel !== 3) {
+                    text = WordFilter.filter(text);
+                }
+                if (staffModLevel === 2 || staffModLevel === 3) {
+                    this.addChat(7, text, '@cr2@' + JString.toScreenName(JString.toRawUsername(from)));
+                } else if (staffModLevel === 1) {
+                    this.addChat(7, text, '@cr1@' + JString.toScreenName(JString.toRawUsername(from)));
+                } else {
+                    this.addChat(3, text, JString.toScreenName(JString.toRawUsername(from)));
+                }
+            } catch (_e) {
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleFriendListLoaded(): boolean {
+        this.friendServerStatus = this.in.g1();
+        this.redrawSide = true;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateFriendList(): boolean {
+        const username: bigint = this.in.g8();
+        const world: number = this.in.g1();
+        let displayName: string | null = JString.toScreenName(JString.toRawUsername(username));
+        for (let i: number = 0; i < this.friendCount; i++) {
+            if (username === this.friendUserhash[i]) {
+                if (this.friendNodeId[i] !== world) {
+                    this.friendNodeId[i] = world;
+                    this.redrawSide = true;
+                    if (world > 0) {
+                        this.addChat(5, displayName + ' has logged in.', '');
+                    }
+                    if (world === 0) {
+                        this.addChat(5, displayName + ' has logged out.', '');
+                    }
+                }
+                displayName = null;
+                break;
+            }
+        }
+        if (displayName && this.friendCount < 200) {
+            this.friendUserhash[this.friendCount] = username;
+            this.friendUsername[this.friendCount] = displayName;
+            this.friendNodeId[this.friendCount] = world;
+            this.friendCount++;
+            this.redrawSide = true;
+        }
+
+        let sorted = false;
+        while (!sorted) {
+            sorted = true;
+            for (let i: number = 0; i < this.friendCount - 1; i++) {
+                if ((this.friendNodeId[i] !== Client.nodeId && this.friendNodeId[i + 1] === Client.nodeId) || (this.friendNodeId[i] === 0 && this.friendNodeId[i + 1] !== 0)) {
+                    const oldWorld: number = this.friendNodeId[i];
+                    this.friendNodeId[i] = this.friendNodeId[i + 1];
+                    this.friendNodeId[i + 1] = oldWorld;
+                    const oldName: string | null = this.friendUsername[i];
+                    this.friendUsername[i] = this.friendUsername[i + 1];
+                    this.friendUsername[i + 1] = oldName;
+                    const oldUserhash: bigint = this.friendUserhash[i];
+                    this.friendUserhash[i] = this.friendUserhash[i + 1];
+                    this.friendUserhash[i + 1] = oldUserhash;
+                    this.redrawSide = true;
+                    sorted = false;
+                }
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUnsetMapFlag(): boolean {
+        this.minimapFlagX = 0;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateRunWeight(): boolean {
+        if (this.activeIcon === 12) {
+            this.redrawSide = true;
+        }
+        this.runweight = this.in.g2b();
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleHintArrow(): boolean {
+        this.hintType = this.in.g1();
+        if (this.hintType === 1) {
+            this.hintNpc = this.in.g2();
+        }
+        if (this.hintType >= 2 && this.hintType <= 6) {
+            if (this.hintType === 2) {
+                this.hintOffsetX = 64;
+                this.hintOffsetZ = 64;
+            } else if (this.hintType === 3) {
+                this.hintOffsetX = 0;
+                this.hintOffsetZ = 64;
+            } else if (this.hintType === 4) {
+                this.hintOffsetX = 128;
+                this.hintOffsetZ = 64;
+            } else if (this.hintType === 5) {
+                this.hintOffsetX = 64;
+                this.hintOffsetZ = 0;
+            } else if (this.hintType === 6) {
+                this.hintOffsetX = 64;
+                this.hintOffsetZ = 128;
+            }
+            this.hintType = 2;
+            this.hintTileX = this.in.g2();
+            this.hintTileZ = this.in.g2();
+            this.hintHeight = this.in.g1();
+        }
+        if (this.hintType === 10) {
+            this.hintPlayer = this.in.g2();
+        }
+        // The engine pads entity/clear arrows to the six-byte descriptor size.
+        this.in.pos = this.psize;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateRebootTimer(): boolean {
+        this.rebootTimer = this.in.g2_alt1() * 30;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdateRunEnergy(): boolean {
+        if (this.activeIcon === 12) {
+            this.redrawSide = true;
+        }
+        this.runenergy = this.in.g1();
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleResetAnims(): boolean {
+        for (let i: number = 0; i < this.players.length; i++) {
+            const player: ClientPlayer | null = this.players[i];
+            if (player) {
+                player.primaryAnim = -1;
+            }
+        }
+        for (let i: number = 0; i < this.npc.length; i++) {
+            const npc: ClientNpc | null = this.npc[i];
+            if (npc) {
+                npc.primaryAnim = -1;
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleUpdatePid(): boolean {
+        this.membersAccount = this.in.g1();
+        this.selfSlot = this.in.g2_alt1();
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleLastLoginInfo(): boolean {
+        const state = this as unknown as Client377State;
+        state.daysSincePasswordChanged = this.in.g2_alt1();
+        this.in.g2_alt3();
+        this.in.g2();
+        this.in.g2();
+        state.currentDay = this.in.g2_alt1();
+        this.unreadMessages = this.in.g2_alt2();
+        state.previousLoginDay = this.in.g2_alt2();
+        state.daysOfMembersRemaining = this.in.g2();
+        this.lastAddress = this.in.g4_alt1();
+        state.recoveriesLastChangedDay = this.in.g2_alt3();
+        this.in.g1_alt1();
+
+        this.daysSinceLastLogin = state.currentDay - state.previousLoginDay;
+        this.daysSinceRecoveriesChanged = state.recoveriesLastChangedDay;
+        this.warnMembersInNonMembers = 0;
+        const ipStr = JString.formatIPv4(this.lastAddress >>> 0);
+        this.dnsReq = ipStr;
+        reverseDnsLookup(ipStr).then(
+            results => {
+                this.dnsReq = results[0] ?? ipStr;
+            },
+            () => {
+                this.dnsReq = 'unknown';
+            }
+        );
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleSetMultiway(): boolean {
+        this.inMultizone = this.in.g1();
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleSetPlayerOp(): boolean {
+        const index: number = this.in.g1_alt2();
+        let op: string | null = this.in.gjstr();
+        const priority: number = this.in.g1();
+        if (index >= 1 && index <= 5) {
+            if (op.toLowerCase() === 'null') {
+                op = null;
+            }
+            this.playerOp[index - 1] = op;
+            this.playerOpPriority[index - 1] = priority === 0;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleMinimapToggle(): boolean {
+        this.minimapState = this.in.g1();
+        this.ptype = -1;
+        return true;
+    }
+
+    private handlePCountDialog(): boolean {
+        const state = this as unknown as Client377State;
+        this.socialInputOpen = false;
+        state.chatbackInputOpen = 1;
+        this.dialogInputOpen = true;
+        this.dialogInput = '';
+        this.redrawChat = true;
+        if (this.isMobile) {
+            MobileKeyboard.show();
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handlePNamedialog(): boolean {
+        const state = this as unknown as Client377State;
+        this.socialInputOpen = false;
+        state.chatbackInputOpen = 2;
+        this.dialogInputOpen = false;
+        this.dialogInput = '';
+        this.redrawChat = true;
+        if (this.isMobile) {
+            MobileKeyboard.show();
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleCamLookAt(): boolean {
+        this.cinemaCam = true;
+        this.camLookAtLx = this.in.g1();
+        this.camLookAtLz = this.in.g1();
+        this.camLookAtHei = this.in.g2();
+        this.camLookAtRate = this.in.g1();
+        this.camLookAtRate2 = this.in.g1();
+        if (this.camLookAtRate2 >= 100) {
+            const sceneX: number = this.camLookAtLx * 128 + 64;
+            const sceneZ: number = this.camLookAtLz * 128 + 64;
+            const sceneY: number = this.getAvH(sceneX, sceneZ, this.minusedlevel) - this.camLookAtHei;
+            const deltaX: number = sceneX - this.camX;
+            const deltaY: number = sceneY - this.camY;
+            const deltaZ: number = sceneZ - this.camZ;
+            const distance: number = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ) | 0;
+            this.camPitch = ((Math.atan2(deltaY, distance) * 325.949) | 0) & 0x7ff;
+            this.camYaw = ((Math.atan2(deltaX, deltaZ) * -325.949) | 0) & 0x7ff;
+            if (this.camPitch < 128) {
+                this.camPitch = 128;
+            } else if (this.camPitch > 383) {
+                this.camPitch = 383;
+            }
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleCamShake(): boolean {
+        const axis: number = this.in.g1();
+        const ran: number = this.in.g1();
+        const amp: number = this.in.g1();
+        const rate: number = this.in.g1();
+        this.camShake[axis] = true;
+        this.camShakeAxis[axis] = ran;
+        this.camShakeRan[axis] = amp;
+        this.camShakeAmp[axis] = rate;
+        this.camShakeCycle[axis] = 0;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleCamMoveTo(): boolean {
+        this.cinemaCam = true;
+        this.camMoveToLx = this.in.g1();
+        this.camMoveToLz = this.in.g1();
+        this.camMoveToHei = this.in.g2();
+        this.camMoveToRate = this.in.g1();
+        this.camMoveToRate2 = this.in.g1();
+        if (this.camMoveToRate2 >= 100) {
+            this.camX = this.camMoveToLx * 128 + 64;
+            this.camZ = this.camMoveToLz * 128 + 64;
+            this.camY = this.getAvH(this.camX, this.camZ, this.minusedlevel) - this.camMoveToHei;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleCamReset(): boolean {
+        this.cinemaCam = false;
+        for (let i: number = 0; i < 5; i++) {
+            this.camShake[i] = false;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleSynthSound(): boolean {
+        const soundId: number = this.in.g2();
+        const loops: number = this.in.g1();
+        const delay: number = this.in.g2();
+        if (delay === 65535) {
+            if (this.waveCount < 50) {
+                this.waveIds[this.waveCount] = soundId;
+                this.waveLoops[this.waveCount] = loops;
+                this.waveDelay[this.waveCount] = 0;
+                this.waveCount++;
+            }
+        } else if (this.waveEnabled && !Client.lowMem && this.waveCount < 50) {
+            this.waveIds[this.waveCount] = soundId;
+            this.waveLoops[this.waveCount] = loops;
+            this.waveDelay[this.waveCount] = delay + JagFX.delays[soundId];
+            this.waveCount++;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleMidiSong(): boolean {
+        let songId: number = this.in.g2_alt3();
+        if (songId === 65535) {
+            songId = -1;
+        }
+        if (this.nextMidiSong !== songId && this.midiActive && !Client.lowMem && this.nextMusicDelay === 0) {
+            this.midiSong = songId;
+            this.midiFading = true;
+            this.onDemand?.request(2, this.midiSong);
+        }
+        this.nextMidiSong = songId;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleMidiJingle(): boolean {
+        const jingleId: number = this.in.g2_alt1();
+        const delay: number = this.in.g3_alt3();
+        if (this.midiActive && !Client.lowMem) {
+            this.midiSong = jingleId;
+            this.midiFading = false;
+            this.onDemand?.request(2, this.midiSong);
+            this.nextMusicDelay = delay;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfOpenFull(): boolean {
+        const overlayCom: number = this.in.g2_alt1();
+        const mainCom: number = this.in.g2_alt2();
+        const state = this as unknown as Client377State;
+        this.ifAnimReset(mainCom);
+        this.ifAnimReset(overlayCom);
+        if (this.mainModalId !== -1) {
+            this.mainModalId = -1;
+        }
+        if (this.sideModalId !== -1) {
+            this.sideModalId = -1;
+            this.redrawSide = true;
+            this.redrawIcons = true;
+        }
+        if (this.chatModalId !== -1) {
+            this.chatModalId = -1;
+            this.redrawChat = true;
+        }
+        if (state.fullscreenInterfaceId0 !== mainCom) {
+            state.fullscreenInterfaceId0 = mainCom;
+        }
+        if (state.fullscreenInterfaceId1 !== mainCom) {
+            state.fullscreenInterfaceId1 = overlayCom;
+        }
+        state.chatbackInputOpen = 0;
+        this.dialogInputOpen = false;
+        this.resumedPauseButton = false;
+        this.redrawFrame = true;
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetAngle(): boolean {
+        const xan: number = this.in.g2_alt2();
+        const comId: number = this.in.g2_alt3();
+        const zoom: number = this.in.g2_alt2();
+        const yan: number = this.in.g2_alt1();
+        const com = IfType.list[comId];
+        if (com) {
+            com.modelXAn = xan;
+            com.modelYAn = yan;
+            com.modelZoom = zoom;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
+    private handleIfSetRotation(): boolean {
+        const a: number = this.in.g2();
+        const comId: number = this.in.g2_alt2();
+        const b: number = this.in.g2_alt1();
+        const com = IfType.list[comId] as (IfType & { modelRotate: number }) | undefined;
+        if (com) {
+            com.modelRotate = (a << 16) + b;
+        }
+        this.ptype = -1;
+        return true;
+    }
+
     private ifAnimReset(id: number): void {
         const parent: IfType = IfType.list[id];
         if (!parent.children) {
@@ -11138,83 +12166,103 @@ export class Client extends GameShell {
                 com.colour = Colour.WHITE;
                 com.text = 'Moderator option: Mute player for 48 hours: <OFF>';
             }
-        } else if (clientCode === ClientCode.CC_LAST_LOGIN_INFO || clientCode === ClientCode.CC_LAST_LOGIN_INFO2) {
-            if (this.lastAddress === 0) {
-                com.text = '';
+        } else if (clientCode === ClientCode.CC_LAST_LOGIN_INFO) {
+            const state = this as unknown as Client377State;
+            const daysAgo: number = state.currentDay - state.previousLoginDay;
+            let when: string;
+            if (daysAgo <= 0) {
+                when = 'earlier today';
+            } else if (daysAgo === 1) {
+                when = 'yesterday';
             } else {
-                let text: string;
-                if (this.daysSinceLastLogin === 0) {
-                    text = 'earlier today';
-                } else if (this.daysSinceLastLogin === 1) {
-                    text = 'yesterday';
+                when = daysAgo + ' days ago';
+            }
+            const host = this.dnsReq ?? JString.formatIPv4(this.lastAddress >>> 0);
+            com.text = 'You last logged in @red@' + when + '@bla@ from: @red@' + host;
+        } else if (clientCode === ClientCode.CC_RECOVERY_QUESTIONS) {
+            const state = this as unknown as Client377State;
+            if (state.recoveriesLastChangedDay === 0) {
+                com.text =
+                    '\\nYou have not yet set any recovery questions.\\nIt is @lre@strongly@yel@ recommended that you do so.\\n\\nIf you don\'t you will be @lre@unable to recover your\\n@lre@password@yel@ if you forget it, or it is stolen.';
+            } else if (state.recoveriesLastChangedDay <= state.currentDay) {
+                com.text = '\\n\\nRecovery Questions Last Set:\\n@gre@' + this.getDateString(state.recoveriesLastChangedDay);
+            } else {
+                const pending: number = state.currentDay + 14 - state.recoveriesLastChangedDay;
+                let when: string;
+                if (pending <= 0) {
+                    when = 'Earlier today';
+                } else if (pending === 1) {
+                    when = 'Yesterday';
                 } else {
-                    text = this.daysSinceLastLogin + ' days ago';
+                    when = pending + ' days ago';
                 }
-
-                com.text = `You last logged in ${text}`;
-
-                const ipStr = JString.formatIPv4(this.lastAddress);
-                if (!ipStr.startsWith('127.')) {
-                    com.text += ` from: ${this.dnsReq ?? ipStr}`;
-                }
+                com.text =
+                    when +
+                    ' you requested@lre@ new recovery\\n@lre@questions.@yel@ The requested change will occur\\non: @lre@' +
+                    this.getDateString(state.recoveriesLastChangedDay) +
+                    '\\n\\nIf you do not remember making this request\\ncancel it immediately, and change your password.';
             }
         } else if (clientCode === ClientCode.CC_UNREAD_MESSAGES) {
+            let message: string;
             if (this.unreadMessages === 0) {
-                com.text = '0 unread messages';
-                com.colour = Colour.YELLOW;
+                message = '@yel@0 unread messages';
             } else if (this.unreadMessages === 1) {
-                com.text = '1 unread message';
-                com.colour = Colour.GREEN;
-            } else if (this.unreadMessages > 1) {
-                com.text = this.unreadMessages + ' unread messages';
-                com.colour = Colour.GREEN;
-            }
-        } else if (clientCode === ClientCode.CC_RECOVERY1) {
-            if (this.daysSinceRecoveriesChanged === 201) {
-                if (this.warnMembersInNonMembers == 1) {
-                    com.text = '@yel@This is a non-members world: @whi@Since you are a member we';
-                } else {
-                    com.text = '';
-                }
-            } else if (this.daysSinceRecoveriesChanged === 200) {
-                com.text = 'You have not yet set any password recovery questions.';
+                message = '@gre@1 unread message';
             } else {
-                let text: string;
-                if (this.daysSinceRecoveriesChanged === 0) {
-                    text = 'Earlier today';
-                } else if (this.daysSinceRecoveriesChanged === 1) {
-                    text = 'Yesterday';
-                } else {
-                    text = this.daysSinceRecoveriesChanged + ' days ago';
-                }
-
-                com.text = text + ' you changed your recovery questions';
+                message = '@gre@' + this.unreadMessages + ' unread messages';
             }
-        } else if (clientCode === ClientCode.CC_RECOVERY2) {
-            if (this.daysSinceRecoveriesChanged === 201) {
-                if (this.warnMembersInNonMembers == 1) {
-                    com.text = '@whi@recommend you use a members world instead. You may use';
-                } else {
-                    com.text = '';
-                }
-            } else if (this.daysSinceRecoveriesChanged === 200) {
-                com.text = 'We strongly recommend you do so now to secure your account.';
+            com.text = 'You have ' + message + '\\nin your message centre.';
+        } else if (clientCode === ClientCode.CC_PASSWORD_CHANGE) {
+            const state = this as unknown as Client377State;
+            if (state.daysSincePasswordChanged > 0 && state.daysSincePasswordChanged <= state.currentDay + 10) {
+                com.text = 'Last password change:\\n@gre@' + this.getDateString(state.daysSincePasswordChanged);
             } else {
-                com.text = 'If you do not remember making this change then cancel it immediately';
+                com.text = 'Last password change:\\n@gre@Never changed';
             }
-        } else if (clientCode === ClientCode.CC_RECOVERY3) {
-            if (this.daysSinceRecoveriesChanged === 201) {
-                if (this.warnMembersInNonMembers == 1) {
-                    com.text = '@whi@this world but member benefits are unavailable whilst here.';
-                } else {
-                    com.text = '';
-                }
-            } else if (this.daysSinceRecoveriesChanged === 200) {
-                com.text = "Do this from the 'account management' area on our front webpage";
+        } else if (clientCode === ClientCode.CC_MEMBERS_CREDIT) {
+            const state = this as unknown as Client377State;
+            if (state.daysOfMembersRemaining > 2 && !Client.memServer) {
+                com.text = 'This is a non-members\\nworld. To enjoy your\\nmembers benefits we\\nrecommend you play on a\\nmembers world instead.';
+            } else if (state.daysOfMembersRemaining > 2) {
+                com.text = '\\n\\nYou have @gre@' + state.daysOfMembersRemaining + '@yel@ days of\\nmember credit remaining.';
+            } else if (state.daysOfMembersRemaining > 0) {
+                com.text =
+                    'You have @gre@' +
+                    state.daysOfMembersRemaining +
+                    '@yel@ days of\\nmember credit remaining.\\n\\n@lre@Credit low! Renew now\\n@lre@to avoid losing members.';
             } else {
-                com.text = "Do this from the 'account management' area on our front webpage";
+                com.text = 'You are not a member.\\n\\nChoose to subscribe and\\nyou\'ll get loads of extra\\nbenefits and features.';
+            }
+        } else if (clientCode === ClientCode.CC_MEMBERS_HELP) {
+            const state = this as unknown as Client377State;
+            if (state.daysOfMembersRemaining > 2 && !Client.memServer) {
+                com.text =
+                    'To switch to a members-only world:\\n1) Logout and return to the world selection page.\\n2) Choose one of the members world with a gold star next to it\'s name.\\n\\nIf you prefer you can continue to use this world,\\nbut members only features will be unavailable here.';
+            } else if (state.daysOfMembersRemaining > 0) {
+                com.text =
+                    'To extend or cancel a subscription:\\n1) Logout and return to the frontpage of this website.\\n2)Choose the relevant option from the \'membership\' section.\\n\\nNote: If you are a credit card subscriber a top-up payment will\\nautomatically be taken when 3 days credit remain.\\n(unless you cancel your subscription, which can be done at any time.)';
+            } else {
+                com.text = 'To start a subscripton:\\n1) Logout and return to the frontpage of this website.\\n2) Choose \'Start a new subscription\'';
+            }
+        } else if (clientCode === ClientCode.CC_RECOVERY_HELP) {
+            const state = this as unknown as Client377State;
+            if (state.recoveriesLastChangedDay > state.currentDay) {
+                com.text =
+                    'To cancel this request:\\n1) Logout and return to the frontpage of this website.\\n2) Choose \'Cancel recovery questions\'.';
+            } else {
+                com.text =
+                    'To change your recovery questions:\\n1) Logout and return to the frontpage of this website.\\n2) Choose \'Set new recovery questions\'.';
             }
         }
+    }
+
+    private getDateString(day: number): string {
+        const currentDay = (this as unknown as Client377State).currentDay;
+        if (day > currentDay + 10) {
+            return 'Unknown';
+        }
+        const date = new Date((day + 11745) * 86400000);
+        return date.getUTCDate() + '-' + MONTHS[date.getUTCMonth()] + '-' + date.getUTCFullYear();
     }
 
     private closeModal(): void {

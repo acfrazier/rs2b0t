@@ -16,7 +16,6 @@ const { default: ObjType } = await import('#/client/config/ObjType.js');
 const { default: ClientPlayer } = await import('#/client/dash3d/ClientPlayer.js');
 const { default: Model } = await import('#/client/dash3d/Model.js');
 const { default: Packet } = await import('#/client/io/Packet.js');
-const { ServerProt } = await import('#/client/io/ServerProt.js');
 const { Client } = await import('#/client/shell/Client.js');
 
 function transformedPlayer(npcId = 1487) {
@@ -29,23 +28,16 @@ function transformedPlayer(npcId = 1487) {
     return player;
 }
 
-async function setPlayerHead(player: InstanceType<typeof ClientPlayer>, comId: number) {
-    const bytes = Uint8Array.of(ServerProt.IF_SETPLAYERHEAD, comId >> 8, comId & 255);
-    let offset = 0;
+function setPlayerHead(player: InstanceType<typeof ClientPlayer>, comId: number): void {
+    const input = new Packet(new Uint8Array(2));
+    input.p2_alt3(comId);
+    input.pos = 0;
     const client = Object.assign(Object.create(Client.prototype), {
         localPlayer: player,
-        in: new Packet(new Uint8Array(16)),
-        ptype: -1,
-        randomIn: null,
-        stream: {
-            get available() { return bytes.length - offset; },
-            async readBytes(dst: Uint8Array, start: number, count: number) {
-                dst.set(bytes.subarray(offset, offset + count), start);
-                offset += count;
-            }
-        }
+        in: input,
+        ptype: -1
     }) as InstanceType<typeof Client>;
-    expect(await client['tcpIn']()).toBe(true);
+    expect(client['handleIfSetPlayerHead']()).toBe(true);
 }
 
 describe('player dialogue heads', () => {
@@ -102,12 +94,12 @@ describe('player dialogue heads', () => {
         const com = IfType.list[0] = new IfType();
         const player = transformedPlayer();
 
-        await setPlayerHead(player, 0);
+        setPlayerHead(player, 0);
         expect(com.getTempModel(-1, -1, false, player)).toBe(normal);
 
         player.transmog!.id = 1480;
         player.transmog!.head = Uint16Array.of(1480);
-        await setPlayerHead(player, 0);
+        setPlayerHead(player, 0);
         expect(com.getTempModel(-1, -1, false, player)).toBe(ninja);
     });
 
@@ -118,12 +110,12 @@ describe('player dialogue heads', () => {
         const com = IfType.list[0] = new IfType();
         const player = transformedPlayer();
 
-        await setPlayerHead(player, 0);
+        setPlayerHead(player, 0);
         expect(com.getTempModel(-1, -1, false, player)).toBe(monkey);
 
         player.transmog = null;
         player.appearance.fill(0);
-        await setPlayerHead(player, 0);
+        setPlayerHead(player, 0);
         const human = com.getTempModel(-1, -1, false, player);
         expect(human).toBeInstanceOf(Model);
         expect(human).not.toBe(monkey);
