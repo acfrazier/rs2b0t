@@ -27,9 +27,10 @@ export default class SeqType {
 
     id: number = -1;
     numFrames: number = 0;
-    frames: Int16Array | null = null;
-    iframes: Int16Array | null = null;
-    delay: Int16Array | null = null;
+    /** Java int[] field777/778/779: unsigned g2, including frame ids >= 32768. */
+    frames: Int32Array | null = null;
+    iframes: Int32Array | null = null;
+    delay: Int32Array | null = null;
     loops: number = -1;
     walkmerge: Int32Array | null = null;
     reachforward: boolean = false;
@@ -94,17 +95,15 @@ export default class SeqType {
 
             if (code === 1) {
                 this.numFrames = dat.g1();
-                this.frames = new Int16Array(this.numFrames);
-                this.iframes = new Int16Array(this.numFrames);
-                this.delay = new Int16Array(this.numFrames);
+                this.frames = new Int32Array(this.numFrames);
+                this.iframes = new Int32Array(this.numFrames);
+                this.delay = new Int32Array(this.numFrames);
 
                 for (let i: number = 0; i < this.numFrames; i++) {
                     this.frames[i] = dat.g2();
 
-                    this.iframes[i] = dat.g2();
-                    if (this.iframes[i] === 65535) {
-                        this.iframes[i] = -1;
-                    }
+                    const iframe = dat.g2();
+                    this.iframes[i] = iframe === 65535 ? -1 : iframe;
 
                     this.delay[i] = dat.g2();
                 }
@@ -145,13 +144,13 @@ export default class SeqType {
         if (this.numFrames === 0) {
             this.numFrames = 1;
 
-            this.frames = new Int16Array(1);
+            this.frames = new Int32Array(1);
             this.frames[0] = -1;
 
-            this.iframes = new Int16Array(1);
+            this.iframes = new Int32Array(1);
             this.iframes[0] = -1;
 
-            this.delay = new Int16Array(1);
+            this.delay = new Int32Array(1);
             this.delay[0] = -1;
         }
 

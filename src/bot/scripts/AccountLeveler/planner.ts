@@ -9,7 +9,7 @@ import { canResumeObjective, trainingPriority } from './priority.js';
 import { requirementKey, stockOf, type ActivityPlan, type Decision, type LevelerSnapshot, type SessionMemory } from './types.js';
 
 export { scimitarFor } from './combat.js';
-/** Skills `methods.ts` can train — not `Skill.used`, so slayer/farming stay off the leveler. */
+/** Skills `methods.ts` can train, not `Skill.used`, so slayer/farming stay off the leveler. */
 const TRAINABLE = new Set(['attack', 'defence', 'strength', 'hitpoints', 'ranged', 'prayer', 'magic', 'cooking', 'woodcutting', 'fletching', 'fishing', 'firemaking', 'crafting', 'smithing', 'mining', 'herblore', 'agility', 'thieving', 'runecraft']);
 export const enabledSkills = Skill.names.filter(name => TRAINABLE.has(name));
 export const emptyMemory = (): SessionMemory => ({ objective: null, recent: [], cooldowns: {}, attempted: {}, deaths: 0 });

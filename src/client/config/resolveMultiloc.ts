@@ -2,6 +2,17 @@ import LocType from '#/client/config/LocType.js';
 import NpcType from '#/client/config/NpcType.js';
 import VarBitType from '#/client/config/VarBitType.js';
 
+/** Live client.var reference. ClientLocAnim.app's setter keeps this current. */
+let liveVarps: number[] = [];
+
+export function setMorphVarps(varps: number[]): void {
+    liveVarps = varps;
+}
+
+export function getMorphVarps(): number[] {
+    return liveVarps;
+}
+
 function morphIndex(varbitId: number, varpId: number, varps: number[]): number | null {
     if (varbitId !== -1) {
         const varbit = VarBitType.list[varbitId];

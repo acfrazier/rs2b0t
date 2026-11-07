@@ -79,6 +79,34 @@ describe('377 loc opcode 77', () => {
         LocType.init(fakeJag({ 'loc.dat': dat, 'loc.idx': idx }));
         expect(() => LocType.list(0)).toThrow('LocType 0: trailing config bytes');
     });
+
+    test('empty decode sets raiseobject from blockwalk', () => {
+        const loc = new LocType();
+        loc.decode(new Packet(new Uint8Array([0])));
+        expect(loc.raiseobject).toBe(1);
+        loc.blockwalk = false;
+        loc.raiseobject = -1;
+        loc.decode(new Packet(new Uint8Array([0])));
+        expect(loc.raiseobject).toBe(0);
+    });
+
+    test('action opcode 35 throws under STRICT', () => {
+        const loc = new LocType();
+        loc.id = 7;
+        expect(() => loc.decode(new Packet(new Uint8Array([35, 65, 10, 0])))).toThrow('LocType 7: unknown config opcode 35');
+    });
+
+    test('idx and dat trailing bytes throw at init under STRICT', () => {
+        const { dat, idx } = locPair([new Uint8Array([0])]);
+        const idxExtra = new Uint8Array(idx.length + 1);
+        idxExtra.set(idx);
+        idxExtra[idx.length] = 99;
+        expect(() => LocType.init(fakeJag({ 'loc.dat': dat, 'loc.idx': idxExtra }))).toThrow('LocType: trailing idx bytes');
+        const datExtra = new Uint8Array(dat.length + 1);
+        datExtra.set(dat);
+        datExtra[dat.length] = 99;
+        expect(() => LocType.init(fakeJag({ 'loc.dat': datExtra, 'loc.idx': idx }))).toThrow('LocType: trailing dat bytes');
+    });
 });
 
 describe('377 npc opcode 106', () => {
@@ -100,6 +128,24 @@ describe('377 npc opcode 106', () => {
         npc.id = 2;
         expect(() => npc.decode(new Packet(new Uint8Array([200, 0])))).toThrow('NpcType 2: unknown config opcode 200');
     });
+
+    test('action opcode 35 throws under STRICT', () => {
+        const npc = new NpcType();
+        npc.id = 2;
+        expect(() => npc.decode(new Packet(new Uint8Array([35, 65, 10, 0])))).toThrow('NpcType 2: unknown config opcode 35');
+    });
+
+    test('idx and dat trailing bytes throw at init under STRICT', () => {
+        const { dat, idx } = locPair([new Uint8Array([0])]);
+        const idxExtra = new Uint8Array(idx.length + 1);
+        idxExtra.set(idx);
+        idxExtra[idx.length] = 99;
+        expect(() => NpcType.init(fakeJag({ 'npc.dat': dat, 'npc.idx': idxExtra }))).toThrow('NpcType: trailing idx bytes');
+        const datExtra = new Uint8Array(dat.length + 1);
+        datExtra.set(dat);
+        datExtra[dat.length] = 99;
+        expect(() => NpcType.init(fakeJag({ 'npc.dat': datExtra, 'npc.idx': idx }))).toThrow('NpcType: trailing dat bytes');
+    });
 });
 
 describe('377 obj opcode 10', () => {
@@ -107,6 +153,18 @@ describe('377 obj opcode 10', () => {
         const obj = new ObjType();
         obj.decode(new Packet(new Uint8Array([10, 0, 42, 0])));
         expect(obj.unused10).toBe(42);
+    });
+
+    test('idx and dat trailing bytes throw at init under STRICT', () => {
+        const { dat, idx } = locPair([new Uint8Array([0])]);
+        const idxExtra = new Uint8Array(idx.length + 1);
+        idxExtra.set(idx);
+        idxExtra[idx.length] = 99;
+        expect(() => ObjType.init(fakeJag({ 'obj.dat': dat, 'obj.idx': idxExtra }), true)).toThrow('ObjType: trailing idx bytes');
+        const datExtra = new Uint8Array(dat.length + 1);
+        datExtra.set(dat);
+        datExtra[dat.length] = 99;
+        expect(() => ObjType.init(fakeJag({ 'obj.dat': datExtra, 'obj.idx': idx }), true)).toThrow('ObjType: trailing dat bytes');
     });
 });
 
@@ -124,6 +182,14 @@ describe('377 seq opcode 12', () => {
         const seq = new SeqType();
         seq.decode(new Packet(new Uint8Array([12, 128, 0, 0, 1, 0])));
         expect(seq.unused12).toBe(-2147483647);
+    });
+
+    test('frame ids above 32767 stay unsigned and iframe 65535 becomes -1', () => {
+        const seq = new SeqType();
+        seq.decode(new Packet(new Uint8Array([1, 1, 0x83, 0x1f, 0xff, 0xff, 0x80, 0x00, 0])));
+        expect(Array.from(seq.frames ?? [])).toEqual([33567]);
+        expect(Array.from(seq.iframes ?? [])).toEqual([-1]);
+        expect(Array.from(seq.delay ?? [])).toEqual([32768]);
     });
 });
 
@@ -180,14 +246,19 @@ describe('377 flo opcode 7', () => {
     });
 
     test('opcode 7 restores hue after overlay recompute', () => {
+        const dat = new Packet(new Uint8Array([1, 255, 0, 0, 2, 255, 3, 5, 6, 122, 10, 7, 0, 0, 255, 0]));
         const flo = new FloType();
-        flo.decode(new Packet(new Uint8Array([1, 255, 0, 0, 2, 255, 3, 5, 6, 122, 10, 7, 0, 0, 255, 0])));
+        flo.decode(dat);
+        expect(dat.pos).toBe(dat.length);
         expect(flo.texture).toBe(255);
         expect(flo.overlay).toBe(true);
         expect(flo.occlude).toBe(false);
         expect(flo.debugname).toBe('z');
         expect(flo.hue).toBe(0);
         expect(flo.lightness).toBe(127);
+        expect(flo.chroma).toBe(0);
+        expect(flo.chroma).toBe(flo.underlayHue);
+        expect(flo.overlayHsl).not.toBe(0);
     });
 });
 
@@ -221,7 +292,58 @@ describe('377 IfType type 8', () => {
         data.pjstr('Tip');
         IfType.init(interfaceJag(data.data.subarray(0, data.pos)), null, []);
         expect(IfType.list[0].text).toBe('Tip');
+        expect(IfType.list[0].modelRotate).toBe(0);
         expect(IfType.list[0]).toBeInstanceOf(IfType);
         expect('unloadCom' in IfType).toBe(false);
+    });
+
+    test('unknown component type throws under STRICT', () => {
+        const data = new Packet(new Uint8Array(32));
+        data.p2(1);
+        data.p2(0);
+        data.p1(9);
+        expect(() => IfType.init(interfaceJag(data.data.subarray(0, data.pos)), null, [])).toThrow('IfType 0: unknown component type 9');
+    });
+
+    test('type 255 header-only records unpack under STRICT', () => {
+        const data = new Packet(new Uint8Array(32));
+        data.p2(1);
+        data.p2(0);
+        data.p1(255);
+        data.p1(0);
+        data.p2(0);
+        data.p2(1);
+        data.p2(1);
+        data.p1(0);
+        data.p1(0);
+        data.p1(0);
+        data.p1(0);
+        IfType.init(interfaceJag(data.data.subarray(0, data.pos)), null, []);
+        expect(IfType.list[0].type).toBe(255);
+    });
+
+    test('component id past count throws under STRICT', () => {
+        const data = new Packet(new Uint8Array(8));
+        data.p2(1);
+        data.p2(5);
+        expect(() => IfType.init(interfaceJag(data.data.subarray(0, data.pos)), null, [])).toThrow('IfType: component id 5 out of range (count 1)');
+    });
+
+    test('trailing bytes after the last component throw under STRICT', () => {
+        const data = new Packet(new Uint8Array(64));
+        data.p2(1);
+        data.p2(0);
+        data.p1(ComponentType.TYPE_TEXT_STATIC);
+        data.p1(0);
+        data.p2(0);
+        data.p2(1);
+        data.p2(1);
+        data.p1(0);
+        data.p1(0);
+        data.p1(0);
+        data.p1(0);
+        data.pjstr('Tip');
+        data.p1(99);
+        expect(() => IfType.init(interfaceJag(data.data.subarray(0, data.pos)), null, [])).toThrow('IfType: trailing config bytes');
     });
 });

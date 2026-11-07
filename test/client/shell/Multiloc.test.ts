@@ -9,6 +9,7 @@ const { default: ClientBuild } = await import('#/client/shell/ClientBuild.js');
 const { default: LocType } = await import('#/client/config/LocType.js');
 const { default: VarBitType } = await import('#/client/config/VarBitType.js');
 const { default: Model } = await import('#/client/dash3d/Model.js');
+const { default: CollisionMap } = await import('#/client/dash3d/CollisionMap.js');
 const { BotHost } = await import('#/bot/runtime/BotHost.js');
 const { ServerProt } = await import('#/client/io/ServerProt.js');
 const { attach, detach, invalidateLocSnapshots, reader } = await import('#/bot/adapter/ClientAdapter.js');
@@ -249,14 +250,24 @@ describe('multiloc placement', () => {
         const base = locs.get(rawId)!;
         const child = locs.get(transformedId)!;
         base.width = 2;
-        base.length = 3;
+        base.length = 1;
+        base.blockwalk = true;
+        base.blockrange = false;
         child.width = 1;
         child.length = 1;
         const resolved = resolveMultiloc(base, [0]);
         expect(resolved?.name).toBe('Secret passage');
         expect(resolved?.width).toBe(1);
-        expect(base.width).toBe(2);
-        expect(base.length).toBe(3);
+
+        ClientBuild.lowMem = false;
+        const groundh = [Array.from({ length: 5 }, () => new Int32Array(5))];
+        const builder = Object.assign(Object.create(ClientBuild.prototype), { groundh });
+        const cmap = new CollisionMap();
+        builder.addLoc(0, 2, 2, rawId, 10, 0, null, cmap);
+        const blocked = (x: number, z: number) => (cmap.flags[CollisionMap.index(x, z)] & 0x100) !== 0;
+        expect(blocked(2, 2)).toBe(true);
+        expect(blocked(3, 2)).toBe(true);
+        expect(blocked(2, 3)).toBe(false);
     });
 
     test('varp-only change re-resolves without rebuilding the scene', () => {
@@ -297,6 +308,45 @@ describe('multinpc resolve', () => {
             expect(resolveMultiNpc(base, [0, 1])).toBeNull();
         } finally {
             NpcType.list = orig;
+        }
+    });
+
+    test('getTempModel and getHead resolve the morph child like Java method475/getHeadModel', () => {
+        const child = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        child.id = 9;
+        child.multinpc = [];
+        child.multivarbit = -1;
+        child.multivar = -1;
+        child.head = Uint16Array.of(4);
+        child.model = null;
+        child.recol_s = null;
+        child.recol_d = null;
+        const base = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        base.id = 3;
+        base.multinpc = [9, -1];
+        base.multivarbit = -1;
+        base.multivar = 0;
+        base.head = null;
+        base.model = null;
+        const orig = NpcType.list;
+        const origApp = ClientLocAnim.app;
+        const origReq = Model.requestDownload;
+        const origLoad = Model.load;
+        NpcType.list = (id: number) => (id === 9 ? child : base);
+        ClientLocAnim.app = { var: [0] } as InstanceType<typeof Client>;
+        Model.requestDownload = () => true;
+        Model.load = (id: number) => ({ id }) as never;
+        try {
+            expect((base.getHead() as unknown as { id: number }).id).toBe(4);
+            expect(base.getTempModel(-1, -1, null)).toBeNull();
+            ClientLocAnim.app.var[0] = 1;
+            expect(base.getHead()).toBeNull();
+            expect(base.getTempModel(-1, -1, null)).toBeNull();
+        } finally {
+            NpcType.list = orig;
+            ClientLocAnim.app = origApp;
+            Model.requestDownload = origReq;
+            Model.load = origLoad;
         }
     });
 });

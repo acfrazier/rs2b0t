@@ -49,10 +49,26 @@ const { default: VarBitType } = await import('../src/client/config/VarBitType.js
 const { default: IdkType } = await import('../src/client/config/IdkType.js');
 const { default: FloType } = await import('../src/client/config/FloType.js');
 const { default: IfType } = await import('../src/client/config/IfType.js');
+const { default: PixFont } = await import('../src/client/graphics/PixFont.js');
 
 const config = new JagFile(loadBytes('config'));
 const interfaces = new JagFile(loadBytes('interface'));
 const media = new JagFile(loadBytes('media'));
+
+function tryLoadBytes(name: string): Uint8Array | null {
+    try {
+        return loadBytes(name);
+    } catch {
+        return null;
+    }
+}
+
+const titleBytes = tryLoadBytes('title');
+let fonts: InstanceType<typeof PixFont>[] = [];
+if (titleBytes) {
+    const title = new JagFile(titleBytes);
+    fonts = [PixFont.depack(title, 'p11_full', false), PixFont.depack(title, 'p12_full', false), PixFont.depack(title, 'b12_full', false), PixFont.depack(title, 'q8_full', true)];
+}
 
 SeqType.init(config);
 LocType.init(config);
@@ -63,7 +79,7 @@ IdkType.init(config);
 SpotType.init(config);
 VarpType.init(config);
 VarBitType.init(config);
-IfType.init(interfaces, media, []);
+IfType.init(interfaces, media, fonts);
 
 let failures = 0;
 
@@ -93,8 +109,13 @@ let blockrange = 0;
 let ops = 0;
 let multilocs = 0;
 for (let id = 0; id < LocType.numDefinitions; id++) {
-    const loc = LocType.list(id);
-    if (loc.name) named++;
+    let loc;
+    try {
+        loc = LocType.list(id);
+    } catch {
+        continue;
+    }
+    if (loc.name !== null) named++;
     if (loc.model) modeled++;
     if (loc.shape) shaped++;
     if (loc.active) active++;

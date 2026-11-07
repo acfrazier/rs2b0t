@@ -104,6 +104,8 @@ export default class IfType {
     modelZoom: number = 0;
     modelXAn: number = 0;
     modelYAn: number = 0;
+    /** Java field700: packed IF_SETROTATION spin (high 16 xan delta, low 16 signed yan delta). */
+    modelRotate: number = 0;
     targetVerb: string | null = null;
     targetBase: string | null = null;
     targetMask: number = -1;
@@ -125,10 +127,18 @@ export default class IfType {
         this.list = new Array(count);
 
         while (data.pos < data.length) {
+            if (data.length - data.pos < 2) {
+                break;
+            }
+
             let id: number = data.g2();
             if (id === 65535) {
                 layer = data.g2();
                 id = data.g2();
+            }
+
+            if (IfType.STRICT && (id < 0 || id >= count)) {
+                throw new Error(`IfType: component id ${id} out of range (count ${count})`);
             }
 
             const com: IfType = (this.list[id] = new IfType());
@@ -136,6 +146,11 @@ export default class IfType {
             com.layerId = layer;
 
             com.type = data.g1();
+            // Java reads any g1 and only type 0–8 have bodies. The 377 pack stores 456
+            // type-255 (unsigned -1) header-only records; reject other unknowns under STRICT.
+            if (IfType.STRICT && com.type !== 255 && (com.type < ComponentType.TYPE_LAYER || com.type > ComponentType.TYPE_TEXT_STATIC)) {
+                throw new Error(`IfType ${id}: unknown component type ${com.type}`);
+            }
             com.buttonType = data.g1();
             com.clientCode = data.g2();
             com.width = data.g2();

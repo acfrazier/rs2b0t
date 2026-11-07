@@ -82,6 +82,14 @@ export default class ObjType {
             offset += idx.g2();
         }
         this.datEnd = offset;
+        if (ObjType.STRICT) {
+            if (idx.pos !== idx.length) {
+                throw new Error(`ObjType: trailing idx bytes (pos ${idx.pos}, end ${idx.length})`);
+            }
+            if (this.dat.length !== offset) {
+                throw new Error(`ObjType: trailing dat bytes (end ${offset}, length ${this.dat.length})`);
+            }
+        }
 
         this.recent = new TypedArray1d(10, null);
         for (let id: number = 0; id < 10; id++) {

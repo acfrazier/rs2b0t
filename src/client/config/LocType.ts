@@ -56,7 +56,7 @@ export default class LocType {
     forceapproach: number = 0;
     forcedecor: boolean = false;
     breakroutefinding: boolean = false;
-    raiseobject: number = 0;
+    raiseobject: number = -1;
     multivarbit: number = -1;
     /** 377 Java field1635 — varp selector when multivarbit is −1. */
     multivar: number = -1;
@@ -78,6 +78,14 @@ export default class LocType {
             offset += idx.g2();
         }
         this.datEnd = offset;
+        if (LocType.STRICT) {
+            if (idx.pos !== idx.length) {
+                throw new Error(`LocType: trailing idx bytes (pos ${idx.pos}, end ${idx.length})`);
+            }
+            if (this.dat.length !== offset) {
+                throw new Error(`LocType: trailing dat bytes (end ${offset}, length ${this.dat.length})`);
+            }
+        }
 
         this.recent = new TypedArray1d(10, null);
         for (let id: number = 0; id < 10; id++) {
@@ -213,7 +221,7 @@ export default class LocType {
                 this.ambient = dat.g1b();
             } else if (code === 39) {
                 this.contrast = dat.g1b();
-            } else if (code >= 30 && code < 39) {
+            } else if (code >= 30 && code < 35) {
                 if (!this.op) {
                     this.op = new TypedArray1d(5, null);
                 }

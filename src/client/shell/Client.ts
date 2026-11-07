@@ -11088,7 +11088,7 @@ export class Client extends GameShell {
                 model.calculateNormals(64, 850, -30, -50, -30, true);
 
                 if (this.localPlayer) {
-                    const frames: Int16Array | null = SeqType.list[this.localPlayer.readyanim].frames;
+                    const frames: Int32Array | null = SeqType.list[this.localPlayer.readyanim].frames;
                     if (frames) {
                         model.animate(frames[0]);
                     }

@@ -1,3 +1,4 @@
+import { getMorphVarps, resolveMultiNpc } from '#/client/config/resolveMultiloc.js';
 import LruCache from '#/client/datastruct/LruCache.js';
 
 import AnimFrame from '#/client/dash3d/AnimFrame.js';
@@ -67,6 +68,14 @@ export default class NpcType {
             offset += idx.g2();
         }
         this.datEnd = offset;
+        if (NpcType.STRICT) {
+            if (idx.pos !== idx.length) {
+                throw new Error(`NpcType: trailing idx bytes (pos ${idx.pos}, end ${idx.length})`);
+            }
+            if (this.dat.length !== offset) {
+                throw new Error(`NpcType: trailing dat bytes (end ${offset}, length ${this.dat.length})`);
+            }
+        }
 
         this.recent = new TypedArray1d(20, null);
         for (let id: number = 0; id < 20; id++) {
@@ -131,7 +140,7 @@ export default class NpcType {
                 this.walkanim_b = dat.g2();
                 this.walkanim_r = dat.g2();
                 this.walkanim_l = dat.g2();
-            } else if (code >= 30 && code < 40) {
+            } else if (code >= 30 && code < 35) {
                 if (!this.op) {
                     this.op = new TypedArray1d(5, null);
                 }
@@ -206,6 +215,12 @@ export default class NpcType {
     }
 
     getTempModel(primaryTransformId: number, secondaryTransformId: number, seqMask: Int32Array | null): Model | null {
+        // Java method475: multinpc table resolves here (ClientNpc just calls method475).
+        if (this.multinpc.length > 0) {
+            const resolved = resolveMultiNpc(this, getMorphVarps());
+            return resolved ? resolved.getTempModel(primaryTransformId, secondaryTransformId, seqMask) : null;
+        }
+
         let model = NpcType.modelCache.find(BigInt(this.id));
 
         if (!model && this.model) {
@@ -272,6 +287,12 @@ export default class NpcType {
     }
 
     getHead(): Model | null {
+        // Java getHeadModel: multinpc table resolves here (IfType type 2 chathead calls this).
+        if (this.multinpc.length > 0) {
+            const resolved = resolveMultiNpc(this, getMorphVarps());
+            return resolved ? resolved.getHead() : null;
+        }
+
         if (!this.head) {
             return null;
         }
