@@ -19,7 +19,7 @@ const fixture = JSON.parse(readFileSync('test/io/fixtures/prot377/engine-prot.js
     client: { name: string; id: number; length: number }[];
 };
 
-/** Methods the production client actually calls. Private is erased at runtime. */
+/** Methods the production client calls. Private is erased at runtime. */
 interface Reach {
     tryMove(srcX: number, srcZ: number, dx: number, dz: number, tryNearest: boolean, locWidth: number, locLength: number, locAngle: number, locShape: number, forceapproach: number, type: number): boolean;
     doAction(optionId: number): void;
