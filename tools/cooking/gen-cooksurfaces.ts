@@ -4,9 +4,11 @@ import { dirname, join } from 'node:path';
 
 import type { CookSurfaceKind, CookSurfaceLoc } from '../../src/bot/data/cookSurfaceTypes.js';
 import { Reader, bridgedLevel, forEachLoc, loadLocTypes, loadMapsquares, parseLands } from '../nav/lib.js';
+import { resolveOut, resolveRevision } from '../lib/genout.js';
 
 const ENGINE = process.env.ENGINE_DIR ?? join(homedir(), 'code', 'lostcity-dev', 'engine');
-const OUT = 'src/bot/data/cookSurfaceLocs.ts';
+const OUT = resolveOut('src/bot/data/cookSurfaceLocs.ts');
+const REVISION = resolveRevision();
 
 /** Loc types carrying `category=cooking_oven` or `cooking_fire` in content, minus `fire`.
  *  Why: `fire` is the player-lit one; it never appears in the map pack and Locs.query finds it live. */
@@ -25,7 +27,7 @@ const COOK_SURFACE_KINDS: Readonly<Record<string, CookSurfaceKind>> = {
 type Row = CookSurfaceLoc;
 
 function generate(): string {
-    const { configs } = loadLocTypes(ENGINE);
+    const { configs } = loadLocTypes(ENGINE, REVISION);
     const wanted = new Map<number, { name: string; debugname: string; kind: CookSurfaceKind }>();
     for (let id = 0; id < configs.length; id++) {
         const type = configs[id];

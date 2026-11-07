@@ -1,7 +1,7 @@
 /** Why: the first commit of the integration branch. `git mv`s every staged manifest artifact onto its repo path, deletes `data/377/` and the 289 recordings, rewrites the manifest.
  *  Why it refuses first: an unlisted staged file would vanish without a trace, and a hash mismatch describes a tree nobody reviewed.
  */
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
 import { MANIFEST_PATH, STAGED_KINDS, STAGING_ROOT, readManifest, sha256File, verifyManifest, writeManifest } from './lib/manifest.js';
@@ -39,7 +39,12 @@ function refusals(root: string, manifest: Manifest): string[] {
     const problems: string[] = [];
     if (manifest.cutover) problems.push(`already cut over (${MANIFEST_PATH} says cutover: true)`);
 
-    const staged = new Set(manifest.artifacts.filter(a => STAGED_KINDS.includes(a.kind)).map(a => a.path));
+    const staged = new Set(
+        manifest.artifacts.flatMap(artifact => [
+            ...(STAGED_KINDS.includes(artifact.kind) ? [artifact.path] : []),
+            ...(artifact.stagedPath === undefined ? [] : [artifact.stagedPath])
+        ])
+    );
     for (const artifact of manifest.artifacts) {
         if (STAGED_KINDS.includes(artifact.kind) && !artifact.path.startsWith(`${STAGING_ROOT}/`)) {
             problems.push(`${artifact.path} is listed as ${artifact.kind} but is not under ${STAGING_ROOT}/`);
@@ -56,7 +61,7 @@ function refusals(root: string, manifest: Manifest): string[] {
             problems.push(`${path} is listed but missing`);
             continue;
         }
-        const expected = manifest.artifacts.find(a => a.path === path)?.sha256;
+        const expected = manifest.artifacts.find(a => a.path === path || a.stagedPath === path)?.sha256;
         const actual = sha256File(join(root, path));
         if (expected !== actual) problems.push(`${path} hash differs from the manifest (${actual.slice(0, 12)}… vs ${expected?.slice(0, 12)}…)`);
     }
@@ -77,11 +82,18 @@ export function cutover(root = process.cwd()): string[] {
 
     const moved: string[] = [];
     for (const artifact of manifest.artifacts) {
-        if (!STAGED_KINDS.includes(artifact.kind)) continue;
-        const to = relative(STAGING_ROOT, artifact.path);
-        mkdirSync(dirname(join(root, to)), { recursive: true });
-        git(root, ['mv', '-f', '--', artifact.path, to]);
-        moved.push(to);
+        if (STAGED_KINDS.includes(artifact.kind)) {
+            const to = relative(STAGING_ROOT, artifact.path);
+            mkdirSync(dirname(join(root, to)), { recursive: true });
+            git(root, ['mv', '-f', '--', artifact.path, to]);
+            moved.push(to);
+        } else if (artifact.stagedPath !== undefined) {
+            const from = join(root, artifact.stagedPath);
+            const to = join(root, artifact.path);
+            mkdirSync(dirname(to), { recursive: true });
+            renameSync(from, to);
+            moved.push(artifact.path);
+        }
     }
 
     for (const path of GUARD_FIXTURES) {
@@ -97,9 +109,16 @@ export function cutover(root = process.cwd()): string[] {
     const rewritten: Manifest = {
         ...manifest,
         cutover: true,
-        artifacts: manifest.artifacts.map(artifact =>
-            artifact.path.startsWith(`${STAGING_ROOT}/`) ? { ...artifact, path: relative(STAGING_ROOT, artifact.path) } : artifact
-        )
+        artifacts: manifest.artifacts.map(artifact => {
+            if (artifact.path.startsWith(`${STAGING_ROOT}/`)) {
+                return { ...artifact, path: relative(STAGING_ROOT, artifact.path) };
+            }
+            if (artifact.stagedPath !== undefined) {
+                const { stagedPath: _stagedPath, ...finalArtifact } = artifact;
+                return finalArtifact;
+            }
+            return artifact;
+        })
     };
     writeManifest(root, rewritten);
 

@@ -1,35 +1,64 @@
 import { filesUnder } from '../lib/content.js';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { resolveOut } from '../lib/genout.js';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import type { NavPoint } from '#/bot/event/webwalk/PathFinder.js';
 
 import { decodeCoord } from '../nav/stairsParse.js';
-import { buildClueDb, parseChallengeTalk, parseClueObjs, parseEnum, parseKillForKey, parsePuzzleTalk, parseTalkMappings, type ClueType, type PuzzleMapping, type TalkMapping } from './cluesParse.js';
+import { buildClueDb, parseChallengeTalk, parseClueObjs, parseEnum, parseKillForKey, parsePuzzleTalk, parseTalkMappings, type ClueType, type ParsedClueObj, type PuzzleMapping, type TalkMapping } from './cluesParse.js';
 
 const CONTENT = process.env.CONTENT_DIR ?? join(homedir(), 'code', 'rs2b2t-content');
-const OUT = 'src/bot/api/ai/clues/data/cluedb.ts';
-const PIECES_OUT = 'src/bot/api/ai/clues/data/puzzlePieces.ts';
+const OUT = resolveOut('src/bot/api/ai/clues/data/cluedb.ts');
+const PIECES_OUT = resolveOut('src/bot/api/ai/clues/data/puzzlePieces.ts');
 const TRAIL = join(CONTENT, 'scripts', 'minigames', 'game_trail', 'configs');
 const MEDIUM_SCRIPT = join(CONTENT, 'scripts', 'minigames', 'game_trail', 'scripts', 'medium', 'trail_clue_medium.rs2');
 
+/** The `[trail_*]` obj corpus from every .obj under `scripts/`: 289 keeps it in
+ *  `game_trail/configs/trail*.obj`, 377 in `scripts/_unpack/377/all.obj`, read the way the
+ *  engine's packer reads configs: every file under `scripts/`, names unique across the tree
+ *  (PackShared refuses duplicates), ids resolved through `pack/obj.pack`. */
+function loadTrailObjs(): Record<string, ParsedClueObj> {
+    const out: Record<string, ParsedClueObj> = {};
+    for (const f of filesUnder(join(CONTENT, 'scripts'), '.obj')) {
+        const parsed = parseClueObjs(readFileSync(f, 'utf8'));
+        for (const [id, obj] of Object.entries(parsed)) {
+            if (!id.startsWith('trail_')) {
+                continue;
+            }
+            if (id in out) {
+                throw new Error(`duplicate trail obj block: ${id}`);
+            }
+            out[id] = obj;
+        }
+    }
+    return out;
+}
+
 const VAGUE003_COORD = '1_40_51_14_62';
 
-// Two hard clues keep their coord in the handler script, so the generator can't read them off trail_hard.obj.
+// Two hard clues keep their coord in the handler script, so the generator can't read them off the obj corpus.
 const HARD_SPECIAL_COORDS: Record<string, string> = {
-    // quest_fluffs.rs2, gertrudeempty_crate switch on loc_coord
+    // 377 scripts/quests/quest_fluffs/scripts/quest_fluffs.rs2:288-290, gertrudeempty_crate (oploc1)
     trail_clue_hard_map001: '0_51_54_45_47',
-    // general_use/bookcases.rs2, switch_coord case
+    // 289 only: 377 has no trail_clue_hard_riddle022 in trail_hard.enum; 289 general_use/bookcases.rs2, switch_coord
     trail_clue_hard_riddle022: '1_42_53_14_17'
 };
 
+// The key chests/drawers; each line is the 377 content source of the loc_coord branch that opens it.
 const RIDDLE_KEY_COORDS: Record<string, string> = {
+    // scripts/general_use/scripts/chests.rs2:10 (chest)
     trail_clue_medium_riddle001: '0_50_54_56_31',
+    // scripts/general_use/scripts/drawers.rs2:5 (drawers)
     trail_clue_medium_riddle002: '1_40_51_14_62',
+    // scripts/general_use/scripts/drawers.rs2:8
     trail_clue_medium_riddle003: '1_40_51_51_60',
+    // scripts/general_use/scripts/drawers.rs2:11
     trail_clue_medium_riddle004: '0_42_54_21_22',
+    // scripts/general_use/scripts/chests.rs2:12 (chest)
     trail_clue_medium_riddle005: '1_40_48_33_36',
+    // 289 only: 377 has no riddle007/008 in trail_medium.enum; 289 general_use/drawers.rs2:17,19
     trail_clue_medium_riddle007: '1_43_49_57_29',
     trail_clue_medium_riddle008: '0_45_55_41_57'
 };
@@ -83,29 +112,31 @@ function loadNpcDisplayNames(): Map<string, string> {
 
 /** Sliding-puzzle pieces are all named "Sliding piece", so the board is read by obj id. puzzle_piece_id is the slot the piece belongs in when solved. */
 function generatePieces(objIds: Map<string, number>): string {
-    const text = readFileSync(join(TRAIL, 'trail.obj'), 'utf8');
     const pieces: [number, number][] = [];
-    let cur: string | null = null;
-    for (const raw of text.split('\n')) {
-        const line = raw.trim();
-        const head = /^\[([a-z0-9_]+)\]$/.exec(line);
-        if (head) {
-            cur = head[1];
-        } else if (cur?.startsWith('trail_slidingpuzzle') && line.startsWith('param=puzzle_piece_id,')) {
-            const id = objIds.get(cur);
-            if (id === undefined) {
-                throw new Error(`no obj id for puzzle piece ${cur}`);
+    for (const f of filesUnder(join(CONTENT, 'scripts'), '.obj')) {
+        let cur: string | null = null;
+        for (const raw of readFileSync(f, 'utf8').split('\n')) {
+            const line = raw.trim();
+            const head = /^\[([a-z0-9_]+)\]$/.exec(line);
+            if (head) {
+                cur = head[1];
+            } else if (cur?.startsWith('trail_slidingpuzzle') && line.startsWith('param=puzzle_piece_id,')) {
+                const id = objIds.get(cur);
+                if (id === undefined) {
+                    throw new Error(`no obj id for puzzle piece ${cur}`);
+                }
+                pieces.push([id, Number(line.slice('param=puzzle_piece_id,'.length))]);
             }
-            pieces.push([id, Number(line.slice('param=puzzle_piece_id,'.length))]);
         }
     }
     if (pieces.length === 0) {
-        throw new Error('no sliding puzzle pieces found in trail.obj');
+        throw new Error('no sliding puzzle pieces found under scripts/');
     }
     pieces.sort((a, b) => a[0] - b[0]);
     console.log(`puzzle pieces=${pieces.length}`);
 
     return [
+        '/* eslint-disable */',
         '// GENERATED by tools/clues/gen-cluedb.ts, do not edit.',
         '// Regenerate: bun tools/clues/gen-cluedb.ts   (drift gate: --check)',
         '// docs/reference/clues-mechanics.md#puzzle-boxes',
@@ -122,11 +153,12 @@ function generate(): string {
     const objIds = loadObjIds();
     const npcDisplay = loadNpcDisplayNames();
     const rs2Files = filesUnder(join(CONTENT, 'scripts'), '.rs2');
+    const trailObjs = loadTrailObjs();
 
     const easyTalk: TalkMapping[] = rs2Files.flatMap(f => parseTalkMappings(readFileSync(f, 'utf8'), 'easy'));
     const easy = buildClueDb({
         clueNames: parseEnum(readFileSync(join(TRAIL, 'trail_easy.enum'), 'utf8')),
-        objs: parseClueObjs(readFileSync(join(TRAIL, 'trail_easy.obj'), 'utf8')),
+        objs: trailObjs,
         objIds,
         talk: easyTalk,
         npcDisplay,
@@ -153,7 +185,7 @@ function generate(): string {
     }
     const medium = buildClueDb({
         clueNames: parseEnum(readFileSync(join(TRAIL, 'trail_medium.enum'), 'utf8')),
-        objs: parseClueObjs(readFileSync(join(TRAIL, 'trail_medium.obj'), 'utf8')),
+        objs: trailObjs,
         objIds,
         talk: mediumTalk,
         npcDisplay,
@@ -162,7 +194,7 @@ function generate(): string {
         items: CLUE_ITEMS
     });
 
-    const hardObjs = parseClueObjs(readFileSync(join(TRAIL, 'trail_hard.obj'), 'utf8'));
+    const hardObjs = trailObjs;
     const hardTalk: TalkMapping[] = rs2Files.flatMap(f => parseTalkMappings(readFileSync(f, 'utf8'), 'hard'));
     const hardPuzzles: PuzzleMapping[] = rs2Files.flatMap(f => parsePuzzleTalk(readFileSync(f, 'utf8')));
     const guardians: Record<string, string> = {};
@@ -247,6 +279,7 @@ if (process.argv.includes('--check')) {
     }
 } else {
     for (const [path, fresh] of outputs) {
+        mkdirSync(dirname(path), { recursive: true });
         writeFileSync(path, fresh);
         console.log(`wrote ${path}`);
     }

@@ -36,6 +36,14 @@ and every artifact's hash, kind and qualification. Three readers:
   staging tree and the 289 recordings, and rewrites the manifest. It refuses an unlisted
   staged file or a hash mismatch before moving anything.
 
+For the 377 navigation bake, `tools/gen-377-data.sh` stages door, stair and transport
+JSONs plus the door-category and stair-price inputs under `data/377/`. The compressed
+collision pack is built in the run's private work directory and recorded as an `out`
+artifact at `out/collision.lcnav.gz` with its temporary source in `data/377/out/`; the
+cutover validates and moves that source. `build-collision.ts` defaults to
+`out/collision.lcnav` for every revision, and deploy/pack callers name that path explicitly,
+so a revision-specific build cannot overwrite a staged pack.
+
 Until the cutover, `data/377/` is tracked but inert: `bunfig.toml` roots test discovery at
 `test/`, `tsconfig.json` excludes the tree and eslint ignores it.
 `test/repo/stagingInert.test.ts` keeps a throwing test and an unresolvable import there, so

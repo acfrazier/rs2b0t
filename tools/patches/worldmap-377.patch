@@ -1,0 +1,67 @@
+diff --git a/tools/pack/map/Worldmap.ts b/tools/pack/map/Worldmap.ts
+index 2ea1fd8..e5fb84d 100644
+--- a/tools/pack/map/Worldmap.ts
++++ b/tools/pack/map/Worldmap.ts
+@@ -624,8 +624,8 @@ export async function packWorldmap() {
+     ];
+ 
+     for (let i = 0; i < FloType.configs.length; i++) {
+-        floorcol.p4(refColors[i][0]);
+-        floorcol.p4(refColors[i][1]);
++        floorcol.p4(refColors[i] ? refColors[i][0] : 0);
++        floorcol.p4(refColors[i] ? refColors[i][1] : FloType.configs[i].colour);
+     }
+ 
+     // ----
+@@ -636,14 +636,20 @@ export async function packWorldmap() {
+     const mapfunction = await convertImage(index, `${Environment.BUILD_SRC_DIR}/sprites`, 'mapfunction');
+     const b12 = await convertImage(index, `${Environment.BUILD_SRC_DIR}/fonts`, 'b12_full');
+     const mapdots = await convertImage(index, `${Environment.BUILD_SRC_DIR}/sprites`, 'mapdots');
+-    const f11 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f11.fm`, true);
+-    const f12 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f12.fm`, true);
+-    const f14 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f14.fm`, true);
+-    const f17 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f17.fm`, true);
+-    const f19 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f19.fm`, true);
+-    const f22 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f22.fm`, true);
+-    const f26 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f26.fm`, true);
+-    const f30 = Packet.load(`${Environment.BUILD_SRC_DIR}/fonts/f30.fm`, true);
++    // 377 content keeps fonts as PNG + .opt; the legacy .fm metrics are absent, so a missing
++    // font is omitted from the jag and the client falls back to its system font (MapView.ts).
++    const font = (name: string): Packet | null => {
++        const path = `${Environment.BUILD_SRC_DIR}/fonts/${name}.fm`;
++        return fs.existsSync(path) ? Packet.load(path, true) : null;
++    };
++    const f11 = font('f11');
++    const f12 = font('f12');
++    const f14 = font('f14');
++    const f17 = font('f17');
++    const f19 = font('f19');
++    const f22 = font('f22');
++    const f26 = font('f26');
++    const f30 = font('f30');
+ 
+     // ----
+ 
+@@ -676,14 +682,14 @@ export async function packWorldmap() {
+     jag.write('mapscene.dat', mapscene);
+     jag.write('mapfunction.dat', mapfunction);
+     jag.write('b12_full.dat', b12);
+-    jag.write('f11.dat', f11);
+-    jag.write('f12.dat', f12);
+-    jag.write('f14.dat', f14);
+-    jag.write('f17.dat', f17);
+-    jag.write('f19.dat', f19);
+-    jag.write('f22.dat', f22);
+-    jag.write('f26.dat', f26);
+-    jag.write('f30.dat', f30);
++    if (f11) jag.write('f11.dat', f11);
++    if (f12) jag.write('f12.dat', f12);
++    if (f14) jag.write('f14.dat', f14);
++    if (f17) jag.write('f17.dat', f17);
++    if (f19) jag.write('f19.dat', f19);
++    if (f22) jag.write('f22.dat', f22);
++    if (f26) jag.write('f26.dat', f26);
++    if (f30) jag.write('f30.dat', f30);
+     jag.write('mapdots.dat', mapdots);
+     jag.write('index.dat', index);
+     jag.write('labels.dat', labels);

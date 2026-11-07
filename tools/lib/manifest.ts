@@ -18,11 +18,13 @@ export const ARTIFACT_KINDS: readonly ArtifactKind[] = ['generated', 'edition', 
 export const QUALIFICATIONS: readonly Qualification[] = ['pending', 'offline', 'qualified'];
 
 export interface ManifestArtifact {
-    /** Repo-relative path; staged artifacts carry the `data/377/` prefix until the cutover. */
+    /** Repo-relative final path; staged kinds carry a `data/377/` path until the cutover. */
     path: string;
     sha256: string;
     kind: ArtifactKind;
     qualification: Qualification;
+    /** For an `out` artifact staged before cutover, its temporary source path under `data/377/`. */
+    stagedPath?: string;
 }
 
 export interface Manifest {
@@ -53,7 +55,7 @@ const ENGINE_KEYS = ['commit', 'archives'];
 const ARCHIVE_KEYS = ['config', 'interface'];
 const CONTENT_KEYS = ['commit'];
 const TOOLCHAIN_KEYS = ['node', 'bun'];
-const ARTIFACT_KEYS = ['path', 'sha256', 'kind', 'qualification'];
+const ARTIFACT_KEYS = ['path', 'sha256', 'kind', 'qualification', 'stagedPath'];
 
 function fail(where: string, message: string): never {
     throw new ManifestError(`${MANIFEST_PATH}: ${where}: ${message}`);
@@ -108,7 +110,7 @@ function parseArtifact(value: unknown, index: number, cutover: boolean, seen: Se
     const where = `artifacts[${index}]`;
     const entry = asObject(value, where);
     onlyKeys(entry, ARTIFACT_KEYS, where);
-    requireKeys(entry, ARTIFACT_KEYS, where);
+    requireKeys(entry, ['path', 'sha256', 'kind', 'qualification'], where);
 
     const path = checkRepoPath(entry.path, `${where}.path`);
     if (seen.has(path)) fail(where, `duplicate artifact path '${path}'`);
@@ -131,11 +133,24 @@ function parseArtifact(value: unknown, index: number, cutover: boolean, seen: Se
     }
     if (cutover && staged) fail(`${where}.path`, `'${path}' still points into ${STAGING_ROOT}/ after the cutover`);
 
+    let stagedPath: string | undefined;
+    if (entry.stagedPath !== undefined) {
+        stagedPath = checkRepoPath(entry.stagedPath, `${where}.stagedPath`);
+        if (kind !== 'out') fail(`${where}.stagedPath`, 'is only valid for an out artifact');
+        if (cutover) fail(`${where}.stagedPath`, `still points into ${STAGING_ROOT}/ after the cutover`);
+        if (!path.startsWith('out/') || !stagedPath.startsWith(`${STAGING_ROOT}/out/`)) {
+            fail(`${where}.stagedPath`, 'must stage an out artifact under data/377/out/ while keeping its final out/ path');
+        }
+        if (seen.has(stagedPath)) fail(where, `duplicate staged artifact path '${stagedPath}'`);
+        seen.add(stagedPath);
+    }
+
     return {
         path,
         sha256,
         kind: kind as ArtifactKind,
-        qualification: qualification as Qualification
+        qualification: qualification as Qualification,
+        ...(stagedPath === undefined ? {} : { stagedPath })
     };
 }
 
@@ -234,16 +249,26 @@ export function engineArchiveProblems(root: string, engineDir: string): string[]
     return problems;
 }
 
+/** Why: out artifacts (`out/`) are untracked by design, so a hosted runner never has the file.
+ *  An out artifact with `stagedPath` is the exception: verify its staged source until cutover,
+ *  even when a different revision's live `out/` file is present.
+ */
+export interface VerifyReport {
+    problems: string[];
+    skipped: string[];
+}
+
 /** Every problem that makes the manifest or the tree it describes wrong, in a stable order; empty means artifacts, generators and the staging tree all agree with it. */
-export function verifyManifest(root = process.cwd()): string[] {
+export function verifyManifestReport(root = process.cwd()): VerifyReport {
     let manifest: Manifest;
     try {
         manifest = readManifest(root);
     } catch (err) {
-        return [(err as Error).message];
+        return { problems: [(err as Error).message], skipped: [] };
     }
 
     const problems: string[] = [];
+    const skipped: string[] = [];
     for (const [path, expected] of Object.entries(manifest.generators).sort(([a], [b]) => a.localeCompare(b))) {
         const abs = join(root, path);
         if (!existsSync(abs)) {
@@ -255,9 +280,16 @@ export function verifyManifest(root = process.cwd()): string[] {
     }
 
     for (const artifact of manifest.artifacts) {
-        const abs = join(root, artifact.path);
+        const checkedPath = artifact.stagedPath ?? artifact.path;
+        const abs = join(root, checkedPath);
         if (!existsSync(abs)) {
-            problems.push(`artifact '${artifact.path}' is listed but missing`);
+            if (artifact.stagedPath !== undefined) {
+                problems.push(`artifact '${artifact.path}' staged at '${artifact.stagedPath}' is missing`);
+            } else if (artifact.kind === 'out') {
+                skipped.push(`SKIP: ${artifact.path}: out artifact is not tracked; hash verified only when the file is present`);
+            } else {
+                problems.push(`artifact '${artifact.path}' is listed but missing`);
+            }
             continue;
         }
         const actual = sha256File(abs);
@@ -268,11 +300,16 @@ export function verifyManifest(root = process.cwd()): string[] {
 
     const stagingExists = existsSync(join(root, STAGING_ROOT));
     if (manifest.cutover && stagingExists) problems.push(`${STAGING_ROOT}/ still exists after the cutover`);
-    if (!manifest.cutover && !stagingExists && manifest.artifacts.some(a => a.kind !== 'out' && a.kind !== 'recording')) {
+    if (!manifest.cutover && !stagingExists && manifest.artifacts.some(a => a.stagedPath !== undefined || (a.kind !== 'out' && a.kind !== 'recording'))) {
         problems.push(`${STAGING_ROOT}/ is missing while staged artifacts are listed`);
     }
 
-    return problems;
+    return { problems, skipped };
+}
+
+/** The problems only; the skipped `out` rows are the CLI's concern. */
+export function verifyManifest(root = process.cwd()): string[] {
+    return verifyManifestReport(root).problems;
 }
 
 if (import.meta.main) {
@@ -304,9 +341,10 @@ if (import.meta.main) {
         console.error('usage: bun tools/lib/manifest.ts verify | archives <engine-dir>');
         process.exit(2);
     }
-    const problems = verifyManifest();
-    for (const problem of problems) console.error(`STALE: manifest ${problem}`);
-    if (problems.length > 0) process.exit(1);
+    const report = verifyManifestReport();
+    for (const line of report.skipped) console.log(line);
+    for (const problem of report.problems) console.error(`STALE: manifest ${problem}`);
+    if (report.problems.length > 0) process.exit(1);
     const manifest = readManifest();
     console.log(`ok: manifest matches ${manifest.artifacts.length} artifact(s) and ${Object.keys(manifest.generators).length} generator(s)`);
 }

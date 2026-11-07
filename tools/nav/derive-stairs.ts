@@ -95,7 +95,7 @@ function loadStairPrices(): StairPriceTable {
     return table;
 }
 
-function movementExtraTicks(prices: StairPriceTable | null, debugName: string, op: number): number | undefined {
+export function movementExtraTicks(prices: StairPriceTable | null, debugName: string, op: number): number | undefined {
     if (prices === null) {
         return undefined;
     }
@@ -504,4 +504,4 @@ function main(): void {
     }
 }
 
-main();
+if (import.meta.main) main();

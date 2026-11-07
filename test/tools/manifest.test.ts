@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ManifestError, engineArchiveProblems, parseManifest, readManifest, sha256File, verifyManifest, writeManifest } from '../../tools/lib/manifest.js';
+import { ManifestError, engineArchiveProblems, parseManifest, readManifest, sha256File, verifyManifest, verifyManifestReport, writeManifest } from '../../tools/lib/manifest.js';
 import type { Manifest } from '../../tools/lib/manifest.js';
 
 const HASH_A = 'a'.repeat(64);
@@ -98,6 +98,38 @@ describe('manifest schema', () => {
             parseManifest({ ...empty(), artifacts: [{ path: 'out/collision.lcnav.gz', sha256: HASH_A, kind: 'out', qualification: 'pending' }] })
         ).not.toThrow();
     });
+    test('an out artifact may point at a staged source while keeping its final path', () => {
+        expect(() =>
+            parseManifest({
+                ...empty(),
+                artifacts: [
+                    {
+                        path: 'out/collision.lcnav.gz',
+                        sha256: HASH_A,
+                        kind: 'out',
+                        qualification: 'pending',
+                        stagedPath: 'data/377/out/collision.lcnav.gz'
+                    }
+                ]
+            })
+        ).not.toThrow();
+        expect(() =>
+            parseManifest({
+                ...empty(),
+                artifacts: [
+                    {
+                        path: 'data/377/src/bot/data/x.ts',
+                        sha256: HASH_A,
+                        kind: 'generated',
+                        qualification: 'pending',
+                        stagedPath: 'data/377/out/collision.lcnav.gz'
+                    }
+                ]
+            })
+        ).toThrow(/only valid for an out artifact/);
+    });
+
+
 });
 
 describe('manifest verify', () => {
@@ -135,6 +167,52 @@ describe('manifest verify', () => {
         });
         expect(verifyManifest(root)).toEqual([expect.stringContaining('is listed but missing')]);
     });
+
+    test('a missing out artifact is a printed skip, not a failure', () => {
+        const root = tempDir();
+        mkdirSync(join(root, 'data'), { recursive: true });
+        writeManifest(root, {
+            ...empty(),
+            artifacts: [{ path: 'out/basemap.x.png', sha256: HASH_A, kind: 'out', qualification: 'pending' }]
+        });
+        // Untracked by design: no problem, the CLI prints the skip line.
+        expect(verifyManifest(root)).toEqual([]);
+        expect(verifyManifestReport(root).skipped).toEqual([
+            'SKIP: out/basemap.x.png: out artifact is not tracked; hash verified only when the file is present'
+        ]);
+    });
+
+    test('a present out artifact is still hash-checked', () => {
+        const root = tempDir();
+        mkdirSync(join(root, 'data'), { recursive: true });
+        const hash = put(root, 'out/basemap.x.png', 'png-bytes\n');
+        writeManifest(root, {
+            ...empty(),
+            artifacts: [{ path: 'out/basemap.x.png', sha256: hash, kind: 'out', qualification: 'pending' }]
+        });
+        expect(verifyManifestReport(root)).toEqual({ problems: [], skipped: [] });
+
+        put(root, 'out/basemap.x.png', 'other-bytes\n');
+        const report = verifyManifestReport(root);
+        expect(report.problems).toEqual([expect.stringContaining("artifact 'out/basemap.x.png' changed")]);
+        expect(report.skipped).toEqual([]);
+    });
+    test('a staged out artifact verifies its staged bytes instead of a different live revision', () => {
+        const root = tempDir();
+        const staged = 'data/377/out/collision.lcnav.gz';
+        const output = 'out/collision.lcnav.gz';
+        const hash = put(root, staged, '377 collision pack\n');
+        put(root, output, '289 collision pack\n');
+        writeManifest(root, {
+            ...empty(),
+            artifacts: [{ path: output, sha256: hash, kind: 'out', qualification: 'pending', stagedPath: staged }]
+        });
+        expect(verifyManifestReport(root)).toEqual({ problems: [], skipped: [] });
+
+        put(root, staged, 'different staged pack\n');
+        expect(verifyManifest(root)).toEqual([expect.stringContaining("artifact 'out/collision.lcnav.gz' changed")]);
+    });
+
 
     test('the staging tree must agree with cutover', () => {
         const root = tempDir();

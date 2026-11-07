@@ -228,6 +228,7 @@ def resolve_source_loc(
     configs: dict[int, LocConfig],
     spatial: dict[tuple[int, int, int], list[Placement]],
     allowed_stair_debugs: set[str],
+    revision: int,
 ) -> tuple[LocConfig, Placement] | None:
     wanted_name = normalized(edge.get("locName"))
     wanted_action = normalized(edge.get("action"))
@@ -277,10 +278,11 @@ def resolve_source_loc(
                 or (kind in {"dungeon", "shortcut"} and action_match)
             )
 
-            # Movement edges require the exact scripted action; name-only matches can route through inert locs.
-            if kind in {"stair", "dungeon"} and not action_match:
-                continue
-            if kind not in {"stair", "dungeon"} and not (name_match or action_match):
+            # Stairs always require the exact action; revision 377 applies that rule to dungeons too.
+            if kind == "stair" or (revision == 377 and kind == "dungeon"):
+                if not action_match:
+                    continue
+            elif not (name_match or action_match):
                 continue
             score = 0
             if name_match:
@@ -450,7 +452,7 @@ def main() -> None:
                 enriched.append(edge)
                 continue
             action_config = None
-            resolved = resolve_source_loc(edge, configs, spatial, allowed_stair_debugs)
+            resolved = resolve_source_loc(edge, configs, spatial, allowed_stair_debugs, revision)
             if resolved:
                 config, placement = resolved
                 action_config = config

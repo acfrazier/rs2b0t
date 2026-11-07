@@ -44,7 +44,7 @@ function repo(files: Record<string, string>, entries: ManifestArtifact[]): strin
     TEMP.push(root);
     git(root, ['init', '-q']);
     for (const [path, content] of Object.entries(files)) put(root, path, content);
-    for (const entry of entries) entry.sha256 = sha256File(join(root, entry.path));
+    for (const entry of entries) entry.sha256 = sha256File(join(root, entry.stagedPath ?? entry.path));
     writeManifest(root, manifest(entries));
     const paths = [...Object.keys(files), 'data/manifest.json'];
     git(root, ['add', '--', ...paths]);
@@ -89,6 +89,31 @@ describe('cutover moves the staged tree', () => {
         expect(after.artifacts.map(a => a.path)).toEqual(['src/bot/data/gen.ts', 'tools/nav/doors.json', 'src/bot/data/cookLocations.ts']);
         expect(verifyManifest(root)).toEqual([]);
     });
+    test('moves a staged out artifact onto its final path over the 289 output', () => {
+        const entry: ManifestArtifact = {
+            path: 'out/collision.lcnav.gz',
+            sha256: '',
+            kind: 'out',
+            qualification: 'pending',
+            stagedPath: 'data/377/out/collision.lcnav.gz'
+        };
+        const root = repo(
+            {
+                'data/377/out/collision.lcnav.gz': '377 collision pack\n',
+                'out/collision.lcnav.gz': '289 collision pack\n'
+            },
+            [entry]
+        );
+
+        expect(cutover(root)).toEqual(['out/collision.lcnav.gz']);
+        expect(readFileSync(join(root, 'out/collision.lcnav.gz'), 'utf8')).toBe('377 collision pack\n');
+        expect(existsSync(join(root, 'data/377'))).toBe(false);
+        expect(readManifest(root).artifacts).toEqual([
+            { path: 'out/collision.lcnav.gz', sha256: sha256File(join(root, 'out/collision.lcnav.gz')), kind: 'out', qualification: 'pending' }
+        ]);
+        expect(verifyManifest(root)).toEqual([]);
+    });
+
 
     test('the two staging guard fixtures are the only unlisted files allowed', () => {
         expect(GUARD_FIXTURES).toEqual(['data/377/test/x.test.ts', 'data/377/src/x.ts']);

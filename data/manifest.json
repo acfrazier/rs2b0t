@@ -1,26 +1,547 @@
 {
   "schemaVersion": 1,
-  "revision": 289,
+  "revision": 377,
   "cutover": false,
   "engine": {
-    "commit": null,
+    "commit": "bc47497ee8cf6148dbfb7239714ddd5045c40194",
     "archives": {
-      "config": null,
-      "interface": null
+      "config": "0ffd31ceb7240b79907fd200c19cfa05bce207b1b8b7287060fe83a6fc5dc69a",
+      "interface": "4f5a4ed3a6dea54b8562e5cc487abdf87211f0e54e4b0866d703d40b0dc158a3"
     }
   },
   "content": {
-    "commit": null
+    "commit": "a15d0faa809f5f8455ef43e1ae4edfdd22512bb2"
   },
   "toolchain": {
-    "node": null,
-    "bun": null
+    "node": "v26.12.0",
+    "bun": "1.3.14"
   },
-  "generators": {},
+  "generators": {
+    "tools/clues/cluesParse.ts": "3aea7ffb5aa9cc2f62d52d2ecd1af8ffa271a20a1f876b0af3f7ec75e57eae72",
+    "tools/clues/gen-cluedb.ts": "26eec0cb09501c0bb5704b340e8b41b2db52cb145c740951ddfbef89d199650e",
+    "tools/combat/gen-dropdb.ts": "c168de0e955f30b3468fb9d7218e66dadf4df549cebd29d8cf4625f70cb9023c",
+    "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
+    "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
+    "tools/gen-377-data.sh": "c7a8ee5d0c4673b9f5580c57daff54ddca2ad275903349a692da2ef218968005",
+    "tools/gen-377-manifest.ts": "b8b97f313cec9bab691f6ba3507539c6c90fefcbcce8a52c1b7193684ca05552",
+    "tools/gen-ifids.ts": "af570c66ec2ff2411737d6dd649619ee1cd80fb7700d148c3b6f2683357cc187",
+    "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
+    "tools/items/gen-namecollisions.ts": "fe0ceeaff2d68927f5c8de18848c83acecb0376d27a36127a9b3330beb424dcd",
+    "tools/items/gen-untradeable.ts": "2f97f8ba7a122d367d40ce016cf8a259f01d69442ba5f50e8718f395f8f270bb",
+    "tools/items/parse.ts": "1e0f0cb50afdc4edd7519d158967095d2433cdd1e49f3e725b9f373780f57549",
+    "tools/lib/content.ts": "ebd229b1ffe38c9e5162eb15a06f89171747db84ca1152724e118c586f5220c4",
+    "tools/lib/genout.ts": "e2de3ebfced6186aea69d04e57e7924f353d8000676552b926d59c9b1f1f4836",
+    "tools/map/build-basemap.ts": "f90956e475ef0a71da30629225dc3c5b40b7e2c1a07c55309fc6de1165ee14dc",
+    "tools/map/encodePng.ts": "ebf62672a4035f6b0a7cfe451cb3d856dfe82201cc3b830c4eec9f4b6159f961",
+    "tools/nav/build-collision.ts": "84af9f74ac800e16cf29f9665576069346cedac043056e04d00a9cca09210bcb",
+    "tools/nav/derive-doors.ts": "0d1e622f047c9932976adc18e282fb618eff054666c0ea85f565cd5b19882d0f",
+    "tools/nav/derive-ladders.py": "68c118763ec08bb66e12c65e2655e29c9b6f2330c86b3320a858609589b6e407",
+    "tools/nav/derive-stairs.ts": "eb83f5ab589f7293d3cf0fbf984a413486fa64e9b4ea05aaa62663a7284693c4",
+    "tools/nav/derive-transports.sh": "a9b62ed612cc4b464bbe87c456e10e8f115966941237e791dfe268a781674b7d",
+    "tools/nav/enrich-transports.py": "37a753bc64a4636f021ad9bc4640f145d91598fa164ed119e0521554dd76472f",
+    "tools/nav/lib.ts": "93f5d22f03c65f8be03e95319085a16b0da62acdaa9753af81c777cb9c476a22",
+    "tools/nav/stairsParse.ts": "9369171ffbee7ec995d8da4444a0f11da8ed145ad4154a694dd47668b9eeec06",
+    "tools/patches/worldmap-377.patch": "0ac9dbe029993299bf4a2579944b24ff57f68611d4b54906990f329229ccf223",
+    "tools/shops/gen-shopdb.ts": "e0bb4e5c9262f3f0cd60ecd5536b15a1d64eb3c9add90104c93f5600af04acd5",
+    "tools/shops/parse.ts": "ba9d7fae056e2b150f3fd0402f93c1f2196265686c4c88fd0fdc357ca4464baf"
+  },
   "artifacts": [
+    {
+      "path": "data/377/src/bot/api/ai/clues/data/cluedb.ts",
+      "sha256": "c888c441a0675749cfcf494f5c05046ab7d4ab771c65f077c8ec9cf3be376af7",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/api/ai/clues/data/puzzlePieces.ts",
+      "sha256": "b086dbb95c60373c422b100ff872ddda70bff08d5d5c2fecb22c6c56fbdd035e",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/cookSurfaceLocs.ts",
+      "sha256": "d9876350d5a4758803333ad1eff97a5d9a5336b2f77ac037ee4bcc99558c06d1",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/dropdb.ts",
+      "sha256": "7faebd08323d155677a781d4f2217c3999b5d4326abef0fc981896c5482e9a3b",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/ifIds.ts",
+      "sha256": "f2fe94dd34bb0551cca951056726bd36630e663580eb83795d41f0347a4896d4",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/itemdb.ts",
+      "sha256": "202954780e62cf685c1cced2b3732cf9339bb87054f14f7dc7d3ca4b5f9c1842",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/nameCollisions.ts",
+      "sha256": "5bff3fc3088064efab997a2b268f6e48eaa3bcdcca8797902dbedb3fe7868fc5",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/shopdb.ts",
+      "sha256": "92791f340a29773d8e7d1174af45688bbc06fa7a357a92c3e2afa9d21973968d",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/spelldb.ts",
+      "sha256": "5c59b575f5e24baac699c9fdb6ec7118634edfa9f42b9ed2faffc5f7555a0d69",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/data/untradeable.ts",
+      "sha256": "f8e5faa0364a126f3704ecaee7f9c3637da8bb67ed2b57689667495227bd0781",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/data/doors.json",
+      "sha256": "6d5fe992c5c829a2f1ce2fd8fa8fb1e0cb2fa8d3762233df16f9445fe850c6f5",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/data/stairEdges.json",
+      "sha256": "4c1ff89e8c13be38db1ebcd2787039d9b1107bcbdda4dad60edba36088656745",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/src/bot/event/webwalk/data/transports.json",
+      "sha256": "4578579f0332094ecb4e23b6c4a082ac7604ba8f937bbf465be3097648698508",
+      "kind": "generated",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/tools/nav/door-categories.json",
+      "sha256": "e847368c1a27ce1c87dd3fdd5545cdd743b8b5e7233d8cdfa1001f7f782da720",
+      "kind": "nav-input",
+      "qualification": "pending"
+    },
+    {
+      "path": "data/377/tools/nav/stair-prices.json",
+      "sha256": "21a0f9810e1517b6058e5f28b72ede1d06b87667ed0a47552d3f45757b8a91ba",
+      "kind": "nav-input",
+      "qualification": "pending"
+    },
     {
       "path": "out/collision.lcnav.gz",
       "sha256": "ed64309ee43a7eb117f101cd542ceedb2bbf5db7dbaad18cab7415ce0baf5a99",
+      "kind": "out",
+      "qualification": "pending",
+      "stagedPath": "data/377/out/collision.lcnav.gz"
+    },
+    {
+      "path": "out/worldmap-basemap.e6315f93c51abd46.png",
+      "sha256": "3f68c5f10d9792fa8063b5f46ebdd670801d4dd298ddac8d0539295774cbee29",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-basemap.manifest.json",
+      "sha256": "cda47029c11195cee2cef68a4cbad433401cc1ab3d755a38b2a2dc88700d05f4",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-free.e6315f93c51abd46.png",
+      "sha256": "13a9c64dc6cf56f36b3565e1887cee03c9fd02151193db9e4a6ef2c0962266ed",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-index.e6315f93c51abd46.json",
+      "sha256": "c5d339e9937cb74bd4ed454d6d59a8a85dc7ad5a08a64cff64c59736014a4dfd",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-0.e6315f93c51abd46.png",
+      "sha256": "8d3f37546cdd248568e2c6f129a3f7a4a5e6e2bd471ee3158592bcd27a00ed4b",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-1.e6315f93c51abd46.png",
+      "sha256": "abfd5ae17a13fd247fac97e751d247fa8b4d535e6a0240ef3635fee2c04ffdfe",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-10.e6315f93c51abd46.png",
+      "sha256": "ba9b4c9276547c23e24e79b114fcd88b597b8c25146bfd5faad4509ecc08ca6e",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-11.e6315f93c51abd46.png",
+      "sha256": "a72b083505118c767675ca1e7dc9367627460c5a1595743443345c84c6563b23",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-12.e6315f93c51abd46.png",
+      "sha256": "02353eee296893981018861e2defe2651531512bf0d432b948720b71cdda644e",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-13.e6315f93c51abd46.png",
+      "sha256": "00dea0997a787df9bb23f0d94693aead41732967185c0dd828fc1d4c1a3d79c2",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-14.e6315f93c51abd46.png",
+      "sha256": "b7e1a55a77bdca9e77dd9011f53473a90d5547e78be32d932a6d70126cb97b9a",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-15.e6315f93c51abd46.png",
+      "sha256": "b2b617e0b276389e9847647e080a570612806ae3cfbd36b49974239babcb0eed",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-16.e6315f93c51abd46.png",
+      "sha256": "98214eee54e3dcbdf4569d50b504d0569ecfec1232c07ee071ad5525b971bd04",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-17.e6315f93c51abd46.png",
+      "sha256": "4f4e2cc3488245acaa09469aa1c26473c7ea2d257c67ee0bb6ba6eee05e791d2",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-18.e6315f93c51abd46.png",
+      "sha256": "7cac108c3e3dcebd05c6140ac68fb517b5bcfd5d2602fa35f167961f9375d494",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-19.e6315f93c51abd46.png",
+      "sha256": "71cd9e02d3d0ddec023a6ac4f79a4874a5c08b1a1a363e12d35bb068e2e19b84",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-2.e6315f93c51abd46.png",
+      "sha256": "e079c5785386c1ad87b228002de4398836fbeebaf961710e3e303e6816c576d5",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-20.e6315f93c51abd46.png",
+      "sha256": "208c5fddb7c7dfec765139536b7589f24b5e547b6cc0773ea761a2d305625151",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-21.e6315f93c51abd46.png",
+      "sha256": "f49a0735132155ad77a0ebc5ff1ce76f652cc81677cf50bc418ed6296e442445",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-22.e6315f93c51abd46.png",
+      "sha256": "361bd0dda0dcf8e7cca35305459bff58e974eaa47f2e2f42d05779829e765a2c",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-23.e6315f93c51abd46.png",
+      "sha256": "1707b8c1a9793ab70c46923cb6ab2cea38a4b5a70f5342cbc859f2b0f7bf99f3",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-24.e6315f93c51abd46.png",
+      "sha256": "b2fd88417148b62952e957b6611be6c2014e86f3066f6f7d4895b9668014f5d9",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-25.e6315f93c51abd46.png",
+      "sha256": "27c6e0656daa64de5a83ec3c0d3a285aa7b8bf6af74db7705ddf929535adfd13",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-26.e6315f93c51abd46.png",
+      "sha256": "55b2d5c95963c47a54d6c5a7932c70f0ea9b3e07019ad7e81eb35d8d2ef465db",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-27.e6315f93c51abd46.png",
+      "sha256": "4927e3fa5b4c82853b1f869c9cc48d7a807e8e9766697f5d6811896db153bca0",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-28.e6315f93c51abd46.png",
+      "sha256": "f75f61c0096da8f1d96f540fa3824700ff80aa6a6841d91da7f952fee210a670",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-29.e6315f93c51abd46.png",
+      "sha256": "be4bdb40f00dba22c96f2a4dc79bf974a45e48bd2dc0f05172eb0f1ca93f9a00",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-3.e6315f93c51abd46.png",
+      "sha256": "5489cec4a4473d4430615773fde0e829d7498696337759c2f7c1576b338b5f4e",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-30.e6315f93c51abd46.png",
+      "sha256": "e83f07bc30ec6bd7552026bec80071294fd88d535345da9712c733907bd4a36f",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-31.e6315f93c51abd46.png",
+      "sha256": "1b54925f63adca99b954c8d1b7c8cae806c7e85a5ce8f87c5b30555a90e54fb0",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-32.e6315f93c51abd46.png",
+      "sha256": "d9c0e67a231c575a4fdd3241dae701de41900490d3c9a8b0618c0fa790c96f91",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-33.e6315f93c51abd46.png",
+      "sha256": "aa716a9572322dc8dc11922014272f57d130cceba7e921664cadbd3bc84b88b8",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-34.e6315f93c51abd46.png",
+      "sha256": "409da8ecaf10e25266a2b91c1f97e0a30d1c00f9a41cc028f3540a93403d23bc",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-35.e6315f93c51abd46.png",
+      "sha256": "ac47196755b1f3ef6908a41d7000d895f96bdd957b83854c3e9a7f1cbb5c4260",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-36.e6315f93c51abd46.png",
+      "sha256": "0fb23dc48eeeb75395edf90014a820a647bb4d521f87947696ba615c8bddcb0a",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-37.e6315f93c51abd46.png",
+      "sha256": "e21ff3ff7a9b008f7e2855196a1d94b0c729f0981df5b5d5c1cec70aa71d4ed2",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-38.e6315f93c51abd46.png",
+      "sha256": "fb8f3c17a2fa0c6be60b2368e326b10a2161b0503b8d00fe1251ecf5c432dfc5",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-39.e6315f93c51abd46.png",
+      "sha256": "029e786f846184e9c20c19f2c974a6eec4149e11ac19b116a4141c7db4d50a74",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-4.e6315f93c51abd46.png",
+      "sha256": "744f57c0e166ab4be1b524823fd86f6fab5ab4810328ec8c719da5291b7d37af",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-40.e6315f93c51abd46.png",
+      "sha256": "5b870115d6cd7003485f2bd8af0ba7d00b2cb63a5f944738a681fff4fdd8fe8c",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-41.e6315f93c51abd46.png",
+      "sha256": "33b71378be6c06898d2379316ca12a466be2ecacc94bb0d42855f08afbf61592",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-42.e6315f93c51abd46.png",
+      "sha256": "72b44db36577257050e3d4f8285d3fec1e63624ef6f9e434e1d1f8fedc35d98d",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-43.e6315f93c51abd46.png",
+      "sha256": "bd5a6270f10ed2cf78dcf4716dfab71463b5a6be8b2658d34b26d03d495ede1f",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-45.e6315f93c51abd46.png",
+      "sha256": "22b34317b763fd14565ce96600825650db6e43d40bfcb5e57c89feb2931f0b3c",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-46.e6315f93c51abd46.png",
+      "sha256": "27200d70b5e28f1a61d5aad5c6dcd1f98f7c9ca2cf94bea6bad4e99f9f402c46",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-47.e6315f93c51abd46.png",
+      "sha256": "df9b3682cbc29db224ffa3f72f061f069e08775c37089e1fdddea30307e6118a",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-48.e6315f93c51abd46.png",
+      "sha256": "e99c0155b8c0cf345c0dbc3cefcc3d5018e88cd168a2a5fc20ce34692452f1e7",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-49.e6315f93c51abd46.png",
+      "sha256": "00b4efe8d44e75c3722d93e798335b04b2f66d74f53870d86008108367964106",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-5.e6315f93c51abd46.png",
+      "sha256": "3bc97da2006ca98fcedd66d1c934b9c9b082b45abf64b53dcb215de65332d45c",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-50.e6315f93c51abd46.png",
+      "sha256": "c97a55c3767369753f247d2494ade9bd608129aad750bd36bcf58904ed5826a5",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-51.e6315f93c51abd46.png",
+      "sha256": "8e3b6dd0e1649d35d41e9bc874947c85696cf9aa82a1eda2c849cef69d68e4b1",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-52.e6315f93c51abd46.png",
+      "sha256": "a7a1f4800058e44ebbc00675d506a32913dda44620f833cf835cd0ac0a077ef6",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-53.e6315f93c51abd46.png",
+      "sha256": "62d4cf431aaa1f8bfa86bfcdf8c03905c4dcfe86157e1a2a2d9f3a1149c701f4",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-54.e6315f93c51abd46.png",
+      "sha256": "08ba9d9a0a97f5df80a46df90fb45017fa2aa03a66124d28933224727a458987",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-55.e6315f93c51abd46.png",
+      "sha256": "932c88e07a59368c4afcfa2317e15823a7d78e346f1b3ad67f50ff4d610515c9",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-56.e6315f93c51abd46.png",
+      "sha256": "134c6572bea3e38eb883003a2c6b7c446df1bb015718080c74f2d5bf1daa0b05",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-58.e6315f93c51abd46.png",
+      "sha256": "0e0f4dbd0169663f8d5c4e0d61edbc1fe2393aca8811f68fb5f2ebbd6a803f15",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-59.e6315f93c51abd46.png",
+      "sha256": "aa1f9be0618421f94b191e5df8a28b614d542a7e27bdd135493bc3c70a5cb9a5",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-6.e6315f93c51abd46.png",
+      "sha256": "7fa7ec430adf1e7bcb8d087674e7e038b590b75824b22a2a36bb3cb95d81f638",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-61.e6315f93c51abd46.png",
+      "sha256": "868e8c4b22c333a68b5858f2b5939d2139f8ada5109cda5276af636799a9aaa4",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-7.e6315f93c51abd46.png",
+      "sha256": "e653c6dff14f65d38cde6923c48dd92f8cacef59f873c648337ca1cc380758fa",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-8.e6315f93c51abd46.png",
+      "sha256": "b2fedd196e679e8d90c2ad1a6566bea4e5b874db77d9e03729b7ff5c5f13d62c",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key-type-9.e6315f93c51abd46.png",
+      "sha256": "3d9da77e0c0a061ded82a2c835f73a9a460f0a04aa6155357bbd7325e996d31f",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-key.e6315f93c51abd46.png",
+      "sha256": "a9f7210fbf06d314f5f6e733ce7d7a531ba840247b1f24274d6c87494dc16bb7",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-labels.e6315f93c51abd46.png",
+      "sha256": "ba3341bfdb33575c11c8716c79f615d5a030b1644089ad38326f04eaaeb8d3a3",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-multi.e6315f93c51abd46.png",
+      "sha256": "017079d916d90bbe9a2517ed1c993bb6ec3729543049d6d11000250fbdd53d88",
+      "kind": "out",
+      "qualification": "pending"
+    },
+    {
+      "path": "out/worldmap-player-marker.e6315f93c51abd46.png",
+      "sha256": "dfd6c0378bc309708d8acfd1443dd30a2a46282a079078660d3460ba7dd64a1e",
       "kind": "out",
       "qualification": "pending"
     }
