@@ -53,8 +53,14 @@
       "qualification": "pending"
     },
     {
+      "path": "data/377/src/bot/api/ai/clues/data/clueGates.ts",
+      "sha256": "cef23ab3dc65d086a35de95905926fc682058eef79a4fe3f9aabd28c19cd6145",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
       "path": "data/377/src/bot/api/ai/clues/data/killAnchors.ts",
-      "sha256": "11a21e1552cc77d3c609e93640af0b0a36a3d77605c83dc6315ebc55078b3faf",
+      "sha256": "93b3341c7d9cfc026ce276b7553ed8291ad2343a4a93f694268b987c58b4faed",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -65,8 +71,14 @@
       "qualification": "pending"
     },
     {
+      "path": "data/377/src/bot/api/ai/clues/data/toolAcquire.ts",
+      "sha256": "4aa22762ee3518f71e3fcac9ff56e1b7fccba3d6f559914390d34d8aa065858d",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
       "path": "data/377/src/bot/api/ai/clues/data/unreachable.ts",
-      "sha256": "2d8373cb6bcb40e39f8150ff3afa1fde2ab423c4cf8a391db0c641b0b523ee59",
+      "sha256": "5796ebb5805a1a3b46e33faf1382400be201c9660ef5db498c7f27edd76e8d08",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -84,7 +96,7 @@
     },
     {
       "path": "data/377/src/bot/data/cowKillerLocations.ts",
-      "sha256": "576ccf0c8cc4f0d5ce5121eb6d32c53cfcdaccfc58dd3e0a145c508e2f811cff",
+      "sha256": "74de1e18202a4c69e78e3ef31f2cfd205e581b5ffb6e40e9b0b3c304db645392",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -96,7 +108,7 @@
     },
     {
       "path": "data/377/src/bot/data/fishingLocations.ts",
-      "sha256": "45a0a0e7522671d4667cd906df880f93eb317647d237b0c00a93f656eb7bcf3e",
+      "sha256": "53f85650912daf68f799468b1e2a7b4471ed0f231504f62493cd9fc963302f3d",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -108,7 +120,7 @@
     },
     {
       "path": "data/377/src/bot/data/itemAliases.ts",
-      "sha256": "4933fd97860188ac99bb77a6cc9e1bd0225f503e9da8bf62b38f53c150e908ef",
+      "sha256": "dacd1bd21d3114ebcd385ef36dcb97253227293cdd52cbd2d01068940193b16e",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -120,7 +132,7 @@
     },
     {
       "path": "data/377/src/bot/data/miningLocations.ts",
-      "sha256": "05eba97f0720ec13cfdfb7d0e7a3914061f77251cfddb16541d281f4441e93f7",
+      "sha256": "ff536a5cc6f3b20dc06edb33e2f0d61f1d08fdbdad16f9ab36012f24b31f15d9",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -185,20 +197,50 @@
       "qualification": "pending"
     },
     {
+      "path": "data/377/test/api/ai/clues/clue-audit.test.ts",
+      "sha256": "f27c121d756a27c123571e3bd06511509f7334cb1d395da558d1768bb72a6b41",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/api/ai/clues/ClueExecutor.test.ts",
+      "sha256": "1e2cb0adee1e1a867bbda4f5e2808d7aae10c466119423a6b1770087c0e84d5f",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/api/ai/clues/data/toolAcquire.test.ts",
+      "sha256": "ab5367f4dcb8f9331742c6df207893d830c255950be72fb2e290dd5d68f26116",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/api/ai/clues/hard-tier.test.ts",
+      "sha256": "23efcda729653dd851ed4db36106366d79278619bed5cc1582c808bf2bdb27fd",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/api/market/catalog.test.ts",
+      "sha256": "ba8526f658929a96d0e91a621f7146566c92c003bda283756194c63e3ca3ce3e",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
       "path": "data/377/test/data/mining-rocks.test.ts",
-      "sha256": "8129d051d0d8a2a01f9339281f8ce668800c7778986e2e6d976575ac8283094e",
+      "sha256": "1bb94041dae161853d037d5e76334fd94f51cce62b05da6a86110e0568cf4594",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/test/data/nameCollisions.test.ts",
-      "sha256": "5e6b41e879e2abc57a952ee1d74fac8d022614e3666cd54778866578c1b8a2c0",
+      "sha256": "43233b314522e891102080217dbab80285c36ac20ecfe1a29828bc1e25c30183",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/test/data/placementBoxes.test.ts",
-      "sha256": "f78eef128d20d4096530c3cd389492f019865d8275ddac567f5e23a9c8ef3b61",
+      "sha256": "b1d32ab77553e118739336c09244f805bfe78155378dd8eeae06820b70268a5e",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -209,8 +251,32 @@
       "qualification": "offline"
     },
     {
+      "path": "data/377/test/runtime/randomevents/RandomEvents.test.ts",
+      "sha256": "299d53c62c66c1e5e19ba520d9aa9f5765c9c5ac0bd5ef0cd9f2d440cc43fd97",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/scripts/Alcher/AlcherLogic.test.ts",
+      "sha256": "4b2de70dbba2e6c3a33d5c4ec9a23149151a6cc38baad43db2ddeddeed7d7a80",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/scripts/JiveDragons/settings.test.ts",
+      "sha256": "c4faf45ffecce5f8991e014465deee74246fc919bdafc69042511530295f07a4",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "data/377/test/scripts/marketMakerLogic.test.ts",
+      "sha256": "91e2b84e73b091c606296c1d736c52880518e2e54da7e4416ff691ec9cade662",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
       "path": "data/377/tools/content-drift.sh",
-      "sha256": "b96d9f2eb3ae9ff8c7f0d538a910dfd526704f4030d0c9e7ba398d94f83b0bc2",
+      "sha256": "c4545cd93f89f16f27c9a85a0040daf63e1105a6e12855cff75e2f45a089a6a2",
       "kind": "edition",
       "qualification": "offline"
     },

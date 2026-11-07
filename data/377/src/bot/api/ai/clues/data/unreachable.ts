@@ -16,9 +16,11 @@ export const PACK_UNREACHABLE: Record<number, string> = {
     2694: 'content defect: stale trail_coord param, fix pending (FR content unit) — obj `0_46_51_25_46` (all.obj:30875) vs the drawers the script checks `0_46_51_25_47` (drawers.rs2:47), placed at (2969,3311,0) with marker 10627 (maps/m46_51.jm2)',
     2711: 'content defect: stale trail_coord param, fix pending (FR content unit) — obj `0_40_51_49_40` (all.obj:31147) vs the crate the script checks `1_40_51_52_40` (crates.rs2:25), placed at (2612,3304,1) (maps/m40_51.jm2)',
 
-    // NAV: destinations the baked 377 pack cannot route to from the audit's bank starts; each row names the
-    // missing crossing for an S8 live bake or a P4b follow-up.
-    2773: '@nav-diagnosis: hard riddle001 search chest — pending the nav probe receipt',
-    2790: '@nav-diagnosis: hard riddle011 dig — pending the nav probe receipt',
-    2853: '@nav-diagnosis: medium anagram008 (Gnome ball referee) — pending the nav probe receipt'
+    // NAV: destinations the baked 377 pack cannot route to from the audit's bank starts (expansion budget
+    // exhausted, so the destinations sit in a component the banks cannot reach). The 377 doors bake lost
+    // 335 of the 289 crossings and gained 222; each row names the crossing(s) the route needs. S8's route
+    // corpus or a P4b derivation fix restores them; baking the crossing makes the clue work with no solver edit.
+    2773: 'nav gap: hard riddle001 chest at (3219,9617,0) is unreachable from both audit banks; the 377 doors.json lost the wilderness-underground crossings the route needs (Gate locs 1557/1558 at (3151,9565-9566) and the Sturdy door 2411 at (3233,9554)/(3238,9558), plus the ladders 1747/1746 at (3171,9579) from the 289 doors/stairEdges; derive-doors missed them as Open locs without a 377 category)',
+    2790: 'nav gap: hard riddle011 dig at (3161,9905,0) is unreachable from both audit banks; no crossing is lost at the dig itself, so the break is upstream in the same lost set (the underground gates/ladders listed under 2773); the S8 route corpus decides which edge to re-bake',
+    2853: 'nav gap: medium anagram008 (Gnome ball referee) anchor (2384,3488,0) sits behind the gnome ball field gate, which the 377 doors.json lost: loc 2394 gate_gnomeball_game ("Gate", op1 Open) at (2383,3488) has no 377 category, so the category join dropped it (the 289 pack derived it); deriving Open locs without a category restores it'
 };
