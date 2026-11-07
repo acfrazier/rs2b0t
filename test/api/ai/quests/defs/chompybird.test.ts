@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { CB_ID, CB_STAGE } from '#/bot/api/ai/quests/defs/chompybird/areas.js';
 import { CookState } from '#/bot/api/ai/quests/defs/chompybird/cook.js';
@@ -61,6 +61,11 @@ const TOOLED: [number, number][] = [[CB_ID.KNIFE, 1], [CB_ID.CHISEL, 1]];
 
 describe('big chompy bird hunting decide', () => {
     beforeEach(() => {
+        CookState.kidsAsked = false;
+        ChestState.refused = false;
+    });
+
+    afterEach(() => {
         CookState.kidsAsked = false;
         ChestState.refused = false;
     });

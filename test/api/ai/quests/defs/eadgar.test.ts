@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { WorldTile } from '#/bot/adapter/ClientAdapter.js';
 import { ER_ITEM, type EadgarItem } from '#/bot/api/ai/quests/defs/eadgar/areas.js';
 import { decide, eadgar } from '#/bot/api/ai/quests/defs/eadgar/index.js';
@@ -91,6 +91,12 @@ const realStatus = Quests.status;
 beforeEach(() => {
     QuestFood.name = 'Lobster';
     QuestLoadout.current = { name: 'quest', worn: { righthand: WEAPON }, carry: [] };
+    Quests.status = realStatus;
+});
+
+afterEach(() => {
+    QuestFood.name = 'Trout';
+    QuestLoadout.current = null;
     Quests.status = realStatus;
 });
 

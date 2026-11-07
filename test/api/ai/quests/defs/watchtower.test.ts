@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { QuestFood } from '#/bot/api/ai/quests/food.js';
 import { CRYSTALS, WT_ITEM, WT_NPC, watchtowerArea } from '#/bot/api/ai/quests/defs/watchtower/areas.js';
 import { WATCHTOWER_STAGE, parseWatchtowerJournal } from '#/bot/api/ai/quests/defs/watchtower/journal.js';
@@ -861,7 +861,7 @@ describe('the enclave food is whatever the player chose to eat', () => {
     });
 
     afterEach(() => {
-        QuestFood.name = 'Lobster';
+        QuestFood.name = 'Trout';
     });
 
     test('the configured food is withdrawn when the bank holds only that', () => {
@@ -884,7 +884,17 @@ describe('the enclave food is whatever the player chose to eat', () => {
     });
 });
 
+afterEach(() => {
+    QuestFood.name = 'Trout';
+});
+
 describe('the kit comes out of the bank in one trip', () => {
+    // Why: these tests bank lobster, so they declare the configured food instead of
+    // inheriting whatever the enclave suite leaves behind.
+    beforeEach(() => {
+        QuestFood.name = 'Lobster';
+    });
+
     const FULL_BANK = new Map<string, number>([['lobster', 100]]);
     const bankIds = (): Map<number, number> => new Map([
         [WT_ITEM.COINS.id, 50_000],

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { driveDialog } from '#/bot/api/ai/quests/exec/primitives.js';
 import { ChatDialog } from '#/bot/api/ui/dialogue/ChatDialog.js';
 import { Execution } from '#/bot/api/execution/Execution.js';
@@ -9,32 +9,35 @@ import { Execution } from '#/bot/api/execution/Execution.js';
 const TICK_MS = 600;
 /** Poll the predicate once per simulated tick, so a longer wait gets more chances. */
 beforeEach(() => {
-    (Execution as unknown as { delayUntil: (c: () => boolean, ms: number) => Promise<boolean> }).delayUntil =
-        async (check: () => boolean, ms: number) => {
-            for (let i = 0; i < Math.max(1, Math.floor(ms / TICK_MS)); i++) {
-                if (check()) {
-                    return true;
-                }
+    spyOn(Execution, 'delayUntil').mockImplementation(async (check: () => boolean, ms = 6000) => {
+        for (let i = 0; i < Math.max(1, Math.floor(ms / TICK_MS)); i++) {
+            if (check()) {
+                return true;
             }
-            return check();
-        };
-    (Execution as unknown as { delayTicks: (n: number) => Promise<void> }).delayTicks = async () => {};
+        }
+        return check();
+    });
+    spyOn(Execution, 'delayTicks').mockImplementation(async () => {});
+});
+
+afterEach(() => {
+    mock.restore();
 });
 
 /** A conversation that goes quiet for `gapTicks` polls, then offers one last page. */
 function scriptGap(gapTicks: number): { pages: () => number } {
     let polls = 0;
     let pages = 0;
-    (ChatDialog as unknown as { isOpen: () => boolean }).isOpen = () => false;
-    (ChatDialog as unknown as { canContinue: () => boolean }).canContinue = () => {
+    spyOn(ChatDialog, 'isOpen').mockImplementation(() => false);
+    spyOn(ChatDialog, 'canContinue').mockImplementation(() => {
         polls++;
         return polls > gapTicks;
-    };
-    (ChatDialog as unknown as { continue: () => Promise<boolean> }).continue = async () => {
+    });
+    spyOn(ChatDialog, 'continue').mockImplementation(async () => {
         pages++;
         return true;
-    };
-    (ChatDialog as unknown as { options: () => string[] }).options = () => [];
+    });
+    spyOn(ChatDialog, 'options').mockImplementation(() => []);
     return { pages: () => pages };
 }
 

@@ -2,4 +2,4 @@
 ## Why: every test lives under test/; the 377 staging tree is tracked and must never be discovered
 ## (test/repo/stagingInert.test.ts proves a throwing fixture there stays invisible).
 root = "test"
-preload = ["./test/setup-dom.ts", "./test/setup-env-guard.ts"]
+preload = ["./test/setup-dom.ts", "./test/setup-env-guard.ts", "./test/setup-static-guard.ts"]

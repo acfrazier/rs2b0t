@@ -38,6 +38,7 @@ const origLocList = LocType.list;
 const origFloList = FloType.list;
 const origLowMem = ClientBuild.lowMem;
 const origMinUsed = ClientBuild.minusedlevel;
+const origMinBuilt = ClientBuild.minBuiltLevel;
 
 function fixture(): Fixture {
     const groundh = new Int32Array3d(4, 105, 105);
@@ -63,6 +64,7 @@ afterEach(() => {
     FloType.list = origFloList;
     ClientBuild.lowMem = origLowMem;
     ClientBuild.minusedlevel = origMinUsed;
+    ClientBuild.minBuiltLevel = origMinBuilt;
 });
 
 // A tile whose every field is a function of its position, so a misplaced tile shows up as a wrong value.

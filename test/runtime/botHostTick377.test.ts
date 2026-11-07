@@ -1,4 +1,4 @@
-import { afterAll, expect, mock, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, expect, mock, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 mock.module('#/client/3rdparty/audio.js', () => ({ playWave: async (): Promise<void> => {}, setWaveVolume: (): void => {} }));
@@ -11,6 +11,15 @@ import { ServerProt } from '#/client/io/ServerProt.js';
 import { loadReplayRecordings } from '../io/replay/recording.js';
 
 const handle = (ptype: number): void => (BotHost as unknown as { handlePacket(ptype: number): void }).handlePacket(ptype);
+
+// Why: LocType.list is a process-wide static; a stub left behind broke every later file's loc decoder.
+const realLocList = LocType.list;
+beforeEach(() => {
+    LocType.list = ((id: number) => ({ name: `loc${id}`, op: ['Mine'], multiloc: [] })) as unknown as typeof LocType.list;
+});
+afterEach(() => {
+    LocType.list = realLocList;
+});
 
 test('a server tick is one PLAYER_INFO: NPC_INFO, rebuilds and zone packets never advance tickCount', () => {
     const before = BotHost.tickCount;
@@ -48,7 +57,6 @@ test('every committed 377 recording carries exactly one PLAYER_INFO per game tic
     }
 });
 
-LocType.list = ((id: number) => ({ name: `loc${id}`, op: ['Mine'], multiloc: [] })) as unknown as typeof LocType.list;
 afterAll(() => detach());
 
 test('a scene rebuild drops the loc snapshot memo, so an instanced scene never reads the previous one', () => {

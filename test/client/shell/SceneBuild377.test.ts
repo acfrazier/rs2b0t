@@ -15,6 +15,7 @@ const origLocList = LocType.list;
 const origLowMem = Client.lowMem;
 const origBuildLowMem = ClientBuild.lowMem;
 const origCheck = ClientBuild.checkLocations;
+const origMinUsedLevel = ClientBuild.minusedlevel;
 
 function patterned(level: number, x: number, z: number): LandTile {
     return { height: 2 + ((x * 7 + z * 3 + level * 5) % 200), flags: (x + z) % 9 === 0 ? 2 : 0 };
@@ -56,6 +57,7 @@ afterEach(() => {
     Client.lowMem = origLowMem;
     ClientBuild.lowMem = origBuildLowMem;
     ClientBuild.checkLocations = origCheck;
+    ClientBuild.minusedlevel = origMinUsedLevel;
 });
 
 describe('Client.mapBuild of an instanced scene (Java buildScene)', () => {

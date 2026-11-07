@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { DIG_ID, DIG_TILE } from '#/bot/api/ai/quests/defs/digsite/areas.js';
 import { decide, digsite } from '#/bot/api/ai/quests/defs/digsite/index.js';
@@ -54,6 +54,10 @@ const ALTAR_CAVE = { x: 3368, z: 9767, level: 0 };
 const NITRATE_AND_NITRO = [DIG_ID.AMMONIUM_NITRATE, DIG_ID.NITROGLYCERIN, DIG_ID.ARCENIA_ROOT, DIG_ID.COINS];
 
 beforeEach(() => {
+    resetDigsiteState();
+});
+
+afterEach(() => {
     resetDigsiteState();
 });
 

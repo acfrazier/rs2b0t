@@ -4,8 +4,10 @@ import { NpcUpdate } from '../../src/client/dash3d/ClientNpc.js';
 import { Client } from '../../src/client/shell/Client.js';
 import type { Descriptor, FrameRecord, LoginRecord } from '../../tools/tap-377/format.js';
 import { BitWriter377, encodeSigned5, signed5 } from './bitWriter377.js';
-import { freshClient, runNpcInfo, seedNpcs } from './infoClient377.js';
+import { freshClient, runNpcInfo, seedNpcs, useInfoStubs } from './infoClient377.js';
 import { loadReplayRecordings } from './replay/recording.js';
+
+useInfoStubs();
 
 const NPC_NEW_INDEX_SENTINEL_377 = 16383;
 

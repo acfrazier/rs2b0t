@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { decide, lostCityArea, LOST_CITY_FOOD_TARGET, LOST_CITY_STAGE, LOST_CITY_STAFF_TARGET, lostcity, parseLostCityJournal } from '#/bot/api/ai/quests/defs/lostcity.js';
 import { QuestFood } from '#/bot/api/ai/quests/food.js';
 import type { WorldTile } from '#/bot/adapter/ClientAdapter.js';
@@ -54,6 +54,10 @@ function customName(step: QuestStep): string | null {
 
 beforeEach(() => {
     QuestFood.name = 'Lobster';
+});
+
+afterEach(() => {
+    QuestFood.name = 'Trout';
 });
 
 describe('Lost City journal stage parsing', () => {
