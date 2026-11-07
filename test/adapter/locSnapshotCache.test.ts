@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, mock, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 
 mock.module('#/client/3rdparty/audio.js', () => ({ playWave: async (): Promise<void> => {}, setWaveVolume: (): void => {} }));
 mock.module('#/client/3rdparty/tinymidipcm.js', () => ({ playMidi: (): void => {}, setMidiVolume: (): void => {}, stopMidi: (): void => {} }));
@@ -7,7 +7,14 @@ const { attach, detach, invalidateLocSnapshots, reader } = await import('#/bot/a
 const { default: LocType } = await import('#/client/config/LocType.js');
 
 // LocType reads the game config cache, which a unit test has no reason to load.
-LocType.list = ((id: number) => ({ name: `loc${id}`, op: ['Mine'], multiloc: [] })) as unknown as typeof LocType.list;
+// Why: LocType.list is a process-wide static; a stub left behind broke every later file's loc decoder.
+const realLocList = LocType.list;
+beforeEach(() => {
+    LocType.list = ((id: number) => ({ name: `loc${id}`, op: ['Mine'], multiloc: [] })) as unknown as typeof LocType.list;
+});
+afterEach(() => {
+    LocType.list = realLocList;
+});
 
 // Why: locs() sweeps 104x104 tiles x 4 typecodes per call (1.4-1.7ms, up to 2289 objects) from predicates that run at frame rate.
 let sceneReads = 0;

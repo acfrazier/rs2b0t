@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import { CB_ID, CB_STAGE } from '#/bot/api/ai/quests/defs/chompybird/areas.js';
 import { CookState } from '#/bot/api/ai/quests/defs/chompybird/cook.js';
@@ -57,6 +57,10 @@ function snap(stage: number, invIds: [number, number][]): QuestSnapshot {
 }
 
 describe('big chompy bird hunting resumes from anywhere', () => {
+    afterEach(() => {
+        CookState.kidsAsked = false;
+        ChestState.refused = false;
+    });
     for (const chestRefused of [false, true]) {
         for (const kidsAsked of [false, true]) {
             for (const stage of STAGES) {

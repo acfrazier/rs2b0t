@@ -1,3 +1,5 @@
+import { afterEach, beforeEach } from 'bun:test';
+
 import NpcType from '../../src/client/config/NpcType.js';
 import SeqType from '../../src/client/config/SeqType.js';
 import ClientNpc from '../../src/client/dash3d/ClientNpc.js';
@@ -14,9 +16,7 @@ const seqStub = {
     getDelay: () => 1
 };
 
-// SeqType.list is a static array; tests replace it with a delay stub.
-const seqTypeList = SeqType as unknown as { list: SeqType[] };
-seqTypeList.list = new Proxy([] as SeqType[], {
+const seqStubList = new Proxy([] as SeqType[], {
     get: (target, key) => (typeof key === 'string' && /^-?\d+$/.test(key) ? seqStub : Reflect.get(target, key))
 });
 
@@ -33,8 +33,22 @@ function npcStub(id = 0): NpcType {
     return type;
 }
 
-const npcTypeList = NpcType as unknown as { list: (id: number) => NpcType };
-npcTypeList.list = (id: number) => npcStub(id);
+// Why: SeqType.list, NpcType.list and Client.loopCycle are process-wide statics, and bun runs every file in one
+// process, so a stub left behind broke later files' config decoders. Call this at the top of each test file.
+export function useInfoStubs(): void {
+    const realSeqList = SeqType.list;
+    const realNpcList = NpcType.list;
+    const realLoopCycle = Client.loopCycle;
+    beforeEach(() => {
+        SeqType.list = seqStubList;
+        NpcType.list = (id: number) => npcStub(id);
+    });
+    afterEach(() => {
+        SeqType.list = realSeqList;
+        NpcType.list = realNpcList;
+        Client.loopCycle = realLoopCycle;
+    });
+}
 
 export interface InfoClient {
     getPlayerPos(buf: Packet, size: number): void;

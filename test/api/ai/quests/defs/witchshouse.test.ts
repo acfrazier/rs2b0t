@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { WorldTile } from '#/bot/adapter/ClientAdapter.js';
 import { WH_OBJ, inGarden, inShed } from '#/bot/api/ai/quests/defs/witchshouse/areas.js';
 import { DiaryState, decide, resetDiaryState, witchshouse } from '#/bot/api/ai/quests/defs/witchshouse/index.js';
@@ -44,6 +44,8 @@ const named = (step: QuestStep): string => (step.kind === 'custom' ? step.name :
 const DRESSED = { worn: [WH_OBJ.GLOVES], ids: [WH_OBJ.DOOR_KEY] };
 
 beforeEach(() => resetDiaryState());
+
+afterEach(() => resetDiaryState());
 
 describe('witchshouse decide', () => {
     test('an unloaded journal waits rather than restarting the quest', () => {

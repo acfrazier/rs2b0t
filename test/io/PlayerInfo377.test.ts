@@ -5,8 +5,10 @@ import Packet from '../../src/client/io/Packet.js';
 import { Client } from '../../src/client/shell/Client.js';
 import type { Descriptor, FrameRecord, LoginRecord, CheckpointRecord } from '../../tools/tap-377/format.js';
 import { BitWriter377, encodeSigned5, signed5 } from './bitWriter377.js';
-import { freshClient, runPlayerInfo, seedPlayers } from './infoClient377.js';
+import { freshClient, runPlayerInfo, seedPlayers, useInfoStubs } from './infoClient377.js';
 import { loadReplayRecordings } from './replay/recording.js';
+
+useInfoStubs();
 
 const PLAYER_NEW_INDEX_SENTINEL_377 = 2047;
 

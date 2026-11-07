@@ -71,11 +71,11 @@ beforeEach(() => {
 afterEach(() => {
     detach();
     invalidateLocSnapshots();
+    LocType.list = origList;
+    VarBitType.list = origVarbits;
 });
 
 afterAll(() => {
-    LocType.list = origList;
-    VarBitType.list = origVarbits;
     Model.pickedCount = origPickedCount;
     Model.pickedEntityTypecode[0] = origPickedTypecode;
     ClientBuild.lowMem = origLowMem;

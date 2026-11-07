@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { QuestFood } from '#/bot/api/ai/quests/food.js';
 import {
     WATERFALL_STAGE,
@@ -21,6 +21,10 @@ interface ItemSpec {
 }
 
 beforeEach(() => {
+    QuestFood.name = 'Trout';
+});
+
+afterEach(() => {
     QuestFood.name = 'Trout';
 });
 

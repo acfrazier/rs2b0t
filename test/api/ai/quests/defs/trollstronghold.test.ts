@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import type { WorldTile } from '#/bot/adapter/ClientAdapter.js';
 import {
     committed,
@@ -82,6 +82,11 @@ function customName(step: QuestStep): string | null {
 beforeEach(() => {
     QuestFood.name = 'Lobster';
     QuestLoadout.current = { name: 'quest', worn: { righthand: WEAPON }, carry: [{ item: 'Lobster', qty: 16 }] };
+});
+
+afterEach(() => {
+    QuestFood.name = 'Trout';
+    QuestLoadout.current = null;
 });
 
 describe('Troll Stronghold journal stage parsing', () => {

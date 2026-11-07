@@ -195,24 +195,31 @@ describe('377 seq opcode 12', () => {
 
 describe('377 varp and varbit', () => {
     test('varp opcodes 8/11/13 set scope', () => {
+        const { codeCount, codeIds } = VarpType;
         VarpType.codeCount = 0;
         VarpType.codeIds = new Int32Array(8);
-        const varp = new VarpType();
-        varp.decode(7, new Packet(new Uint8Array([1, 255, 2, 128, 3, 3, 4, 5, 255, 255, 6, 7, 128, 0, 0, 0, 8, 10, 120, 10, 11, 12, 255, 255, 255, 254, 13, 14, 0])));
-        expect(varp.type).toBe(255);
-        expect(varp.type2).toBe(128);
-        expect(varp.transmit).toBe(true);
-        expect(varp.keepBit).toBe(false);
-        expect(varp.clientcode).toBe(65535);
-        expect(varp.protect).toBe(true);
-        expect(varp.unused7).toBe(-2147483648);
-        expect(varp.debugname).toBe('x');
-        expect(varp.scope).toBe(true);
-        expect(varp.scopeType).toBe(2);
-        expect(varp.unused12).toBe(-2);
-        expect(varp.unused14).toBe(false);
-        expect(VarpType.codeIds?.[0]).toBe(7);
-        expect(VarpType.codeCount).toBe(2);
+        try {
+            const varp = new VarpType();
+            varp.decode(7, new Packet(new Uint8Array([1, 255, 2, 128, 3, 3, 4, 5, 255, 255, 6, 7, 128, 0, 0, 0, 8, 10, 120, 10, 11, 12, 255, 255, 255, 254, 13, 14, 0])));
+            expect(varp.type).toBe(255);
+            expect(varp.type2).toBe(128);
+            expect(varp.transmit).toBe(true);
+            expect(varp.keepBit).toBe(false);
+            expect(varp.clientcode).toBe(65535);
+            expect(varp.protect).toBe(true);
+            expect(varp.unused7).toBe(-2147483648);
+            expect(varp.debugname).toBe('x');
+            expect(varp.scope).toBe(true);
+            expect(varp.scopeType).toBe(2);
+            expect(varp.unused12).toBe(-2);
+            expect(varp.unused14).toBe(false);
+            expect(VarpType.codeIds?.[0]).toBe(7);
+            expect(VarpType.codeCount).toBe(2);
+        } finally {
+            // Why: codeCount and codeIds are process-wide; leave the caller's decoded varps intact.
+            VarpType.codeCount = codeCount;
+            VarpType.codeIds = codeIds;
+        }
     });
 
     test('varbit opcodes 2-5 store transmit and payload', () => {

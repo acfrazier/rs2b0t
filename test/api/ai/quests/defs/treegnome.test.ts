@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import type { WorldTile } from '#/bot/adapter/ClientAdapter.js';
 import { TG_ITEM, TG_TILE } from '#/bot/api/ai/quests/defs/treegnome/areas.js';
@@ -9,6 +9,10 @@ import type { QuestSnapshot, QuestStep } from '#/bot/api/ai/quests/engine/types.
 
 // Why: `QuestLoadout` is one module-level singleton, so a neighbouring suite's declared kit decides this one's gear step.
 beforeEach(() => {
+    QuestLoadout.current = null;
+});
+
+afterEach(() => {
     QuestLoadout.current = null;
 });
 

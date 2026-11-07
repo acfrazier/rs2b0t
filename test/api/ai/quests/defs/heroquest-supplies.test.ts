@@ -31,6 +31,10 @@ function name(step: QuestStep | null): string {
     return JSON.stringify(step ?? {});
 }
 
+afterEach(() => {
+    QuestFood.name = 'Trout';
+});
+
 describe('the Black Arm disguise', () => {
     test('an empty pack buys the platebody first', () => {
         expect(name(disguiseStep(snap()))).toContain(HERO_NAMED.BLACK_PLATEBODY);
