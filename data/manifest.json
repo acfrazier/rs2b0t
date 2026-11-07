@@ -17,5 +17,12 @@
     "bun": null
   },
   "generators": {},
-  "artifacts": []
+  "artifacts": [
+    {
+      "path": "out/collision.lcnav.gz",
+      "sha256": "ed64309ee43a7eb117f101cd542ceedb2bbf5db7dbaad18cab7415ce0baf5a99",
+      "kind": "out",
+      "qualification": "pending"
+    }
+  ]
 }

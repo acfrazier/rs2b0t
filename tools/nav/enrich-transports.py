@@ -9,11 +9,82 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+
+def selected_revision() -> int:
+    revision = os.environ.get("REVISION")
+    if revision is None:
+        client_prot = Path(__file__).resolve().parents[2] / "src" / "client" / "io" / "ClientProt.ts"
+        match = re.search(r"export const CLIENT_VERSION = (\d+);", client_prot.read_text(encoding="utf-8"))
+        if not match:
+            raise RuntimeError(f"Cannot read CLIENT_VERSION from {client_prot}")
+        revision = match.group(1)
+    try:
+        selected = int(revision)
+    except ValueError as error:
+        raise RuntimeError(f"Invalid REVISION '{revision}'") from error
+    if selected not in {289, 377}:
+        raise RuntimeError(f"Unsupported nav revision {selected}")
+    return selected
+
+
+def load_stair_prices() -> dict:
+    path = Path(__file__).with_name("stair-prices.json")
+    table = json.loads(path.read_text(encoding="utf-8"))
+    if table.get("schemaVersion") != 1 or table.get("baseTicks") != 1 or not isinstance(table.get("handlers"), dict):
+        raise RuntimeError(f"Invalid {path} schema")
+    for name, price in table["handlers"].items():
+        if not name or not isinstance(price, dict):
+            raise RuntimeError(f"Invalid stair price for handler '{name}'")
+        has_default = "extraTicks" in price or "source" in price
+        if has_default and (
+            type(price.get("extraTicks")) is not int
+            or price["extraTicks"] < 0
+            or not isinstance(price.get("source"), str)
+            or not price["source"]
+        ):
+            raise RuntimeError(f"Invalid stair price for handler '{name}'")
+        if not has_default and not price.get("opPrices"):
+            raise RuntimeError(f"Handler '{name}' has no default or op-specific stair price")
+        op_prices = price.get("opPrices")
+        if op_prices is not None:
+            if not isinstance(op_prices, dict) or not op_prices:
+                raise RuntimeError(f"Invalid op-specific stair prices for handler '{name}'")
+            for op, op_price in op_prices.items():
+                if (
+                    not op.isdigit()
+                    or not 1 <= int(op) <= 5
+                    or not isinstance(op_price, dict)
+                    or type(op_price.get("extraTicks")) is not int
+                    or op_price["extraTicks"] < 0
+                    or not isinstance(op_price.get("source"), str)
+                    or not op_price["source"]
+                ):
+                    raise RuntimeError(f"Invalid op-specific stair price for handler '{name}' option {op}")
+    return table["handlers"]
+
+
+def extra_ticks(prices: dict | None, debug_name: str, op: int | None = None) -> int | None:
+    if prices is None:
+        return None
+    price = prices.get(debug_name)
+    if price is None:
+        raise RuntimeError(f"Unpriced movement handler '{debug_name}'")
+    op_prices = price.get("opPrices")
+    if op_prices is not None:
+        selected = op_prices.get(str(op)) if op is not None else None
+        if selected is None:
+            raise RuntimeError(f"Unpriced movement handler '{debug_name}' option {op}")
+        return selected["extraTicks"]
+    if "extraTicks" not in price:
+        raise RuntimeError(f"Unpriced movement handler '{debug_name}'")
+    return price["extraTicks"]
+
 
 
 @dataclass
@@ -206,11 +277,10 @@ def resolve_source_loc(
                 or (kind in {"dungeon", "shortcut"} and action_match)
             )
 
-            # Stairs must expose the exact action; otherwise an auto-generated
-            # reverse edge can be incorrectly attached to an up-only ladder.
-            if kind == "stair" and not action_match:
+            # Movement edges require the exact scripted action; name-only matches can route through inert locs.
+            if kind in {"stair", "dungeon"} and not action_match:
                 continue
-            if kind != "stair" and not (name_match or action_match):
+            if kind not in {"stair", "dungeon"} and not (name_match or action_match):
                 continue
             score = 0
             if name_match:
@@ -301,17 +371,66 @@ def main() -> None:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
 
+    revision = selected_revision()
+    prices = load_stair_prices() if revision == 377 else None
+
     configs = load_loc_configs(args.content)
     _, spatial = load_placements(args.content)
     # Include quest ladders with oploc handlers, but exclude decorative ladders.
     allowed_stair_debugs: set[str] = set()
-    oploc_re = re.compile(r"^\[oploc\d+,([a-z0-9_]+)]", re.MULTILINE)
+    movement_handler_ops: set[tuple[str, int]] = set()
+    oploc_re = re.compile(r"^\[oploc([1-5]),([a-z0-9_]+)]", re.MULTILINE)
     for script in (args.content / "scripts").rglob("*.rs2"):
-        allowed_stair_debugs.update(oploc_re.findall(script.read_text(encoding="utf-8")))
+        handlers = {(name, int(option)) for option, name in oploc_re.findall(script.read_text(encoding="utf-8"))}
+        movement_handler_ops.update(handlers)
+        allowed_stair_debugs.update(name for name, _ in handlers)
     allowed_stair_debugs.update({"laddertop", "ladder", "laddermiddle", "laddertop_directional", "ladder_directional"})
     data_dir = args.rs2b0t / "src" / "bot" / "event" / "webwalk" / "data"
     curated = json.loads((data_dir / "transports.json").read_text(encoding="utf-8"))
     stairs = json.loads((data_dir / "stairEdges.json").read_text(encoding="utf-8"))
+
+    def matching_options(config: LocConfig | None, action: str | None) -> list[int]:
+        wanted = normalized(action)
+        if not wanted:
+            return []
+        return [
+            index + 1
+            for index, option in enumerate(config.options if config else [])
+            if normalized(option) == wanted
+        ]
+
+    def disable_unhandled_movement(edge: dict, config: LocConfig | None) -> bool:
+        if revision != 377 or edge.get("kind") not in {"stair", "dungeon"} or edge.get("disabledReason"):
+            return False
+        handler = config.debug_name if config is not None else None
+        if handler and any((handler, op) in movement_handler_ops for op in matching_options(config, edge.get("action"))):
+            return False
+        edge["disabledReason"] = "No matching revision 377 OPLOC handler for this location action."
+        edge.pop("extraTicks", None)
+        return True
+
+    def apply_price(edge: dict) -> None:
+        debug_name = edge.get("debugName")
+        if not debug_name:
+            return
+        if edge.get("extraTicks") is not None:
+            return
+        # Disabled rows cannot be traversed, so a missing script body has no movement price.
+        if edge.get("disabledReason"):
+            return
+
+        price = prices.get(debug_name) if prices is not None else None
+        if price is not None:
+            op = None
+            if price.get("opPrices") is not None:
+                config = configs.get(edge.get("openLocId") or edge.get("locId", -1))
+                matches = matching_options(config, edge.get("action"))
+                if len(matches) != 1:
+                    raise RuntimeError(f"Cannot resolve priced option for movement handler '{debug_name}'")
+                op = matches[0]
+            edge["extraTicks"] = extra_ticks(prices, debug_name, op)
+        elif revision == 377 and edge.get("kind") in {"stair", "dungeon"}:
+            raise RuntimeError(f"Unpriced movement handler '{debug_name}'")
 
     def enrich(edges: list[dict]) -> list[dict]:
         enriched: list[dict] = []
@@ -324,11 +443,17 @@ def main() -> None:
             )
             # Keep ladder placements derived from handlers; refresh metadata for all other edges.
             if source_backed_ladder and all(field in edge for field in ("locId", "locX", "locZ", "debugName", "options")):
+                if disable_unhandled_movement(edge, existing):
+                    enriched.append(edge)
+                    continue
+                apply_price(edge)
                 enriched.append(edge)
                 continue
+            action_config = None
             resolved = resolve_source_loc(edge, configs, spatial, allowed_stair_debugs)
             if resolved:
                 config, placement = resolved
+                action_config = config
                 edge["locX"] = placement.x
                 edge["locZ"] = placement.z
                 edge["debugName"] = config.debug_name
@@ -341,6 +466,10 @@ def main() -> None:
                     edge.pop("openLocId", None)
             else:
                 edge["options"] = [edge["action"]]
+            if disable_unhandled_movement(edge, action_config):
+                enriched.append(edge)
+                continue
+            apply_price(edge)
             enriched.append(edge)
         return enriched
 
