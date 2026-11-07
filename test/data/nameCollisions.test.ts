@@ -92,10 +92,8 @@ describe('the hand-written aliases', () => {
 // Why: these are the families a shop puts on a shelf, so a customer has to be able to name one of them
 // Why: and the shop has to be able to say which it means. New content inside one fails here.
 describe('the families a shop trades are fully separated', () => {
-    // 377: the 289 dragonhide and unstrung-bow families are gone; the 377 content names every member
-    // distinctly (`_unpack/377/all.obj` `name=Green d'hide body` :14517, `name=Oak longbow (u)` :743), so
-    // those groups no longer exist. The families the shop still trades and that need separation are the
-    // key halves, the amulet pairs and the capes (the 377 collision group rows).
+    // 377: the 289 dragonhide and unstrung-bow families are gone: the content names every member distinctly (`all.obj` :14517, :743);
+    // the families that still need separation are the key halves, the amulet pairs and the capes.
     const FAMILIES = [
         'Half of a key',
         'Gold amulet',

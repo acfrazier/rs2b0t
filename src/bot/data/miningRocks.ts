@@ -1,12 +1,6 @@
 /**
- * Ore loc ids from the 377 mine tables and the 377 `loc.pack`; all render as "Rocks", so ore and depleted states are distinguished by id.
- * Why: Dwarven iron spans two clusters, so `findRock` prefers the cluster nearest the player.
- *
- * 377 sources (content a15d0faa8):
- * - `scripts/skill_mining/configs/mine.dbrow` names every rock per ore table: clay :12-20, copper :30-36, tin :46-54, iron :64-70, coal :80-86, gold :96-104, silver :114-120, mithril :130-133, adamantite :143-146, runite :156-159, blurite :171-172, gem :182-183.
- * - `pack/loc.pack` maps each rock debugname to its loc id (`2091:2090=copperrock1`, `9709:9708=rocks_9708`).
- * - The 377 maps place both series; the rocks_97xx/111xxx/119xxx placements are the Rimmington, Crafting Guild and Barbarian Village fields (evidence RS2B0T-377-S9-1106/placements-rocks.txt, decoded from engine `data/pack/.cache/maps-server.zip`).
- * 289 carried only the classic 2090-2110 block; 377 adds the new-series ids the same tables name, so a camp's ore list can no longer assume two ids per ore.
+ * Ore loc ids from the 377 mine tables and `loc.pack`; all render as "Rocks", so ore and depleted states are distinguished by id.
+ * Why: Dwarven iron spans two clusters, so `findRock` prefers the cluster nearest the player. Source lines: docs/decisions/data-377-sources.md#mining-locations-and-rocks.
  */
 export const ROCK_TYPES: Record<string, number[]> = {
     Clay: [2108, 2109, 9711, 9713, 11189, 11190, 11191],
@@ -46,11 +40,7 @@ export function rockTierById(id: number): number {
     return ROCK_TIER_BY_ID.get(id) ?? -1;
 }
 
-/**
- * Gas-rock (macro event) loc ids: the loc a rock turns into when the smoking-rocks event fires.
- * 377 sources: `mine.dbrow` lists each `macro_*rock` beside its ore's rocks (:32-33 copper, :48-49 tin, :66-67 iron, :82-83 coal, :98-99 gold, :119-120 silver, :132-133 mithril, :145-146 adamantite, :158-159 runite, :14-15 clay, :172 blurite, :183 gem), and `pack/loc.pack` assigns the 2119-2140 block (`2120:2119=macro_copperrock1` … `2141:2140=macro_gemrock`).
- * 289 omitted 2140 (the gemrock gas form); the 377 gem table names it (`mine.dbrow:183`) and the 377 maps place gemrocks (Shilo Village, placements-rocks.txt), so it is guarded here.
- */
+/** Gas-rock (macro event) loc ids: the loc a rock turns into when the smoking-rocks event fires; 289 omitted 2140 (gemrock). Source lines: docs/decisions/data-377-sources.md#mining-locations-and-rocks. */
 export const GAS_ROCK_IDS: Set<number> = new Set([
     2119, 2120, // macro_copperrock1/2
     2121, 2122, // macro_ironrock1/2

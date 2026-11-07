@@ -1,11 +1,4 @@
-/**
- * 377 sources (content a15d0faa8): the minable rocks per camp are the 377 map placements of the ids in the
- * staged `miningRocks.ts` edition: the classic 2090-2111 rocks plus the 377 rocks_97xx/111xxx/119xxx series
- * (`pack/loc.pack`, `scripts/skill_mining/configs/mine.dbrow:12-183`), full decode in
- * RS2B0T-377-S9-1106/placements-rocks.txt. The camp anchors, banks and resource claims were re-derived from
- * those placements; Rimmington also carries the new-series field (clay 9713 @ (2986,3239), copper
- * 9708-9710 @ (2976-2979,3245-3248), tin 9714/9716, iron 9717-9719, gold 9720/9722) that Doric's 377 Path mined.
- */
+/** 377 rocks per camp are the map placements of the ids in `miningRocks.ts` (content a15d0faa8); source lines in docs/decisions/data-377-sources.md#mining-locations-and-rocks. */
 import type { WorldTile } from '../adapter/ClientAdapter.js';
 import Tile from '../geometry/Tile.js';
 import { locationOptions, resolveGatheringLocation, type GatheringLocation } from './gatheringLocations.js';

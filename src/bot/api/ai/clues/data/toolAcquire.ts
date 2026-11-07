@@ -12,12 +12,7 @@ export function trailKit(scrollId: number | null): string[] {
     return [SPADE_NAME, ...TRIO, ...(CLUE_DB[scrollId]?.items ?? [])];
 }
 
-/**
- * Five 377 ground spade placements (obj 952; `pack/obj.pack:953:952=spade`), re-derived from the OBJ
- * sections in `maps/*.jm2`: (1951,4964,0) `m30_77:5620`, (2566,3330,0) `m40_52:7877`,
- * (2981,3370,0) `m46_52:14358`, (3120,3359,0) `m48_52:10665`, and (3218,3412,1) `m50_53:12974`.
- * The 289 edition's two alternate spawns are not part of the 377 map placement set.
- */
+/** Five 377 ground spade placements (obj 952) derived from the map OBJ sections; source lines in docs/decisions/data-377-sources.md#spade-spawns. */
 export const SPADE_SPAWNS: Tile[] = [
     new Tile(2566, 3330, 0),
     new Tile(2981, 3370, 0),

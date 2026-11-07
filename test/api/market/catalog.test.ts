@@ -85,9 +85,8 @@ describe('resolveByName', () => {
     // Why: people ask for "1k maple longbows", and the item is called "Maple longbow".
     test('a plural still finds the item', () => {
         expect(resolveByName(CAT, 'maple longbows').map(r => r.id)).toEqual([851]);
-        // 377: the unstrung bow pluralises as "maple longbow (u)s"; the plural strip runs after key()
-        // punctuation-flattening, so the spaced "(u) s" tail can't be recovered: the glued form is what
-        // the resolver forgives.
+        // 377: the unstrung bow pluralises as "maple longbow (u)s"; the plural strip runs after key() flattening,
+        // so only the glued form is recoverable and the resolver forgives it.
         expect(resolveByName(CAT, 'maple longbow us').map(r => r.id)).toEqual([62]);
         expect(resolveByName(CAT, 'iron ores').map(r => r.id)).toEqual([440]);
     });
@@ -133,9 +132,7 @@ describe('resolveByName', () => {
 });
 
 // Why: the live client only sees display names, so these ids are taken from the content pack.
-// The 377 display names: the raw dragonhides carry per-colour names (`_unpack/377/all.obj`
-// `name=Black dragonhide` :23412, Red :23433, Blue :23454, Green :23475) and so do the pieces
-// (`name=Green d'hide body` :14517 etc.), so no family shares a name any more.
+// 377 raw dragonhides and pieces carry per-colour names (`all.obj` :23412-:23475, :14517), so no family shares a name.
 const ALIASED: ObjRecord[] = [
     rec(985, 'Half of a key'),
     rec(987, 'Half of a key'),
@@ -189,10 +186,8 @@ describe('resolveByName with aliases', () => {
         // ambiguity is the next test's subject.
     });
 
-    // KNOWN GAP (S9 finding, receipt RS2B0T-377-S9-1106): the generated collision words include the stopword
-    // 'of' (the cup_of_tea family), so resolveAliased strips it and every "... of a ..." alias query resolves
-    // empty. The check is runtime-detected: once a P4a word-filter fix (drop stopwords from usable()) lands,
-    // the skip disappears and these assertions run again. Nothing here pins the broken behaviour as expected.
+    // KNOWN GAP (S9 finding, receipt RS2B0T-377-S9-1106): the generated collision words include the stopword 'of' (cup_of_tea family), so "... of a ..." aliases resolve empty.
+    // Runtime-detected: once a P4a word-filter fix lands the skip disappears and these assertions run again; nothing here pins the broken behaviour.
     test.skipIf(ids('loop half of a key').length === 0)('the key halves answer to their a-variants', () => {
         expect(ids('loop half of a key')).toEqual([987]);
         expect(ids('tooth half of a key')).toEqual([985]);

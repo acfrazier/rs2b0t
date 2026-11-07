@@ -6,12 +6,8 @@ import { locationOptions, resolveGatheringLocation, type GatheringLocation } fro
 export type WoodcuttingLocation = GatheringLocation;
 
 /**
- * Ent NPCs: the 377 pack's macro_ent_* ids (`pack/npc.pack:1720-1751,1792-1793`: tree1-6 1719/1720/1721/1744/1747/1748,
- * dead_tree1-11 1722-1732 + dead_tree12 1745, dramen 1733, magic 1734, maple 1735, willow1-3 1736-1738, oak 1739, yew 1740,
- * evergreen1-3 1741-1743, achey 1746, hollow1-2 1749-1750, jungle_tree1-2 1791-1792).
- * Why: Ents share tree names and Chop down actions, so match by ID.
- * Why the 289 ids are gone: pack ids depend on build history (pitfall 11); the 289 pack numbered them 444-452,
- * the 377 pack numbers them 1719-1750 and 1791-1792, with crow (1751+) the next id after hollow2.
+ * Ent NPCs: the 377 pack's macro_ent_* ids 1719-1750 and 1791-1792; the 289 ids 444-452 are gone.
+ * Why: Ents share tree names and Chop down actions, so match by ID; pack ids depend on build history (pitfall 11). Source lines: docs/decisions/data-377-sources.md#woodcutting-ents.
  */
 export const ENT_NPC_IDS: Set<number> = new Set([
     1719,

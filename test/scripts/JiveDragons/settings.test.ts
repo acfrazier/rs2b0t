@@ -109,11 +109,8 @@ describe('the ranged supplies', () => {
 });
 
 describe('JiveDragons Brimhaven settings', () => {
-    // KNOWN GAP (S9 finding, receipt RS2B0T-377-S9-1106): the 377 content's drop_tables carry no
-    // iron_dragon.rs2 or steel_dragon.rs2 while the maps place 13 iron and 4 steel dragons in the Brimhaven
-    // dungeon (npc 1591/1592), so DROP_DB has no 'Iron dragon'/'Steel dragon' key, the loot chips derive
-    // empty and the 289 chips test (bars/bones/coins ticked) cannot run. A content unit restores the two
-    // tables; its acceptance reruns that assertion. Nothing is asserted here so the gap cannot pass as green.
+    // KNOWN GAP (S9 finding, receipt RS2B0T-377-S9-1106): the 377 drop_tables carry no iron_dragon.rs2 or steel_dragon.rs2 while the maps place 13 iron and 4 steel dragons in Brimhaven (npc 1591/1592),
+    // so DROP_DB has no such key and the loot chips derive empty; a content unit restores the tables and its acceptance reruns this assertion. Nothing is asserted so the gap cannot pass as green.
     test('the Brimhaven sites still expose their iron and steel loot settings', () => {
         expect(SETTINGS.lootIron!.showIf).toEqual({ key: 'site', anyOf: ['brimhaven-iron'] });
         expect(SETTINGS.lootSteel!.showIf).toEqual({ key: 'site', anyOf: ['brimhaven-steel'] });

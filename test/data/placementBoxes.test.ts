@@ -10,24 +10,8 @@ import { ROCK_TYPES } from '#/bot/data/miningRocks.js';
 import { DEFAULT_CAMP_RADIUS } from '#/bot/data/gatheringLocations.js';
 
 /**
- * The 377 placement-derived camp boxes (pitfall 18).
- *
- * Why: a camp box is the area the script hunts/gathers inside, so it must still cover what the 377 content
- * places. The P9 lesson (`IMPDORIC-377-1106`): undersized boxes turn a spawn/teleport outside the
- * box into a `NoTarget` that looks like a capability bug. This derives each box's required coverage from the
- * 377 sources at run time instead of restating tiles:
- * - loc resources (rocks, trees): every placement of a declared resource type near the camp lies inside the
- *   camp box, and every declared resource has at least one placement inside it;
- * - npc resources (fishing spots): the spots are the direct targets and do not wander (`wanderrange=0` in
- *   `scripts/_unpack/377/all.npc`), so every spot placement near the camp lies inside the camp box;
- * - cow fields: the leash is a loot leash, not a spawn fence (a southern Lumbridge cow may die outside it by
- *   design), so the field must keep a farmed herd (at least three Cow-named spawns inside the leash), and
- *   the per-field enumerations stay pinned in CowKillerLocations.test.ts;
- * - named script teleports: the desert-rescue teleport landings (`quests/quest_desertrescue/configs/
- *   desertrescue.constant:45-46`) must land inside their camp boxes, the one 377 script teleport into a camp.
- *
- * Inputs: ENGINE_DIR must be the 377 engine (its pack supplies the loc defs and the packed map squares),
- * CONTENT_DIR the 377 content (npc.pack ids and the all.npc wander fields). Both absent in hosted runs.
+ * Why: the 377 placement-derived camp boxes (pitfall 18) cover what the content places; a camp box is the area the script gathers inside, and an undersized box turns a spawn outside it into a `NoTarget` that looks like a capability bug (P9, `IMPDORIC-377-1106`), so coverage is derived from the 377 sources at run time.
+ * Inputs: ENGINE_DIR must be the 377 engine (loc defs and packed map squares) and CONTENT_DIR the 377 content (npc.pack ids and the all.npc wander fields); both are absent in hosted runs.
  */
 import { Reader, forEachLoc, loadLocTypes, loadMapsquares } from '../../tools/nav/lib.js';
 
@@ -278,9 +262,8 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
     });
 
     test('named script teleports into the desert camp land inside its boxes', () => {
-        // The Tourist Trap's own teleports (quest_desertrescue/configs/desertrescue.constant:45-46):
-        // ^desertrescue_prison_coord = 0_51_47_21_26 → (3285,3038) surface; ^desertrescue_underground_prison_coord
-        // = 0_51_147_24_29 → (3288,9437) underground.
+        // The Tourist Trap's own teleports (`desertrescue.constant:45-46`): ^desertrescue_prison_coord = 0_51_47_21_26 is (3285,3038) on the surface,
+        // and ^desertrescue_underground_prison_coord = 0_51_147_24_29 is (3288,9437) underground.
         const surface = MINING_LOCATIONS.find(c => c.name === 'Desert Mining Camp Surface')!;
         const underground = MINING_LOCATIONS.find(c => c.name === 'Desert Mining Camp')!;
         const radius = DEFAULT_CAMP_RADIUS;

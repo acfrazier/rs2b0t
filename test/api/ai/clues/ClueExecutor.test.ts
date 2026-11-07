@@ -179,9 +179,8 @@ describe('per-clue required items (2811 Baxtorian Falls rope)', () => {
 });
 
 describe('opening a casket', () => {
-    // 377: the hard sextant casket is 2724 (`trail_clue_hard_sextant001_casket`, obj.pack:2725:2724), the
-    // casketId of cluedb row 2723 (hard sextant001, a guarded dig). The 289 test used 3549
-    // (`trail_clue_hard_sextant025_casket`), a clue the 377 trail_hard enum no longer sells.
+    // 377: the hard sextant casket is 2724 (`trail_clue_hard_sextant001_casket`), the casketId of cluedb row 2723, a guarded dig.
+    // The 289 test used 3549, a clue the 377 trail_hard enum no longer sells.
     let CASKET = 2724;
     const NEXT_SCROLL = 2722;
     const SHARK = 385;

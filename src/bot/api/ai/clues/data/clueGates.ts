@@ -14,10 +14,7 @@ export interface ClueGate {
 }
 
 /** Clues whose destination a quest seals off. */
-// 377: the table is empty. The only 289 rows (3560/3562/3564, the Isafdar dig and elf-camp clues) have no
-// 377 clue items at all: the 377 trail content (`_unpack/377/all.obj`, 367 `trail_clue*` objs) carries no
-// isafdar clue, and the staged cluedb (2677-2858) has no such ids. A row for a clue the content does not
-// sell would be a stale gate (the audit reports it), so the gate moves with the content (pitfall 16).
+// 377: empty; the 377 trail content carries no Isafdar clue item (see docs/decisions/data-377-sources.md#clue-gates).
 export const CLUE_GATES: Record<number, ClueGate> = {};
 
 // Why: `unknown` is the quest tab not loaded yet, so only `complete` opens the gate.

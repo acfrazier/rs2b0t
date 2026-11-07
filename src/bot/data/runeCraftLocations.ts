@@ -8,18 +8,7 @@ export interface RuneRoute {
     ruins: Tile;
 }
 
-/**
- * 377 sources (content a15d0faa8): every `ruins` tile is the `exit_coord` of the rune's row in
- * `scripts/skill_runecraft/configs/runecraft.dbrow` (air :13, mind :27, water :41, earth :55, fire :69,
- * body :83, cosmic :101, chaos :116-124, nature :139, law :154, death :167), cross-checked against the
- * `<rune>temple_ruined` loc the 377 maps place (`pack/loc.pack:2453-2463`; placements in
- * RS2B0T-377-S9-1106/placements-rocks.txt). Two tiles changed from 289, where the 289 content's dbrow
- * pointed cosmic and death into the altar realm:
- * - Cosmic: 289 (3173,9501) → 377 (2406,4380), the Zanaris ruins beside cosmictemple_ruined
- *   (maps/m37_68.jm2:5816, ruins SW (2407,4376)).
- * - Death: 289 (3221,3218) → 377 (1862,4639), the tile east of deathtemple_ruined (maps/m29_72.jm2:12379,
- *   ruins SW (1859,4638)).
- */
+/** 377 `ruins` tiles are the `exit_coord` of each rune's `runecraft.dbrow` row; cosmic and death changed from 289. Source lines: docs/decisions/data-377-sources.md#rune-craft-locations. */
 
 /* Rune altar locations decoded from `runecraft.dbrow`; `exit_coord` is level_chunkX_chunkZ_offsetX_offsetZ with 64-tile chunks. */
 export const RUNES: Record<string, RuneRoute> = {

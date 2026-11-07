@@ -71,9 +71,8 @@ describe('WOODCUTTING_LOCATIONS table', () => {
 });
 
 describe('ENT_NPC_IDS', () => {
-    // 377: the pack numbers the macro_ent_* family 1719-1750 and 1791-1792 (`pack/npc.pack:1720-1751,1792-1793`);
-    // the 289 pack's 444-452 is gone, and the neighbours are not ents (crow 1751, favour_jimmy 1718,
-    // mm_waymottin_final_battle 1790, favour_tassie_slipcast 1793).
+    // 377: the pack numbers macro_ent_* 1719-1750 and 1791-1792 (`pack/npc.pack:1720-1751,1792-1793`); the 289 ids 444-452 are gone,
+    // and the neighbours are not ents (crow 1751, favour_jimmy 1718, mm_waymottin_final_battle 1790, favour_tassie_slipcast 1793).
     test('covers the 377 macro_ent pack rows and stops at their neighbours', () => {
         expect(ENT_LIFE_TICKS).toBe(60);
         expect(ENT_NPC_IDS.size).toBe(34);

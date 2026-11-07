@@ -132,9 +132,8 @@ describe('Client.mapBuild of an instanced scene (Java buildScene)', () => {
             expect(client.groundh[level][12][60]).toBe(0);
         }
 
-        // fadeAdjacent(startZ = zoneZ * 8, startX = zoneX * 8): the empty chunk west of the loaded one (zone x 1, z 3)
-        // ends on tile x 16, which is the loaded chunk's own first column; the fade replaces it with the column to
-        // its east (x 17). With zoneZ and zoneX swapped the fade lands elsewhere and x 16 keeps the flat 0 to its west.
+        // fadeAdjacent(startZ = zoneZ * 8, startX = zoneX * 8): the empty chunk west of the loaded one ends on tile x 16, the loaded chunk's first column,
+        // and the fade replaces it with x 17; with zoneZ and zoneX swapped the fade lands elsewhere and x 16 keeps the flat 0 to its west.
         for (let z = 25; z < 32; z++) {
             expect(client.groundh[0][16][z]).toBe(client.groundh[0][17][z]);
             expect(client.groundh[0][16][z]).not.toBe(0);
