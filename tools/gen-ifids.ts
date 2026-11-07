@@ -1,13 +1,4 @@
-/** Generate `src/bot/data/ifIds.ts`: the component ids for every pack name in `tools/ifids.list`,
- *  resolved from the content checkout's `pack/interface.pack` (pitfall 9: the adapter and
- *  `src/bot/api` address components by number, and those numbers change per revision).
- *  Why: the pack names are Fairy Ring-authored and stable across revisions; the ids are not, so
- *  the hand-maintained list carries names and the generator resolves them per revision.
- *
- *  Usage: bun tools/gen-ifids.ts [--check] [--stage <dir>]
- *    CONTENT_DIR  content checkout whose pack/interface.pack is read (default: ~/code/rs2b2t-content)
- *    REVISION     the revision label in the generated header comment (default: CLIENT_VERSION)
- */
+/** Why: pack names are stable across revisions while component ids are not, so the hand-maintained list carries names and the generator resolves ids per revision; usage in docs/how-to/build-and-data.md. */
 import { resolveOut } from './lib/genout.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

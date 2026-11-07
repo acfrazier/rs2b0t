@@ -15,10 +15,7 @@ const PIECES_OUT = resolveOut('src/bot/api/ai/clues/data/puzzlePieces.ts');
 const TRAIL = join(CONTENT, 'scripts', 'minigames', 'game_trail', 'configs');
 const MEDIUM_SCRIPT = join(CONTENT, 'scripts', 'minigames', 'game_trail', 'scripts', 'medium', 'trail_clue_medium.rs2');
 
-/** The `[trail_*]` obj corpus from every .obj under `scripts/`: 289 keeps it in
- *  `game_trail/configs/trail*.obj`, 377 in `scripts/_unpack/377/all.obj`, read the way the
- *  engine's packer reads configs: every file under `scripts/`, names unique across the tree
- *  (PackShared refuses duplicates), ids resolved through `pack/obj.pack`. */
+/** Why: every `.obj` under the content `scripts/` tree is read the way the engine packer reads configs, so the 289 and 377 corpus layouts both load; see docs/reference/clues-database.md. */
 function loadTrailObjs(): Record<string, ParsedClueObj> {
     const out: Record<string, ParsedClueObj> = {};
     for (const f of filesUnder(join(CONTENT, 'scripts'), '.obj')) {

@@ -249,10 +249,7 @@ export function engineArchiveProblems(root: string, engineDir: string): string[]
     return problems;
 }
 
-/** Why: out artifacts (`out/`) are untracked by design, so a hosted runner never has the file.
- *  An out artifact with `stagedPath` is the exception: verify its staged source until cutover,
- *  even when a different revision's live `out/` file is present.
- */
+/** Why: an `out` artifact is untracked by design, so verify hashes its `stagedPath` source until cutover even when a live `out/` file is present. */
 export interface VerifyReport {
     problems: string[];
     skipped: string[];

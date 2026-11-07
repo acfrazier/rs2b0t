@@ -9,5 +9,6 @@ engine and this client deployed into that engine's `public/` directory.
 
 | Page | Covers |
 |---|---|
-| [Run rs2b0t locally](how-to/run-locally.md) | prerequisites, getting an engine, the login key, deploying, running a bot, tests and smokes |
+| [Run rs2b0t locally](how-to/run-locally.md) | prerequisites, getting an engine, the login key, deploying, running a bot |
+| [Test, lint and smoke](how-to/test-locally.md) | the test, lint, format and smoke commands |
 | [Ports and troubleshooting](reference/ports.md) | port defaults, changing them, symptom-to-cause table |
