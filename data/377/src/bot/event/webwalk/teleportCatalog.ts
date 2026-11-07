@@ -123,9 +123,7 @@ export const SPELL_TELEPORTS: readonly TeleportDestination[] = [
     },
 ];
 
-/** Jewellery destinations implemented by the revision 377 item scripts. */
-// Ring choices: scripts/general/scripts/enchanted_jewellry/ring_of_dueling.rs2:7,21-27; item members flag: scripts/_unpack/377/all.obj:28645-28665.
-// Games-neck choice/members flag: scripts/general/scripts/enchanted_jewellry/necklace_of_minigames.rs2:1-21; scripts/_unpack/377/all.obj:47170-47191.
+/** Jewellery destinations (rings: scripts/general/scripts/enchanted_jewellry/ring_of_dueling.rs2:7,21-27; scripts/_unpack/377/all.obj:28645-28665; games necklace: scripts/general/scripts/enchanted_jewellry/necklace_of_minigames.rs2:1-21; scripts/_unpack/377/all.obj:47170-47191). */
 export const JEWELLERY_TELEPORTS: readonly TeleportDestination[] = [
     {
         teleportId: 'dueling_arena',

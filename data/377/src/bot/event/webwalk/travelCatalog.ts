@@ -296,9 +296,7 @@ export function wildyLeverEdges(): TransportEdgeData[] {
     ];
 }
 
-// scripts/areas/area_mage_arena/scripts/mage_arena.rs2:91-106: one loc placement pair; direction is relative to its tile.
-// Inbound needs the miniquest plus no armour/weapons; outbound teleports north of the loc.
-// `magearena` has no journal quest state, so planning can check only membership and Entrana-restricted gear.
+// scripts/areas/area_mage_arena/scripts/mage_arena.rs2:91-106: inbound needs the miniquest and unrestricted gear; outbound exits north, and planning checks membership and Entrana-restricted gear because the journal has no `magearena` quest state.
 
 /** Mage Arena outdoor barrier edges. */
 export function mageArenaBarrierEdges(): TransportEdgeData[] {
@@ -416,8 +414,7 @@ export function agilityShortcutEdges(): TransportEdgeData[] {
     ];
 }
 
-// scripts/areas/area_gnome/scripts/elkoy.rs2:48-50,74,91,109,121; scripts/quests/quest_tree/configs/quest_tree.constant:11-12.
-// Tree Gnome Village must be started for the escort dialogue (not_started offers only the intro).
+// scripts/areas/area_gnome/scripts/elkoy.rs2:48-50,74,91,109,121; scripts/quests/quest_tree/configs/quest_tree.constant:11-12: Tree Gnome Village must be started for the escort dialogue; `not_started` only offers the intro.
 /** Elkoy maze escort edges. */
 export function elkoyMazeEdges(): TransportEdgeData[] {
     const entrance = parseLcCoord('0_39_49_8_56'); // 2504,3192

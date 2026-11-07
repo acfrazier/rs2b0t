@@ -1,17 +1,48 @@
-import { describe, expect, test } from 'bun:test';
+import fs from 'node:fs';
+import path from 'node:path';
 
+import { describe, expect, test } from 'bun:test';
+import { gunzipSync } from 'fflate';
+
+import doorsJson from '#/bot/event/webwalk/data/doors.json';
 import stairsJson from '#/bot/event/webwalk/data/stairEdges.json';
 import transportsJson from '#/bot/event/webwalk/data/transports.json';
+import { PathFinder, type DoorEdgeData, type TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
 import { edgeCostForKind, teleportEdgeCost, ticksToCost } from '#/bot/event/webwalk/geometry/edgeCosts.js';
-import type { TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
 import { SPELL_TELEPORTS } from '#/bot/event/webwalk/teleportCatalog.js';
 import { shiloGateEdges } from '#/bot/event/webwalk/travelCatalog.js';
 import { specialRequiresAt } from '#/bot/event/webwalk/specialRequires.js';
 import { buildScriptRoutes } from '../../../tools/nav/script-route-corpus.js';
 import stairPrices from '../../../tools/nav/stair-prices.json';
 
-const REQUIRED_ROUTES = ['F2P-01', 'F2P-02', 'F2P-03', 'F2P-04', 'F2P-05', 'F2P-06', 'MIZGOG-01'];
+const REQUIRED_ROUTES = ['F2P-01', 'F2P-02', 'F2P-03', 'F2P-04', 'F2P-05', 'F2P-06', 'MIZGOG-01'] as const;
+type RequiredRouteId = (typeof REQUIRED_ROUTES)[number];
 type PricedTransportEdge = TransportEdgeData & { extraTicks?: number };
+
+const ROUTE_COST_CEILINGS: Record<RequiredRouteId, number> = {
+    'F2P-01': 75,
+    'F2P-02': 310,
+    'F2P-03': 322,
+    'F2P-04': 285,
+    'F2P-05': 290,
+    'F2P-06': 350,
+    'MIZGOG-01': 320
+};
+const MAX_ROUTE_HOPS = 8;
+const PACK_PATH = path.join(process.cwd(), 'out/collision.lcnav.gz');
+const HAS_COLLISION_PACK = fs.existsSync(PACK_PATH);
+
+function loadFinder(): PathFinder {
+    let bytes: Uint8Array = new Uint8Array(fs.readFileSync(PACK_PATH));
+    if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
+        bytes = gunzipSync(bytes);
+    }
+    const built = new PathFinder(bytes);
+    built.addEdges(doorsJson as DoorEdgeData[], transportsJson as TransportEdgeData[], stairsJson as TransportEdgeData[]);
+    return built;
+}
+
+const finder = HAS_COLLISION_PACK ? loadFinder() : null;
 
 describe('revision-377 offline route corpus', () => {
     test('keeps the six historical mainland legs and Lumbridge-to-Mizgog first in the corpus', () => {
@@ -26,7 +57,7 @@ describe('revision-377 offline route corpus', () => {
         });
     });
 
-    test('prices the 377 Wizard Tower stairs and quest-gated telejump edges in server ticks', () => {
+    test('prices the 377 Wizard Tower stairs, trapdoor, and quest-gated telejump edges', () => {
         const edges = [...(transportsJson as PricedTransportEdge[]), ...(stairsJson as PricedTransportEdge[])];
         const wizardStair = (locId: number, fromLevel: number, action: string) =>
             edges.find(edge => edge.locId === locId && edge.from.level === fromLevel && edge.action === action);
@@ -58,6 +89,36 @@ describe('revision-377 offline route corpus', () => {
         expect(pricedStair).toMatchObject({ locId: 4622, kind: 'stair', extraTicks: 1 });
         expect(stairPrices.baseTicks).toBe(1);
         expect(ticksToCost(stairPrices.baseTicks + stairPrices.handlers.board_game_stairs_base.extraTicks)).toBe(4);
+        // Trapdoor Open endpoint: scripts/general_use/scripts/trapdoors.rs2:31-35.
+        const trapdoor = (transportsJson as PricedTransportEdge[]).find(edge => edge.locId === 14879 && edge.action === 'Open');
+        expect(trapdoor).toMatchObject({
+            locId: 14879,
+            locName: 'Trapdoor',
+            action: 'Open',
+            kind: 'dungeon',
+            locX: 3209,
+            locZ: 3216,
+            to: { x: 3209, z: 9617, level: 0 },
+            extraTicks: 0
+        });
+        expect(trapdoor?.disabledReason).toBeUndefined();
+        expect((doorsJson as DoorEdgeData[]).some(edge => edge.locId === 4963 || edge.locId === 4964)).toBe(false);
+        const manhole = (transportsJson as PricedTransportEdge[]).find(
+            edge => edge.locId === 881 && edge.openLocId === 882 && edge.debugName === 'manholeopen'
+        );
+        expect(manhole).toMatchObject({
+            from: { x: 3237, z: 3459, level: 0 },
+            to: { x: 3237, z: 9859, level: 0 },
+            locId: 881,
+            openLocId: 882,
+            locName: 'Manhole',
+            action: 'Climb down',
+            kind: 'dungeon',
+            locX: 3237,
+            locZ: 3458,
+            extraTicks: 0
+        });
+        expect(manhole?.disabledReason).toBeUndefined();
 
         const shiloTelejump = shiloGateEdges().find(edge => edge.debugName === 'shilo_mosol_leads_in');
         expect(shiloTelejump).toMatchObject({
@@ -74,4 +135,37 @@ describe('revision-377 offline route corpus', () => {
         expect(teleportEdgeCost(SPELL_TELEPORTS[0]?.family)).toBe(ticksToCost(5));
         expect(specialRequiresAt(3046, 9756, 0)?.skills).toEqual([{ name: 'mining', level: 60 }]);
     });
+});
+
+describe.skipIf(!HAS_COLLISION_PACK)('revision-377 production PathFinder route proofs', () => {
+    const routes = buildScriptRoutes({ maxBankPairs: 0 }).slice(0, REQUIRED_ROUTES.length);
+
+    for (const id of REQUIRED_ROUTES) {
+        test(`${id} is reachable through the 377 collision pack and production edges`, () => {
+            const route = routes.find(candidate => candidate.id === id);
+            expect(route).toBeDefined();
+            if (!route) return;
+
+            expect(route.source).toBe('mainland-routes.json');
+            const result = finder!.findPath(route.from, route.to, undefined, 4_000_000);
+            expect(result.ok).toBe(true);
+            if (!result.ok) return;
+
+            expect(result.cost).toBeGreaterThan(0);
+            expect(result.cost).toBeLessThanOrEqual(ROUTE_COST_CEILINGS[id]);
+            expect(result.hops.length).toBeLessThanOrEqual(MAX_ROUTE_HOPS);
+
+            if (id === 'F2P-01') {
+                expect(result.hops.some(hop => hop.locId === 1738 && hop.kind === 'stair')).toBe(true);
+            }
+            if (id === 'F2P-02') {
+                expect(result.hops.some(hop => hop.locId === 1740 && hop.kind === 'stair')).toBe(true);
+            }
+            if (id === 'MIZGOG-01') {
+                expect(result.hops.some(hop => hop.locId === 11993 && hop.kind === 'door')).toBe(true);
+                expect(result.hops.some(hop => hop.locId === 12536 && hop.kind === 'stair')).toBe(true);
+                expect(result.hops.some(hop => hop.locId === 12537 && hop.kind === 'stair')).toBe(true);
+            }
+        });
+    }
 });

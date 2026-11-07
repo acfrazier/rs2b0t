@@ -30,14 +30,11 @@ const ARDOUGNE_BANK: NavPoint = { x: 2655, z: 3286, level: 0 };
 /** trail_clue_medium_anagram009, Donovan the Family Handyman, upstairs. */
 const DONOVAN_CLUE = 2855;
 
-// Why: the ground floor's 22-tile north strip is walkable and reads as unsealed, so an approach anchored there is unreachable from the rest of the floor.
+// The pre-289 fixture does not carry over: the 377 collision pack marks this tile unwalkable.
 describe.skipIf(!HAS_COLLISION_PACK)('Sinclair Mansion ladder', () => {
-    test.skip('the ladder approach is reachable from the world (pre-289 collision fixture, drystonewall 979 — see RS2B0T-377-S8-1106/report.md)', () => {
-        const stranded: NavPoint = { x: 2737, z: 3583, level: 0 };
-        const approach: NavPoint = { x: 2736, z: 3582, level: 0 };
-        expect(finder.walkable(stranded.x, stranded.z, stranded.level)).toBe(true);
-        expect(finder.findPath(ARDOUGNE_BANK, stranded, undefined, 4_000_000).ok).toBe(false);
-        expect(finder.findPath(ARDOUGNE_BANK, approach, undefined, 4_000_000).ok).toBe(true);
+    test('the 377 collision pack marks the former stranded tile unwalkable', () => {
+        const formerFixtureTile: NavPoint = { x: 2737, z: 3583, level: 0 };
+        expect(finder.walkable(formerFixtureTile.x, formerFixtureTile.z, formerFixtureTile.level)).toBe(false);
     });
 
     test('no stair edge anchors its approach on the sealed strip', () => {
