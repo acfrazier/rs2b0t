@@ -11,6 +11,7 @@ export default class SpotType {
     static numDefinitions: number = 0;
     static list: SpotType[] = [];
     static modelCache: LruCache<Model> = new LruCache(30);
+    static readonly STRICT: boolean = process.env.STRICT_CONFIG === '1';
 
     id: number = 0;
 
@@ -38,6 +39,10 @@ export default class SpotType {
 
             this.list[id].id = id;
             this.list[id].decode(dat);
+        }
+
+        if (SpotType.STRICT && dat.pos !== dat.length) {
+            throw new Error(`SpotType: trailing config bytes (pos ${dat.pos}, end ${dat.length})`);
         }
     }
 
@@ -70,6 +75,8 @@ export default class SpotType {
                 this.recol_s[code - 40] = dat.g2();
             } else if (code >= 50 && code < 60) {
                 this.recol_d[code - 50] = dat.g2();
+            } else if (SpotType.STRICT) {
+                throw new Error(`SpotType ${this.id}: unknown config opcode ${code}`);
             } else {
                 console.log('Error unrecognised spotanim config code: ', code);
             }

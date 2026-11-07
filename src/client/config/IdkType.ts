@@ -8,6 +8,7 @@ import { TypedArray1d } from '#/client/util/Arrays.js';
 export default class IdkType {
     static numDefinitions: number = 0;
     static list: IdkType[] = [];
+    static readonly STRICT: boolean = process.env.STRICT_CONFIG === '1';
 
     part: number = -1;
     model: Int32Array | null = null;
@@ -28,6 +29,10 @@ export default class IdkType {
             }
 
             this.list[id].decode(dat);
+        }
+
+        if (IdkType.STRICT && dat.pos !== dat.length) {
+            throw new Error(`IdkType: trailing config bytes (pos ${dat.pos}, end ${dat.length})`);
         }
     }
 
@@ -55,6 +60,8 @@ export default class IdkType {
                 this.recol_d[code - 50] = dat.g2();
             } else if (code >= 60 && code < 70) {
                 this.head[code - 60] = dat.g2();
+            } else if (IdkType.STRICT) {
+                throw new Error(`IdkType: unknown config opcode ${code}`);
             } else {
                 console.log('Error unrecognised config code: ', code);
             }

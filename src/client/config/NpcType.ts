@@ -1,3 +1,4 @@
+import { getMorphVarps, resolveMultiNpc } from '#/client/config/resolveMultiloc.js';
 import LruCache from '#/client/datastruct/LruCache.js';
 
 import AnimFrame from '#/client/dash3d/AnimFrame.js';
@@ -41,6 +42,18 @@ export default class NpcType {
     contrast: number = 0;
     headicon: number = -1;
     turnspeed: number = 32;
+    /** 377 Java field1457 / field1462 / field1425 */
+    multivarbit: number = -1;
+    multivar: number = -1;
+    multinpc: number[] = [];
+    /** Java field1434; opcode 107 clears */
+    active: boolean = true;
+    /** Java opcodes 90–92 store g2 (not skip) */
+    unused90: number = -1;
+    unused91: number = -1;
+    unused92: number = -1;
+
+    static datEnd: number = 0;
 
     static init(config: JagFile): void {
         this.dat = new Packet(config.read('npc.dat'));
@@ -53,6 +66,15 @@ export default class NpcType {
         for (let id: number = 0; id < this.numDefinitions; id++) {
             this.idx[id] = offset;
             offset += idx.g2();
+        }
+        this.datEnd = offset;
+        if (NpcType.STRICT) {
+            if (idx.pos !== idx.length) {
+                throw new Error(`NpcType: trailing idx bytes (pos ${idx.pos}, end ${idx.length})`);
+            }
+            if (this.dat.length !== offset) {
+                throw new Error(`NpcType: trailing dat bytes (end ${offset}, length ${this.dat.length})`);
+            }
         }
 
         this.recent = new TypedArray1d(20, null);
@@ -73,12 +95,27 @@ export default class NpcType {
             }
         }
 
+        // Java NpcType.java:384: field1460.pos = field1453[arg0] throws AIOOBE.
+        // Cache first so list(-1) still hits unused slots (id defaults to -1).
+        if (id < 0 || id >= this.numDefinitions) {
+            if (NpcType.STRICT) {
+                throw new Error(`NpcType: id ${id} out of range (count ${this.numDefinitions})`);
+            }
+            throw new RangeError(`Index ${id} out of bounds for length ${this.numDefinitions}`);
+        }
+
         this.recentPos = (this.recentPos + 1) % 20;
 
         const npc: NpcType = (this.recent[this.recentPos] = new NpcType());
         this.dat.pos = this.idx[id];
         npc.id = id;
         npc.decode(this.dat);
+        if (NpcType.STRICT) {
+            const end = id + 1 < this.numDefinitions ? this.idx[id + 1] : this.datEnd;
+            if (this.dat.pos !== end) {
+                throw new Error(`NpcType ${id}: trailing config bytes (pos ${this.dat.pos}, end ${end})`);
+            }
+        }
 
         return npc;
     }
@@ -112,7 +149,7 @@ export default class NpcType {
                 this.walkanim_b = dat.g2();
                 this.walkanim_r = dat.g2();
                 this.walkanim_l = dat.g2();
-            } else if (code >= 30 && code < 40) {
+            } else if (code >= 30 && code < 35) {
                 if (!this.op) {
                     this.op = new TypedArray1d(5, null);
                 }
@@ -138,11 +175,11 @@ export default class NpcType {
                     this.head[i] = dat.g2();
                 }
             } else if (code === 90) {
-                dat.pos += 2;
+                this.unused90 = dat.g2();
             } else if (code === 91) {
-                dat.pos += 2;
+                this.unused91 = dat.g2();
             } else if (code === 92) {
-                dat.pos += 2;
+                this.unused92 = dat.g2();
             } else if (code === 93) {
                 this.minimap = false;
             } else if (code === 95) {
@@ -161,6 +198,25 @@ export default class NpcType {
                 this.headicon = dat.g2();
             } else if (code === 103) {
                 this.turnspeed = dat.g2();
+            } else if (code === 106) {
+                this.multivarbit = dat.g2();
+                if (this.multivarbit === 65535) {
+                    this.multivarbit = -1;
+                }
+                this.multivar = dat.g2();
+                if (this.multivar === 65535) {
+                    this.multivar = -1;
+                }
+                const count = dat.g1();
+                this.multinpc = new Array(count + 1);
+                for (let i = 0; i <= count; i++) {
+                    this.multinpc[i] = dat.g2();
+                    if (this.multinpc[i] === 65535) {
+                        this.multinpc[i] = -1;
+                    }
+                }
+            } else if (code === 107) {
+                this.active = false;
             } else if (NpcType.STRICT) {
                 throw new Error(`NpcType ${this.id}: unknown config opcode ${code}`);
             }
@@ -168,6 +224,12 @@ export default class NpcType {
     }
 
     getTempModel(primaryTransformId: number, secondaryTransformId: number, seqMask: Int32Array | null): Model | null {
+        // Java method475: multinpc table resolves here (ClientNpc just calls method475).
+        if (this.multinpc.length > 0) {
+            const resolved = resolveMultiNpc(this, getMorphVarps());
+            return resolved ? resolved.getTempModel(primaryTransformId, secondaryTransformId, seqMask) : null;
+        }
+
         let model = NpcType.modelCache.find(BigInt(this.id));
 
         if (!model && this.model) {
@@ -234,6 +296,12 @@ export default class NpcType {
     }
 
     getHead(): Model | null {
+        // Java getHeadModel: multinpc table resolves here (IfType type 2 chathead calls this).
+        if (this.multinpc.length > 0) {
+            const resolved = resolveMultiNpc(this, getMorphVarps());
+            return resolved ? resolved.getHead() : null;
+        }
+
         if (!this.head) {
             return null;
         }

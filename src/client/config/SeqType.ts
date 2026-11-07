@@ -27,9 +27,10 @@ export default class SeqType {
 
     id: number = -1;
     numFrames: number = 0;
-    frames: Int16Array | null = null;
-    iframes: Int16Array | null = null;
-    delay: Int16Array | null = null;
+    /** Java int[] field777/778/779: unsigned g2, including frame ids >= 32768. */
+    frames: Int32Array | null = null;
+    iframes: Int32Array | null = null;
+    delay: Int32Array | null = null;
     loops: number = -1;
     walkmerge: Int32Array | null = null;
     reachforward: boolean = false;
@@ -39,7 +40,10 @@ export default class SeqType {
     maxloops: number = 99;
     preanim_move: number = -1;
     postanim_move: number = -1;
-    duplicatebehaviour: number = -1;
+    /** Java field789 default 2 (RestartMode.RESETLOOP) */
+    duplicatebehaviour: number = RestartMode.RESETLOOP;
+    /** Java field790 — opcode 12 stores g4 */
+    unused12: number = 0;
 
     static init(config: JagFile): void {
         const dat: Packet = new Packet(config.read('seq.dat'));
@@ -54,6 +58,10 @@ export default class SeqType {
 
             this.list[id].id = id;
             this.list[id].decode(dat);
+        }
+
+        if (SeqType.STRICT && dat.pos !== dat.length) {
+            throw new Error(`SeqType: trailing config bytes (pos ${dat.pos}, end ${dat.length})`);
         }
     }
 
@@ -87,17 +95,15 @@ export default class SeqType {
 
             if (code === 1) {
                 this.numFrames = dat.g1();
-                this.frames = new Int16Array(this.numFrames);
-                this.iframes = new Int16Array(this.numFrames);
-                this.delay = new Int16Array(this.numFrames);
+                this.frames = new Int32Array(this.numFrames);
+                this.iframes = new Int32Array(this.numFrames);
+                this.delay = new Int32Array(this.numFrames);
 
                 for (let i: number = 0; i < this.numFrames; i++) {
                     this.frames[i] = dat.g2();
 
-                    this.iframes[i] = dat.g2();
-                    if (this.iframes[i] === 65535) {
-                        this.iframes[i] = -1;
-                    }
+                    const iframe = dat.g2();
+                    this.iframes[i] = iframe === 65535 ? -1 : iframe;
 
                     this.delay[i] = dat.g2();
                 }
@@ -128,6 +134,8 @@ export default class SeqType {
                 this.postanim_move = dat.g1();
             } else if (code === 11) {
                 this.duplicatebehaviour = dat.g1();
+            } else if (code === 12) {
+                this.unused12 = dat.g4();
             } else if (SeqType.STRICT) {
                 throw new Error(`SeqType ${this.id}: unknown config opcode ${code}`);
             }
@@ -136,13 +144,13 @@ export default class SeqType {
         if (this.numFrames === 0) {
             this.numFrames = 1;
 
-            this.frames = new Int16Array(1);
+            this.frames = new Int32Array(1);
             this.frames[0] = -1;
 
-            this.iframes = new Int16Array(1);
+            this.iframes = new Int32Array(1);
             this.iframes[0] = -1;
 
-            this.delay = new Int16Array(1);
+            this.delay = new Int32Array(1);
             this.delay[0] = -1;
         }
 

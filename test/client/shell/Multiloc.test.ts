@@ -9,9 +9,12 @@ const { default: ClientBuild } = await import('#/client/shell/ClientBuild.js');
 const { default: LocType } = await import('#/client/config/LocType.js');
 const { default: VarBitType } = await import('#/client/config/VarBitType.js');
 const { default: Model } = await import('#/client/dash3d/Model.js');
+const { default: CollisionMap } = await import('#/client/dash3d/CollisionMap.js');
 const { BotHost } = await import('#/bot/runtime/BotHost.js');
 const { ServerProt } = await import('#/client/io/ServerProt.js');
 const { attach, detach, invalidateLocSnapshots, reader } = await import('#/bot/adapter/ClientAdapter.js');
+const { resolveMultiloc, resolveMultiNpc } = await import('#/client/config/resolveMultiloc.js');
+const { default: NpcType } = await import('#/client/config/NpcType.js');
 
 type Loc = InstanceType<typeof LocType>;
 const rawId = 5;
@@ -31,7 +34,10 @@ function loc(id: number, name: string, op: string[], multiloc: number[] = []): L
     result.name = name;
     result.op = [op[0], null, null, null, null];
     result.multivarbit = multiloc.length ? 0 : -1;
+    result.multivar = -1;
     result.multiloc = multiloc;
+    result.width = 1;
+    result.length = 1;
     result.anim = -1;
     result.getModel = (shape, angle) => ({ id, shape, angle }) as never;
     return result;
@@ -41,7 +47,7 @@ function scene(varValue: number) {
     return {
         world: {
             wallType: () => 0,
-            sceneType: (_level: number, x: number, z: number) => x === 1 && z === 2 ? typecode : 0,
+            sceneType: (_level: number, x: number, z: number) => (x === 1 && z === 2 ? typecode : 0),
             gdType: () => 0,
             decorType: () => 0,
             typeCode2: () => 0
@@ -164,7 +170,11 @@ describe('multiloc placement', () => {
             const groundh = [[Int32Array.of(0, 0), Int32Array.of(0, 0)]];
             const builder = Object.assign(Object.create(ClientBuild.prototype), { groundh });
             let built: unknown;
-            const world = { setGroundDecor: (model: unknown) => { built = model; } };
+            const world = {
+                setGroundDecor: (model: unknown) => {
+                    built = model;
+                }
+            };
             if (path === 'add') {
                 builder.addLoc(0, 0, 0, rawId, 22, angle, world, null);
             } else {
@@ -182,7 +192,9 @@ describe('multiloc placement', () => {
         locs.get(transformedId)!.desc = description;
         const client = menu(0);
         const messages: string[] = [];
-        client.addChat = (_type, text) => { messages.push(text); };
+        client.addChat = (_type, text) => {
+            messages.push(text);
+        };
         client.doAction(client.menuNumEntries - 1);
         expect(messages).toEqual([description ?? "It's a Secret passage."]);
     });
@@ -190,7 +202,9 @@ describe('multiloc placement', () => {
     test.each([2, 4])('examine ignores a menu entry whose child is now hidden at state %i', state => {
         const client = menu(0);
         const messages: string[] = [];
-        client.addChat = (_type, text) => { messages.push(text); };
+        client.addChat = (_type, text) => {
+            messages.push(text);
+        };
         client.var[0] = state;
         client.doAction(client.menuNumEntries - 1);
         expect(messages).toEqual([]);
@@ -201,7 +215,9 @@ describe('multiloc placement', () => {
         locs.get(rawId)!.desc = 'An ordinary door.';
         const client = menu(0);
         const messages: string[] = [];
-        client.addChat = (_type, text) => { messages.push(text); };
+        client.addChat = (_type, text) => {
+            messages.push(text);
+        };
         client.doAction(client.menuNumEntries - 1);
         expect(messages).toEqual(['An ordinary door.']);
     });
@@ -216,5 +232,124 @@ describe('multiloc placement', () => {
     test('ordinary loc with no transform still renders', () => {
         const model = new ClientLocAnim(transformedId, 10, 0, 0, 0, 0, 0, -1, true);
         expect((model.getTempModel() as unknown as { id: number }).id).toBe(transformedId);
+    });
+
+    test('varp-selected form uses multivar when multivarbit is -1', () => {
+        const base = locs.get(rawId)!;
+        base.multivarbit = -1;
+        base.multivar = 0;
+        expect(menu(0).menuOption).toContain('Enter @cya@Secret passage');
+        expect(menu(1).menuOption).toEqual(['Walk here']);
+        attach(scene(0) as never);
+        expect(reader.locs()[0]).toMatchObject({ id: rawId, name: 'Secret passage' });
+        attach(scene(1) as never);
+        expect(reader.locs()).toEqual([]);
+    });
+
+    test('resolved child keeps its name while the base keeps geometry', () => {
+        const base = locs.get(rawId)!;
+        const child = locs.get(transformedId)!;
+        base.width = 2;
+        base.length = 1;
+        base.blockwalk = true;
+        base.blockrange = false;
+        child.width = 1;
+        child.length = 1;
+        const resolved = resolveMultiloc(base, [0]);
+        expect(resolved?.name).toBe('Secret passage');
+        expect(resolved?.width).toBe(1);
+
+        ClientBuild.lowMem = false;
+        const groundh = [Array.from({ length: 5 }, () => new Int32Array(5))];
+        const builder = Object.assign(Object.create(ClientBuild.prototype), { groundh });
+        const cmap = new CollisionMap();
+        builder.addLoc(0, 2, 2, rawId, 10, 0, null, cmap);
+        const blocked = (x: number, z: number) => (cmap.flags[CollisionMap.index(x, z)] & 0x100) !== 0;
+        expect(blocked(2, 2)).toBe(true);
+        expect(blocked(3, 2)).toBe(true);
+        expect(blocked(2, 3)).toBe(false);
+    });
+
+    test('varp-only change re-resolves without rebuilding the scene', () => {
+        const base = locs.get(rawId)!;
+        base.multivarbit = -1;
+        base.multivar = 0;
+        const client = scene(0);
+        attach(client as never);
+        expect(reader.locs()[0].name).toBe('Secret passage');
+        client.var[0] = 1;
+        (BotHost as unknown as { handlePacket(ptype: number): void }).handlePacket(ServerProt.VARP_SMALL);
+        expect(reader.locs()).toEqual([]);
+    });
+});
+
+describe('multinpc resolve', () => {
+    test('resolveMultiNpc follows varbit then varp and hides -1 slots', () => {
+        const child = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        child.id = 9;
+        child.name = 'Guard';
+        child.multinpc = [];
+        child.multivarbit = -1;
+        child.multivar = -1;
+        const base = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        base.id = 3;
+        base.name = 'Door man';
+        base.multivarbit = 0;
+        base.multivar = -1;
+        base.multinpc = [9, -1];
+        const orig = NpcType.list;
+        NpcType.list = (id: number) => (id === 9 ? child : base);
+        try {
+            expect(resolveMultiNpc(base, [0])?.name).toBe('Guard');
+            expect(resolveMultiNpc(base, [2])).toBeNull();
+            base.multivarbit = -1;
+            base.multivar = 1;
+            expect(resolveMultiNpc(base, [0, 0])?.name).toBe('Guard');
+            expect(resolveMultiNpc(base, [0, 1])).toBeNull();
+        } finally {
+            NpcType.list = orig;
+        }
+    });
+
+    test('getTempModel and getHead resolve the morph child like Java method475/getHeadModel', () => {
+        const child = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        child.id = 9;
+        child.multinpc = [];
+        child.multivarbit = -1;
+        child.multivar = -1;
+        child.head = Uint16Array.of(4);
+        child.model = Uint16Array.of(91);
+        child.recol_s = null;
+        child.recol_d = null;
+        // Why: identity sentinel so deleting the getTempModel hop fails this test.
+        const tempSentinel = { id: 91 } as unknown as InstanceType<typeof Model>;
+        child.getTempModel = () => tempSentinel;
+        const base = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
+        base.id = 3;
+        base.multinpc = [9, -1];
+        base.multivarbit = -1;
+        base.multivar = 0;
+        base.head = null;
+        base.model = null;
+        const orig = NpcType.list;
+        const origApp = ClientLocAnim.app;
+        const origReq = Model.requestDownload;
+        const origLoad = Model.load;
+        NpcType.list = (id: number) => (id === 9 ? child : base);
+        ClientLocAnim.app = { var: [0] } as InstanceType<typeof Client>;
+        Model.requestDownload = () => true;
+        Model.load = (id: number) => ({ id }) as never;
+        try {
+            expect((base.getHead() as unknown as { id: number }).id).toBe(4);
+            expect(base.getTempModel(-1, -1, null)).toBe(tempSentinel);
+            ClientLocAnim.app.var[0] = 1;
+            expect(base.getHead()).toBeNull();
+            expect(base.getTempModel(-1, -1, null)).toBeNull();
+        } finally {
+            NpcType.list = orig;
+            ClientLocAnim.app = origApp;
+            Model.requestDownload = origReq;
+            Model.load = origLoad;
+        }
     });
 });
