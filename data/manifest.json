@@ -25,6 +25,7 @@
     "tools/gen-377-data.sh": "352049538f400d0ea2c5aeae92d73271a8cf45af2b5a15aca930d4975ce3d834",
     "tools/gen-377-manifest.ts": "641a69921540b195a51d737d10c43a8a1765ea1f768b8aa18c6802c90498c380",
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
+    "tools/gen-scriptdocs.ts": "9b65974cf3e5f22a4d7010869e9182ddd5068c3e8e081962ce15183c31e6ddc5",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
     "tools/items/gen-namecollisions.ts": "490bd4d603830b3b4ead8719d428f47edc53155c655c9a6031341514d5347f65",
     "tools/items/gen-untradeable.ts": "2f97f8ba7a122d367d40ce016cf8a259f01d69442ba5f50e8718f395f8f270bb",
@@ -46,6 +47,12 @@
     "tools/shops/parse.ts": "ba9d7fae056e2b150f3fd0402f93c1f2196265686c4c88fd0fdc357ca4464baf"
   },
   "artifacts": [
+    {
+      "path": "data/377/docs/SCRIPTS.md",
+      "sha256": "ad7d5d1a52be599b46ad63d05aeca71b29697246516faded2e5a8fd554e30334",
+      "kind": "generated",
+      "qualification": "offline"
+    },
     {
       "path": "data/377/src/bot/api/ai/clues/data/cluedb.ts",
       "sha256": "c888c441a0675749cfcf494f5c05046ab7d4ab771c65f077c8ec9cf3be376af7",
@@ -120,7 +127,7 @@
     },
     {
       "path": "data/377/src/bot/data/itemAliases.ts",
-      "sha256": "e2c7b03665995110571f4dae7e0b94d5d96ca31eca3b101e415f2eca0615fe3e",
+      "sha256": "f65dff2de5cc82cdab49fed8109bde260456a429412a6d9c3081e131a4d99e2a",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -227,8 +234,14 @@
       "qualification": "offline"
     },
     {
+      "path": "data/377/test/api/bank/zanaris-bank.test.ts",
+      "sha256": "a051b9e0052a72d8f21f1af5bb6bdde837bace67b999e9f76f2b8e61af49ad8e",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
       "path": "data/377/test/api/market/catalog.test.ts",
-      "sha256": "b1bb0b847837ad60f226cb42b06d8672aa7f49ddfe56e4c64546189c982b89f4",
+      "sha256": "11a3a118c28c718e790af2a360862ff71081c2645ee906d9a74cf04b6cb5a1cf",
       "kind": "edition",
       "qualification": "offline"
     },

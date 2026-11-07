@@ -86,7 +86,7 @@ describe('resolveByName', () => {
     test('a plural still finds the item', () => {
         expect(resolveByName(CAT, 'maple longbows').map(r => r.id)).toEqual([851]);
         // 377: the unstrung bow pluralises as "maple longbow (u)s"; the plural strip runs after key()
-        // punctuation-flattening, so the spaced "(u) s" tail can't be recovered — the glued form is what
+        // punctuation-flattening, so the spaced "(u) s" tail can't be recovered: the glued form is what
         // the resolver forgives.
         expect(resolveByName(CAT, 'maple longbow us').map(r => r.id)).toEqual([62]);
         expect(resolveByName(CAT, 'iron ores').map(r => r.id)).toEqual([440]);
