@@ -260,8 +260,8 @@ export class Client extends GameShell {
     private mapBuildLocationData: (Uint8Array | null)[] | null = null;
     /** Java `sceneInstanced`: true after REBUILD_REGION until the next REBUILD_NORMAL. */
     private sceneInstanced: boolean = false;
-    /** Java `sceneMapRegion[level][zoneX][zoneZ]`: instance template per 8x8 chunk (26 bits: level, source zone x, z, rotation), or -1. */
-    private sceneMapRegion: Int32Array[][] = new Int32Array3d(BuildArea.LEVELS, 13, 13);
+    /** Java `sceneMapRegion[level][zoneX][zoneZ]`: instance template per 8x8 chunk (26 bits: level, source zone x, z, rotation), or -1 (no chunk). */
+    private sceneMapRegion: Int32Array[][] = Client.emptySceneMapRegion();
     private world: World | null = null;
     private mapl: Uint8Array[][] | null = null;
     private groundh: Int32Array[][] | null = null;
@@ -2023,6 +2023,7 @@ export class Client extends GameShell {
                 this.useMode = 0;
                 this.targetMode = 0;
                 this.sceneState = 0;
+                this.resetSceneRegion();
                 this.waveCount = 0;
 
                 this.macroCameraX = ((Math.random() * 100.0) | 0) - 50;
@@ -2677,6 +2678,31 @@ export class Client extends GameShell {
         }
     }
 
+    private static emptySceneMapRegion(): Int32Array[][] {
+        const region: Int32Array[][] = new Int32Array3d(BuildArea.LEVELS, 13, 13);
+        for (const level of region) {
+            for (const row of level) {
+                row.fill(-1);
+            }
+        }
+        return region;
+    }
+
+    /**
+     * Back to "no instance, no chunk templates" (Java declares `sceneInstanced = false` at Client.java:378 and
+     * `sceneMapRegion = new int[4][13][13]` at :105, i.e. zeros, and never resets either in logout() :2954-2975 or
+     * after login reply 2 :2767; only REBUILD_NORMAL/REBUILD_REGION :8094-8114 write them). Here the empty slot is -1
+     * so a reader between sessions (the bot adapter) sees "no template" rather than template 0.
+     */
+    private resetSceneRegion(): void {
+        this.sceneInstanced = false;
+        for (const level of this.sceneMapRegion) {
+            for (const row of level) {
+                row.fill(-1);
+            }
+        }
+    }
+
     private async logout(): Promise<void> {
         this.cancelLoginAttempt();
         if (this.stream) {
@@ -2695,6 +2721,8 @@ export class Client extends GameShell {
         for (let level: number = 0; level < BuildArea.LEVELS; level++) {
             this.collision[level]?.reset();
         }
+
+        this.resetSceneRegion();
 
         stopMidi(false);
         this.nextMidiSong = -1;

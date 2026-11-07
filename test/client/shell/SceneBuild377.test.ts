@@ -117,11 +117,31 @@ describe('Client.mapBuild of an instanced scene (Java buildScene)', () => {
         expect(flags(5 * 8 + 2, 5 * 8 + 2) & CollisionFlag.UNLOADED).toBe(CollisionFlag.UNLOADED);
     });
 
-    test('empty chunks are flat and the level-0 scene border is faded into them', () => {
+    test('empty chunks are flat (clearChunk) and the level-0 scene border is faded into them (fadeAdjacent)', () => {
         const client = instance();
-        client.groundh[0][40][40] = 999;
+        for (let level = 0; level < 4; level++) {
+            for (const column of client.groundh[level]) {
+                column.fill(999);
+            }
+        }
         client.mapBuild();
-        expect(client.groundh[0][41][41]).toBe(0);
+
+        // clearChunk: every tile inside a chunk with no template is flattened, on every level
+        for (let level = 0; level < 4; level++) {
+            expect(client.groundh[level][44][44]).toBe(0);
+            expect(client.groundh[level][12][60]).toBe(0);
+        }
+
+        // fadeAdjacent(startZ = zoneZ * 8, startX = zoneX * 8): the empty chunk west of the loaded one (zone x 1, z 3)
+        // ends on tile x 16, which is the loaded chunk's own first column; the fade replaces it with the column to
+        // its east (x 17). With zoneZ and zoneX swapped the fade lands elsewhere and x 16 keeps the flat 0 to its west.
+        for (let z = 25; z < 32; z++) {
+            expect(client.groundh[0][16][z]).toBe(client.groundh[0][17][z]);
+            expect(client.groundh[0][16][z]).not.toBe(0);
+        }
+        // the loaded chunk's interior is untouched by the fade of its neighbours
+        const [lx, lz] = turn([3, 3]);
+        expect(client.groundh[0][16 + lx][24 + lz]).toBe(-patterned(0, 24 + 3, 40 + 3).height! * 8);
         expect(client.world).not.toBeNull();
     });
 

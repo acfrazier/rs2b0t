@@ -24,9 +24,8 @@ interface Handled {
     name: string;
 }
 
-// 377 opcode name to the name the built ServerProt table uses
-const BUILT_NAME: Record<string, string> = { LOC_MERGE: 'P_LOCMERGE' };
-const ZONE_CHILDREN = new Set(['LOC_MERGE', 'OBJ_REVEAL', 'LOC_ANIM', 'OBJ_ADD', 'OBJ_COUNT', 'MAP_PROJANIM', 'SOUND_AREA', 'MAP_ANIM', 'LOC_ADD_CHANGE', 'OBJ_DEL', 'LOC_DEL']);
+// the recorded descriptors already carry the built table's spelling (P_LOCMERGE, not LOC_MERGE)
+const ZONE_CHILDREN = new Set(['P_LOCMERGE', 'OBJ_REVEAL', 'LOC_ANIM', 'OBJ_ADD', 'OBJ_COUNT', 'MAP_PROJANIM', 'SOUND_AREA', 'MAP_ANIM', 'LOC_ADD_CHANGE', 'OBJ_DEL', 'LOC_DEL']);
 
 /** Splits one recorded inbound frame into opcode and body by the pinned descriptor's length rule. */
 function body(frame: FrameRecord, protocol: Protocol): { name: string; body: Uint8Array } {
@@ -37,7 +36,7 @@ function body(frame: FrameRecord, protocol: Protocol): { name: string; body: Uin
 }
 
 function built(name: string): number | undefined {
-    return builtOpcode(BUILT_NAME[name] ?? name);
+    return builtOpcode(name);
 }
 
 /** In a 289-numbered build the child opcodes inside an enclosed frame are renumbered; in a 377 build this is the identity. */

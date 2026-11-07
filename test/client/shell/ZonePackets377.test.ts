@@ -82,6 +82,16 @@ function child(client: SceneClient, name: string, bytes: Uint8Array, direct: (c:
     return buf;
 }
 
+/**
+ * SOUND_AREA through the production dispatcher. The opcode is whatever the built ServerProt table holds: 41 once the
+ * 377 table is built; on the 289 table the member is absent, and `zonePacket` compares against that same absent member.
+ */
+function soundArea(client: SceneClient, bytes: Uint8Array): Packet {
+    const buf = new Packet(bytes);
+    client.zonePacket(buf, builtOpcode('SOUND_AREA') as number);
+    return buf;
+}
+
 beforeEach(() => {
     Client.loopCycle = 5000;
     Client.lowMem = false;
@@ -513,14 +523,14 @@ describe('effect children', () => {
             expect(vector.javaValues).toEqual([53, 456, 115]);
             // 115 = range 7 in the high nibble, loops 3 in the low bits
             const client = soundClient(X + 7, Z - 7);
-            const buf = child(client, 'SOUND_AREA', hex(vector.payloadHex), (c, b) => c.zoneSoundArea(b));
+            const buf = soundArea(client, hex(vector.payloadHex));
             expect(buf.pos).toBe(4);
             expect([client.waveCount, client.waveIds[0], client.waveLoops[0], client.waveDelay[0]]).toEqual([1, 456, 3, 17]);
         });
 
         test('is silent beyond the range, with sound off, in low memory, or when the queue is full', () => {
             const play = (client: SceneClient): number => {
-                child(client, 'SOUND_AREA', hex(vector.payloadHex), (c, b) => c.zoneSoundArea(b));
+                soundArea(client, hex(vector.payloadHex));
                 return client.waveCount;
             };
             expect(play(soundClient(X + 8, Z))).toBe(0);
