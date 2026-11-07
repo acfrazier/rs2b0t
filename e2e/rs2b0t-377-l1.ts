@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { parseArgs } from 'node:util';
 import type { Browser, Page } from 'playwright-core';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
-import { cheatQuiet, deployIsolatedClient, launchBrowser, type IsolatedClient } from './lib/harness.js';
+import { cheatQuiet, deployIsolatedClient, launchBrowser, pageTemplatePath, type IsolatedClient } from './lib/harness.js';
 import { action, cleanLogout, cycles, installObserver, login, observe, quiescent, readValue, walk, type Npc } from './tap-377/capture-page.js';
 import { startTap, type TapSession } from '../tools/tap-377/tap.js';
 import { loadEngineProtocol } from '../tools/tap-377/protocol.js';
@@ -58,6 +58,7 @@ const { values } = parseArgs({
         out: { type: 'string' },
         origin: { type: 'string', default: 'http://127.0.0.1:81' },
         'seed-html': { type: 'boolean' },
+        'account-prefix': { type: 'string', default: 'l1x' },
         replay: { type: 'boolean' }
     },
     strict: true
@@ -68,6 +69,8 @@ const required = (name: 'engine' | 'content' | 'out'): string => {
     return resolve(value);
 };
 const output = required('out');
+const accountPrefix = values['account-prefix']!;
+assert.match(accountPrefix, /^[a-z0-9]{1,4}$/, 'L1 account prefix must contain one to four lowercase letters or digits');
 
 function revision(directory: string): string {
     const result = Bun.spawnSync(['git', '-C', directory, 'rev-parse', 'HEAD']);
@@ -148,6 +151,57 @@ async function wrongKey(page: Page, username: string, secret: string): Promise<n
     );
 }
 
+interface RelogAttempt {
+    timestamp: string;
+    replies: number[];
+    ingame: boolean;
+    banner: string[];
+    delayMs: number;
+    elapsedDelayMs?: number;
+}
+
+async function relogAfterRelease(page: Page, username: string, secret: string, attempts: RelogAttempt[]): Promise<void> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        const result = await page.evaluate(async ({ username, secret }) => {
+            const c = (globalThis as unknown as L1Window).rs2b0t.client;
+            const open = c.openLoginStream;
+            const replies: number[] = [];
+            c.openLoginStream = async function () {
+                const stream = await open.call(c);
+                const read = stream.read;
+                stream.read = async function () {
+                    const byte = await read.call(this);
+                    replies.push(byte);
+                    return byte;
+                };
+                return stream;
+            };
+            try {
+                await c.login(username, secret, false);
+                return { timestamp: new Date().toISOString(), replies: replies.slice(8), ingame: c.ingame, banner: [c.loginMes1, c.loginMes2] };
+            } finally {
+                c.openLoginStream = open;
+            }
+        }, { username, secret });
+        const row: RelogAttempt = { ...result, delayMs: 0 };
+        attempts.push(row);
+        if (result.ingame) {
+            assert.equal(result.replies[1], 2, 'L1 server release must produce login reply 2');
+            await quiescent(page);
+            return;
+        }
+        assert.deepEqual(result.replies, [0, 5], 'L1 relog rejected for a reason other than pending session release');
+        assert.deepEqual(result.banner, ['Your account is already logged in.', 'Try again in 60 secs...']);
+        assert.equal(attempt, 0, 'L1 server session remained occupied after two reply-5 attempts');
+        row.delayMs = 60_000;
+        const started = Date.now();
+        // This is the observed reply-5 backoff, not an unconditional delay after logout.
+        await page.waitForFunction(deadline => Date.now() >= deadline, started + row.delayMs, { timeout: row.delayMs + 5000 });
+        row.elapsedDelayMs = Date.now() - started;
+        assert(row.elapsedDelayMs >= row.delayMs, 'L1 reply-5 backoff ended early');
+    }
+}
+
 async function replay(): Promise<void> {
     const protocol = await loadEngineProtocol(required('engine'));
     // The runtime imports bun:test and DOM-dependent client modules. Only the preloaded replay subprocess may load it.
@@ -168,7 +222,7 @@ async function live(): Promise<void> {
         content = required('content');
     const designAccept = readFileSync(join(content, 'pack/interface.pack'), 'utf8').match(/^(\d+)=player_kit:accept$/m);
     assert(designAccept, 'L1 fixture: missing player_kit:accept component');
-    const account = `l1x${randomBytes(4).toString('hex')}`,
+    const account = `${accountPrefix}${randomBytes(4).toString('hex')}`,
         secret = randomBytes(8).toString('hex');
     const tag = account;
     const receipt: Record<string, unknown> = { status: 'FAIL', account, tag, clientCommit: revision(process.cwd()), contentCommit: revision(content), steps: [] };
@@ -180,8 +234,29 @@ async function live(): Promise<void> {
     let browser: Browser | undefined;
     let stage = 'deploy';
     try {
-        deployment = deployIsolatedClient(tag, engine, join(output, 'build'), { seedHtml: true });
-        receipt.deployment = { page: deployment.page, seedHtml: true, writes: [`public/bot-${tag}.html`, `public/bot/${tag}/`], sharedBotHtmlWritten: false };
+        const sharedHtml = join(engine, 'public/bot.html');
+        const sharedState = () =>
+            existsSync(sharedHtml)
+                ? { sha256: createHash('sha256').update(readFileSync(sharedHtml)).digest('hex'), mtimeMs: statSync(sharedHtml).mtimeMs }
+                : null;
+        const sharedBefore = sharedState();
+        const templatePath = pageTemplatePath(join(engine, 'public'), values['seed-html'] ?? false);
+        const template = readFileSync(templatePath, 'utf8');
+        deployment = deployIsolatedClient(tag, engine, join(output, 'build'), { seedHtml: values['seed-html'] ?? false });
+        const deployedHtml = readFileSync(join(engine, 'public', deployment.page), 'utf8');
+        assert.equal(deployedHtml, template.replaceAll('./bot/botclient.js', `./bot/${tag}/botclient.js`), 'L1 deployed template readback');
+        const sharedAfter = sharedState();
+        receipt.deployment = {
+            page: deployment.page,
+            seedHtml: templatePath === 'public-bot/bot.html',
+            template: templatePath === sharedHtml ? 'engine/public/bot.html' : 'public-bot/bot.html',
+            templateReadbackMatches: deployedHtml === template.replaceAll('./bot/botclient.js', `./bot/${tag}/botclient.js`),
+            writes: [`public/bot-${tag}.html`, `public/bot/${tag}/`],
+            sharedBotHtmlWritten: JSON.stringify(sharedBefore) !== JSON.stringify(sharedAfter),
+            sharedBotHtmlBefore: sharedBefore,
+            sharedBotHtmlAfter: sharedAfter
+        };
+        assert.deepEqual(sharedAfter, sharedBefore, 'L1 shared HTML changed during deploy');
         const protocol = await loadEngineProtocol(engine);
         assert.equal(protocol.revision, 377);
         const playerInfo = protocol.server.find(packet => packet.name === 'PLAYER_INFO');
@@ -191,7 +266,7 @@ async function live(): Promise<void> {
             origin: values.origin!,
             recordingPath: join(output, 'session.jsonl'),
             cachePath: join(output, 'cache.json'),
-            accountPrefix: 'l1x',
+            accountPrefix,
             clientCommit: String(receipt.clientCommit),
             contentCommit: String(receipt.contentCommit)
         });
@@ -202,7 +277,7 @@ async function live(): Promise<void> {
             pageErrors++;
         });
         await page.goto(new URL(`${deployment.page}?lowmem=1&autorelogin=0&randomevents=0&run=0`, tap.url).href);
-        await installObserver(page, 'l1x', playerInfo.id);
+        await installObserver(page, accountPrefix, playerInfo.id);
         const checkpoint = async (label: string) => {
             const snapshot = await quiescent(page);
             tap!.checkpoint(label, snapshot.state, snapshot.inboundCount);
@@ -224,8 +299,32 @@ async function live(): Promise<void> {
         assert.deepEqual(walked.state.serverTile, { ...first.state.serverTile, x: first.state.serverTile.x + 1 });
         stage = 'guide';
         assert.equal(await serverVar(page, 'tutorial'), 1);
-        const guide = (await readValue<Npc[]>(page, 'npcs')).find(npc => npc.name === 'RuneScape Guide');
+        type GuideSnapshot = Npc & {
+            tile: { x: number; z: number; level: number };
+            networkTile: { x: number; z: number; level: number };
+        };
+        let guide: GuideSnapshot | undefined;
+        let stableTile = '';
+        let stableTick = -1;
+        // A moving adjacent NPC can leave a zero-distance approach before the server processes the talk action.
+        await until(page, async () => {
+            const snapshot = await observe(page);
+            guide = (await readValue<GuideSnapshot[]>(page, 'npcs')).find(npc => npc.name === 'RuneScape Guide');
+            assert(guide, 'L1 fixture: Guide absent');
+            const { tile, networkTile } = guide;
+            const player = snapshot.state.serverTile;
+            const stationary = tile.x === networkTile.x && tile.z === networkTile.z;
+            const distance = Math.max(Math.abs(player.x - networkTile.x), Math.abs(player.z - networkTile.z));
+            const key = stationary && distance >= 2 ? `${networkTile.x},${networkTile.z}` : '';
+            if (!key || key !== stableTile) {
+                stableTile = key;
+                stableTick = snapshot.tick;
+                return false;
+            }
+            return snapshot.tick > stableTick;
+        }, 'stationary Guide with a nonzero approach');
         assert(guide, 'L1 fixture: Guide absent');
+        steps.push({ label: 'guide-target', state: guide });
         await action(page, 'menuAction', MiniMenuAction.OP_NPC1, guide.index, 0, 0);
         await until(page, async () => (await observe(page)).chat !== -1, 'Guide dialogue');
         steps.push({ label: 'guide-talk', state: await dialogueText(page) });
@@ -247,10 +346,13 @@ async function live(): Promise<void> {
             await until(page, async () => (await dialogueText(page)) !== before, 'Guide transition');
         }
         assert(finishedGuide, 'L1 Guide dialogue exceeded its transition bound');
-        assert.equal(await serverVar(page, 'tutorial'), 4);
-        assert.equal(await readValue<number>(page, 'varp', TUTORIAL_OVERLAY), 1);
-        assert.equal(await serverVar(page, 'tutorial_progress_overlay'), 1);
-        steps.push({ label: 'server-and-client-varp', state: { tutorial: 4, overlayId: TUTORIAL_OVERLAY, clientOverlay: 1, serverOverlay: 1 } });
+        const tutorial = await serverVar(page, 'tutorial');
+        const clientOverlay = await readValue<number>(page, 'varp', TUTORIAL_OVERLAY);
+        const serverOverlay = await serverVar(page, 'tutorial_progress_overlay');
+        assert.equal(tutorial, 4);
+        assert.equal(clientOverlay, 1);
+        assert.equal(serverOverlay, 1);
+        steps.push({ label: 'server-and-client-varp', state: { tutorial, overlayId: TUTORIAL_OVERLAY, clientOverlay, serverOverlay } });
         await checkpoint('tutorial-varp-applied');
         await page.screenshot({ path: join(output, 'scene.png') });
         await page.evaluate(() => {
@@ -267,10 +369,14 @@ async function live(): Promise<void> {
         assert.deepEqual(reset, { streamClosed: true, ingame: false, credentialsCleared: true });
         steps.push({ label: 'logout-reset', state: reset });
         stage = 'relogin';
-        await login(page, account, secret);
+        const relogAttempts: RelogAttempt[] = [];
+        receipt.relogAttempts = relogAttempts;
+        await relogAfterRelease(page, account, secret, relogAttempts);
+        assert.deepEqual(tap.diagnostics.rejectedLoginReplies, relogAttempts.filter(attempt => !attempt.ingame).map(attempt => attempt.replies[1]));
         await sceneReady(page);
         const relog = await checkpoint('relogin-scene');
-        assert.equal(relog.segment, first.segment + 1);
+        assert.equal(relog.segment, first.segment + relogAttempts.length);
+        assert.equal(tap.diagnostics.activeSegment, 2, 'L1 relog must start the second successful recording segment');
         const relogReset = await page.evaluate(() => {
             const g = globalThis as unknown as L1Window;
             const c = g.rs2b0t.client;
@@ -293,7 +399,7 @@ async function live(): Promise<void> {
         // The tap intentionally rejects undecryptable login requests. Test reply 6 directly against the engine.
         const wrongPage = await browser.newPage();
         await wrongPage.goto(new URL(deployment.page, values.origin).href);
-        await installObserver(wrongPage, 'l1x', playerInfo.id);
+        await installObserver(wrongPage, accountPrefix, playerInfo.id);
         const replies = await wrongKey(wrongPage, account, secret);
         assert.deepEqual(replies, [0, 6], 'L1 wrong-key login reply');
         receipt.wrongKeyReplies = replies;
@@ -319,6 +425,8 @@ async function live(): Promise<void> {
         const failedPage = browser?.contexts()[0]?.pages()[0];
         if (failedPage) {
             receipt.failureState = await observe(failedPage).catch(() => null);
+            receipt.failureChat = await readValue(failedPage, 'chat', 100).catch(() => null);
+            receipt.failureNpcs = await readValue<Npc[]>(failedPage, 'npcs').catch(() => null);
             receipt.loginBanner = await failedPage
                 .evaluate(() => {
                     const g = globalThis as unknown as L1Window;

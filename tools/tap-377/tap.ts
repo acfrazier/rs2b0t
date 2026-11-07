@@ -7,7 +7,7 @@ import Isaac from '../../src/client/io/Isaac.js';
 import { ARCHIVES, type ArchiveName, type CacheBundle, type CheckpointState, type EndRecord, type LoginRecord, type Protocol, type RecordingHeader, type RecordingRecord } from './format.js';
 import { checkRecording } from './check-recording.js';
 import { loadEngineProtocol } from './protocol.js';
-import { GameFrameDecoder, OnDemandStream, type DecodedFrame } from './wire.js';
+import { GameFrameDecoder, OnDemandStream, OnDemandFinishError, type DecodedFrame } from './wire.js';
 import { decryptRsaBlock, readRsaPrivateKey, type RsaPrivateKey } from './rsa.js';
 
 export interface TapOptions {
@@ -32,6 +32,7 @@ export interface TapDiagnostics {
     pendingCounts: { clientToServer: number; serverToClient: number; onDemand: number };
     seenOpcodes: { inbound: string[]; outbound: string[] };
     failedConnections: number;
+    rejectedLoginReplies: number[];
 }
 
 export interface TapSession {
@@ -78,6 +79,7 @@ export class Recorder {
     readonly seen = { inbound: new Set<string>(), outbound: new Set<string>() };
     active: SegmentState | null = null;
     failedConnections = 0;
+    private readonly rejectedLoginReplies: number[] = [];
     private lastSegment = 0;
 
     fail(code: string): void {
@@ -117,6 +119,12 @@ export class Recorder {
             if (record?.type === 'login') return record;
         }
         return null;
+    }
+
+    recordRejectedLoginReply(reply: 5): boolean {
+        if (!this.active?.logoutSeen) return false;
+        this.rejectedLoginReplies.push(reply);
+        return true;
     }
 
     frame(segment: SegmentState, frame: DecodedFrame): void {
@@ -210,7 +218,8 @@ export class Recorder {
             failures: [...this.failures],
             pendingCounts: { ...pendingCounts },
             seenOpcodes: { inbound: [...this.seen.inbound], outbound: [...this.seen.outbound] },
-            failedConnections: this.failedConnections
+            failedConnections: this.failedConnections,
+            rejectedLoginReplies: [...this.rejectedLoginReplies]
         };
     }
 
@@ -220,8 +229,8 @@ export class Recorder {
 }
 
 export class GameConnection {
-    private clientStage: 'handshake' | 'await-seed' | 'login' | 'await-reply' | 'game' | 'failed' = 'handshake';
-    private serverStage: 'hello' | 'handshake-reply' | 'seed' | 'login-reply' | 'login-meta' | 'game' | 'failed' = 'hello';
+    private clientStage: 'handshake' | 'await-seed' | 'login' | 'await-reply' | 'game' | 'rejected' | 'failed' = 'handshake';
+    private serverStage: 'hello' | 'handshake-reply' | 'seed' | 'login-reply' | 'login-meta' | 'game' | 'rejected' | 'failed' = 'hello';
     private handshakeSent = 0;
     private serverControl: Uint8Array = new Uint8Array();
     private clientLoginBytes: Uint8Array = new Uint8Array();
@@ -252,6 +261,10 @@ export class GameConnection {
 
     handleClient(bytes: Uint8Array, send: (bytes: Uint8Array) => void): void {
         if (this.closed || this.clientStage === 'failed') return;
+        if (this.clientStage === 'rejected') {
+            if (bytes.length > 0) this.reject('game-login-reply-extra');
+            return;
+        }
         let offset = 0;
         while (offset < bytes.length) {
             if (this.clientStage === 'handshake') {
@@ -286,6 +299,10 @@ export class GameConnection {
     handleServer(bytes: Uint8Array, send: (bytes: Uint8Array) => void, sendClient: (bytes: Uint8Array) => void): void {
         if (this.closed || this.serverStage === 'failed') return;
         sendClient(bytes);
+        if (this.serverStage === 'rejected') {
+            if (bytes.length > 0) this.reject('game-login-reply-extra');
+            return;
+        }
         this.serverControl = append(this.serverControl, bytes);
         while (true) {
             if (this.serverStage === 'hello') {
@@ -330,6 +347,18 @@ export class GameConnection {
                     this.serverStage = 'game';
                     continue;
                 }
+                if (reply === 5) {
+                    if (this.serverControl.length > 0 || this.clientLoginBytes.length > 0 || this.clientPostReply.length > 0) {
+                        this.reject('game-login-reply-extra');
+                    }
+                    if (!this.recorder.recordRejectedLoginReply(reply)) {
+                        this.reject('game-login-rejected');
+                    }
+                    this.clientStage = 'rejected';
+                    this.serverStage = 'rejected';
+                    this.clearSecrets();
+                    return;
+                }
                 this.reject('game-login-rejected');
             }
             if (this.serverStage === 'login-meta') {
@@ -359,6 +388,7 @@ export class GameConnection {
         this.closed = true;
         if (
             this.clientStage !== 'game' &&
+            this.clientStage !== 'rejected' &&
             (this.handshakeSent > 0 || this.replies.length > 0 || this.clientLoginBytes.length > 0 || this.pendingLogin)
         ) {
             this.recorder.fail('incomplete-game-handshake');
@@ -514,6 +544,14 @@ class ProxyConnection {
         return this.ondemand?.pendingCount ?? 0;
     }
 
+    get hasPendingWork(): boolean {
+        return (
+            (this.game?.pendingClientBytes ?? 0) !== 0 ||
+            (this.game?.pendingServerBytes ?? 0) !== 0 ||
+            (this.ondemand?.hasPendingWork ?? false)
+        );
+    }
+
     openClient(upstreamUrl: string, downstream: Socket): void {
         try {
             const socket = new WebSocket(upstreamUrl, 'binary');
@@ -603,8 +641,11 @@ class ProxyConnection {
         }
         try {
             this.ondemand?.finish();
-        } catch {
+        } catch (error) {
             this.recorder.fail('incomplete-ondemand-stream');
+            if (error instanceof OnDemandFinishError) {
+                for (const predicate of error.predicates) this.recorder.fail(`ondemand-finish-${predicate}`);
+            }
         }
     }
 
@@ -707,6 +748,8 @@ export async function startTap(options: TapOptions): Promise<TapSession> {
     const connections = new Set<ProxyConnection>();
     let closed = false;
     let finalized = false;
+
+    let inFlightArchiveRequests = 0;
     const requestHandler = options.requestHandler;
     const assetRoot = options.assetRoot ? await realpath(resolve(options.assetRoot)).catch(() => null) : null;
     if (options.assetRoot && !assetRoot) throw new Error('tap setup failed');
@@ -741,43 +784,49 @@ export async function startTap(options: TapOptions): Promise<TapSession> {
 
 
     const handleHttp = async (request: Request): Promise<Response> => {
-        try {
-            if (requestHandler) {
-                const handled = await requestHandler(request);
-                if (handled instanceof Response) return handled;
-            }
-        } catch {
-            addFailure('request-handler-failed');
-            return new Response('tap request failed', { status: 500 });
-        }
-        if (assetRoot) {
-            const asset = await serveAsset(request, assetRoot, page);
-            if (asset) return asset;
-        }
         const sourceUrl = new URL(request.url);
         const archive = archiveForRequest(sourceUrl);
-        const target = new URL(sourceUrl.pathname + sourceUrl.search, engineOrigin);
-        const headers = new Headers(request.headers);
-        for (const name of ['connection', 'host', 'upgrade', 'origin', 'content-length', 'accept-encoding']) headers.delete(name);
-        headers.set('accept-encoding', 'identity');
-        let body: ArrayBuffer | undefined;
-        if (request.method !== 'GET' && request.method !== 'HEAD') body = await request.arrayBuffer();
-        let response: Response;
+        const captureArchiveRequest = archive !== null && request.method === 'GET';
+        if (captureArchiveRequest) inFlightArchiveRequests++;
         try {
-            response = await fetch(target, { method: request.method, headers, body });
-        } catch {
-            addFailure('http-upstream-failed');
-            return new Response('tap upstream failed', { status: 502 });
+            try {
+                if (requestHandler) {
+                    const handled = await requestHandler(request);
+                    if (handled instanceof Response) return handled;
+                }
+            } catch {
+                addFailure('request-handler-failed');
+                return new Response('tap request failed', { status: 500 });
+            }
+            if (assetRoot) {
+                const asset = await serveAsset(request, assetRoot, page);
+                if (asset) return asset;
+            }
+            const target = new URL(sourceUrl.pathname + sourceUrl.search, engineOrigin);
+            const headers = new Headers(request.headers);
+            for (const name of ['connection', 'host', 'upgrade', 'origin', 'content-length', 'accept-encoding']) headers.delete(name);
+            headers.set('accept-encoding', 'identity');
+            let body: ArrayBuffer | undefined;
+            if (request.method !== 'GET' && request.method !== 'HEAD') body = await request.arrayBuffer();
+            let response: Response;
+            try {
+                response = await fetch(target, { method: request.method, headers, body });
+            } catch {
+                addFailure('http-upstream-failed');
+                return new Response('tap upstream failed', { status: 502 });
+            }
+            const bytes = new Uint8Array(await response.arrayBuffer());
+            if (archive && request.method === 'GET') {
+                if (response.status === 200) captureArchive(archive, bytes);
+                else if (response.status !== 304) addFailure('archive-fetch-failed');
+            }
+            const resultHeaders = new Headers(response.headers);
+            for (const name of ['connection', 'transfer-encoding', 'content-encoding', 'content-length']) resultHeaders.delete(name);
+            const responseBody = request.method === 'HEAD' || [204, 205, 304].includes(response.status) ? null : bytes;
+            return new Response(responseBody, { status: response.status, statusText: response.statusText, headers: resultHeaders });
+        } finally {
+            if (captureArchiveRequest) inFlightArchiveRequests--;
         }
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        if (archive && request.method === 'GET') {
-            if (response.status === 200) captureArchive(archive, bytes);
-            else if (response.status !== 304) addFailure('archive-fetch-failed');
-        }
-        const resultHeaders = new Headers(response.headers);
-        for (const name of ['connection', 'transfer-encoding', 'content-encoding', 'content-length']) resultHeaders.delete(name);
-        const responseBody = request.method === 'HEAD' || [204, 205, 304].includes(response.status) ? null : bytes;
-        return new Response(responseBody, { status: response.status, statusText: response.statusText, headers: resultHeaders });
     };
 
     const server = Bun.serve<SocketData, Record<string, never>>({
@@ -839,6 +888,28 @@ export async function startTap(options: TapOptions): Promise<TapSession> {
     };
     const diagnostics = (): TapDiagnostics => recorder.getDiagnostics(pendingCounts());
 
+    const drainPending = async (deadline: number): Promise<void> => {
+        while (true) {
+            let pending = inFlightArchiveRequests !== 0;
+            if (!pending) {
+                for (const connection of connections) {
+                    if (connection.hasPendingWork) {
+                        pending = true;
+                        break;
+                    }
+                }
+            }
+            if (!pending) return;
+            if (performance.now() >= deadline) {
+                addFailure('finalize-drain-timeout');
+                throw new Error('tap finalization drain timed out');
+            }
+            const poll = Promise.withResolvers<void>();
+            setTimeout(poll.resolve, 25);
+            await poll.promise;
+        }
+    };
+
     const closeInternal = async (markUnfinalized: boolean): Promise<void> => {
         if (closed) return;
         closed = true;
@@ -864,8 +935,20 @@ export async function startTap(options: TapOptions): Promise<TapSession> {
 
     const finalize = async (reason?: 'logout' | 'reconnect') => {
         if (finalized) throw new Error('tap already finalized');
+        const drainDeadline = performance.now() + 30_000;
         try {
+            await drainPending(drainDeadline);
             for (const connection of connections) connection.checkComplete();
+            if (recorder.failures.size > 0) throw new Error('tap session failed');
+            for (const archive of ARCHIVES) {
+                if (!archives.has(archive)) {
+                    await fetchMissingArchive(archive);
+                }
+            }
+            if (recorder.failures.size > 0) throw new Error('tap session failed');
+            await drainPending(drainDeadline);
+            for (const connection of connections) connection.checkComplete();
+            if (recorder.failures.size > 0) throw new Error('tap session failed');
             if (recorder.active) {
                 if (recorder.active.logoutSeen) recorder.endSegment(recorder.active, 'logout');
                 else if (reason === 'reconnect') recorder.endSegment(recorder.active, 'reconnect');
@@ -873,11 +956,7 @@ export async function startTap(options: TapOptions): Promise<TapSession> {
             }
             if (recorder.records.filter(record => record.type === 'login').length === 0) addFailure('no-successful-login');
             if (recorder.failures.size > 0) throw new Error('tap session failed');
-            for (const archive of ARCHIVES) {
-                if (!archives.has(archive)) {
-                    await fetchMissingArchive(archive);
-                }
-            }
+            await closeInternal(false);
             if (recorder.failures.size > 0) throw new Error('tap session failed');
             const bundle = buildCacheBundle();
             const archiveHashes = {} as Record<ArchiveName, string>;
@@ -901,7 +980,6 @@ export async function startTap(options: TapOptions): Promise<TapSession> {
             }
             const recordingBytes = Buffer.from(records.map(record => JSON.stringify(record)).join('\n') + '\n');
             const cacheBytes = Buffer.from(JSON.stringify(bundle) + '\n');
-            await closeInternal(false);
             await writePairExclusive(recordingPath, recordingBytes, cachePath, cacheBytes);
             finalized = true;
             return { recordingPath, cachePath, records };

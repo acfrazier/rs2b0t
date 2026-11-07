@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { constants, createHash, generateKeyPairSync, publicEncrypt, type KeyObject } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,9 +9,10 @@ import Isaac from '../../src/client/io/Isaac.js';
 import { checkRecording, parseRecording } from '../../tools/tap-377/check-recording.js';
 import { ARCHIVES, type ArchiveName, type Descriptor, type Protocol, type RecordingHeader, type RecordingRecord } from '../../tools/tap-377/format.js';
 import { load377Protocol } from '../../tools/tap-377/protocol.js';
-import { acceptsLoginRequest, archiveForRequest, GameConnection, Recorder } from '../../tools/tap-377/tap.js';
+import { acceptsLoginRequest, archiveForRequest, GameConnection, Recorder, startTap, type TapSession } from '../../tools/tap-377/tap.js';
 import { GameFrameDecoder, OnDemandStream } from '../../tools/tap-377/wire.js';
 import { decryptRsaBlock, readRsaPrivateKey, type RsaPrivateKey } from '../../tools/tap-377/rsa.js';
+import { nativeFetch, nativeResponse } from '../setup-dom.js';
 
 const protocol = load377Protocol();
 
@@ -100,6 +101,175 @@ describe('tap OnDemand stream', () => {
         stream.pushClient(Uint8Array.of(15, 0, 0, 7, 0));
         stream.pushServer(concat(new Uint8Array(8), onDemandHeader(0, 7, 1, 0)));
         expect(() => stream.finish()).toThrow();
+    });
+});
+
+describe('tap finalization', () => {
+    let previousFetch: typeof fetch;
+    let previousResponse: typeof Response;
+    beforeEach(() => {
+        previousFetch = globalThis.fetch;
+        previousResponse = globalThis.Response;
+        globalThis.fetch = nativeFetch;
+        globalThis.Response = nativeResponse;
+    });
+    afterEach(() => {
+        globalThis.fetch = previousFetch;
+        globalThis.Response = previousResponse;
+    });
+    test('waits for active OnDemand and archive fetches before finalizing', async () => {
+        const onDemandRequest = Promise.withResolvers<void>();
+        const firstCrcFetch = Promise.withResolvers<void>();
+        const secondCrcFetch = Promise.withResolvers<void>();
+        const loginReply = Promise.withResolvers<void>();
+        const fallbackResponse = Promise.withResolvers<Response>();
+        const clientArchiveResponseGate = Promise.withResolvers<Response>();
+        let upstreamSend: ((bytes: Uint8Array) => void) | null = null;
+        let upstreamMessageCount = 0;
+        let loginMaterial: { packet: Uint8Array; challenge: Uint8Array } | null = null;
+        let logoutFrame: Uint8Array | null = null;
+        let crcFetchCount = 0;
+        const archiveBytes = Uint8Array.of(0x11, 0x22);
+        const fileBytes = Uint8Array.of(0xab, 0xcd);
+        const harness = await startTapHarness(send => {
+            const messageIndex = upstreamMessageCount++;
+            if (messageIndex === 0) {
+                if (!loginMaterial) throw new Error('synthetic login is not prepared');
+                send(concat(new Uint8Array(8), Uint8Array.of(0), loginMaterial.challenge));
+                return;
+            }
+            if (messageIndex === 1) {
+                if (!logoutFrame) throw new Error('synthetic logout is not prepared');
+                send(concat(Uint8Array.of(2, 5, 1), logoutFrame));
+                loginReply.resolve();
+                return;
+            }
+            if (upstreamSend) return;
+            upstreamSend = send;
+            send(new Uint8Array(8));
+            onDemandRequest.resolve();
+        }, request => {
+            if (new URL(request.url).pathname === '/crc') {
+                crcFetchCount++;
+                if (crcFetchCount === 1) {
+                    firstCrcFetch.resolve();
+                    return fallbackResponse.promise;
+                }
+                if (crcFetchCount === 2) {
+                    secondCrcFetch.resolve();
+                    return clientArchiveResponseGate.promise;
+                }
+            }
+            return new Response(Buffer.from(archiveBytes));
+        });
+        let client: WebSocket | null = null;
+        let onDemandClient: WebSocket | null = null;
+        let clientArchiveFetch: Promise<Response> | null = null;
+        try {
+            loginMaterial = syntheticLoginPacket(harness.publicKey, 'qaGuest', 16);
+            const serverSeed = new Int32Array([0x10203040, 0x50607080, 0x12345678, 0x9abcdef0]);
+            for (let index = 0; index < serverSeed.length; index++) serverSeed[index] += 50;
+            const logout = descriptor(protocol, 'server', 'LOGOUT');
+            logoutFrame = encodeGameFrame(new Isaac(serverSeed), logout, new Uint8Array(Math.max(0, logout.length)));
+            serverSeed.fill(0);
+
+            client = new WebSocket(harness.session.url.replace(/^http/, 'ws'));
+            const clientOpened = Promise.withResolvers<void>();
+            client.addEventListener('open', () => clientOpened.resolve(), { once: true });
+            client.addEventListener('error', () => clientOpened.reject(new Error('tap WebSocket failed')), { once: true });
+            const serverHello = Promise.withResolvers<void>();
+            client.addEventListener('message', () => serverHello.resolve(), { once: true });
+            await clientOpened.promise;
+            client.send(Uint8Array.of(14, 0));
+            await serverHello.promise;
+            const gameReady = Promise.withResolvers<void>();
+            client.addEventListener('message', () => gameReady.resolve(), { once: true });
+            client.send(loginMaterial.packet);
+            await Promise.all([loginReply.promise, gameReady.promise]);
+            expect(harness.session.records.some(record => record.type === 'login')).toBe(true);
+
+            onDemandClient = new WebSocket(harness.session.url.replace(/^http/, 'ws'));
+            const onDemandOpened = Promise.withResolvers<void>();
+            onDemandClient.addEventListener('open', () => onDemandOpened.resolve(), { once: true });
+            onDemandClient.addEventListener('error', () => onDemandOpened.reject(new Error('tap OnDemand WebSocket failed')), { once: true });
+            await onDemandOpened.promise;
+            onDemandClient.send(Uint8Array.of(15, 2, 0, 7, 1));
+            await onDemandRequest.promise;
+            expect(harness.session.diagnostics.pendingCounts.onDemand).toBe(1);
+
+            let finalizationSettled = false;
+            const finalizing = harness.session.finalize().then(result => {
+                finalizationSettled = true;
+                return result;
+            }, error => {
+                finalizationSettled = true;
+                throw error;
+            });
+            void finalizing.catch(() => undefined);
+            expect(harness.session.diagnostics.failures).not.toContain('incomplete-ondemand-stream');
+            upstreamSend!(onDemandChunk(2, 7, fileBytes.length, 0, fileBytes));
+            await firstCrcFetch.promise;
+            clientArchiveFetch = fetch(`${harness.session.url}/crc`);
+            void clientArchiveFetch.catch(() => undefined);
+            await secondCrcFetch.promise;
+            fallbackResponse.resolve(new Response(Buffer.from(archiveBytes)));
+            // Keep the HTTP request active across idle drain; fake timers do not exercise Bun's socket/fetch lifecycle.
+            const drainWindow = Promise.withResolvers<void>();
+            setTimeout(drainWindow.resolve, 250);
+            await drainWindow.promise;
+            expect(finalizationSettled).toBe(false);
+
+            clientArchiveResponseGate.resolve(new Response(Buffer.from(archiveBytes)));
+            const clientArchiveResponse = await clientArchiveFetch;
+            expect(clientArchiveResponse.ok).toBe(true);
+            await clientArchiveResponse.arrayBuffer();
+            const result = await finalizing;
+            const cache = JSON.parse(readFileSync(result.cachePath, 'utf8')) as {
+                ondemand: Record<string, string>;
+            };
+            expect(cache.ondemand['2/7']).toBe(Buffer.from(fileBytes).toString('base64'));
+            expect(harness.session.diagnostics.failures).toEqual([]);
+        } finally {
+            fallbackResponse.resolve(new Response(Buffer.from(archiveBytes)));
+            clientArchiveResponseGate.resolve(new Response(Buffer.from(archiveBytes)));
+            loginMaterial?.packet.fill(0);
+            loginMaterial?.challenge.fill(0);
+            logoutFrame?.fill(0);
+            client?.close();
+            onDemandClient?.close();
+            await harness.close();
+        }
+    });
+
+    test('retains named unfinished OnDemand predicates after connection closure', async () => {
+        const requestSeen = Promise.withResolvers<void>();
+        const harness = await startTapHarness(send => {
+            send(new Uint8Array(8));
+            requestSeen.resolve();
+        }, () => new Response(Buffer.from([0x11, 0x22])));
+        const client = new WebSocket(harness.session.url.replace(/^http/, 'ws'));
+        try {
+            const clientOpened = Promise.withResolvers<void>();
+            client.addEventListener('open', () => clientOpened.resolve(), { once: true });
+            client.addEventListener('error', () => clientOpened.reject(new Error('tap WebSocket failed')), { once: true });
+            await clientOpened.promise;
+            client.send(Uint8Array.of(15, 2, 0, 7, 1));
+            await requestSeen.promise;
+            expect(harness.session.diagnostics.pendingCounts.onDemand).toBe(1);
+
+            await harness.session.close();
+
+            expect(harness.session.diagnostics.pendingCounts).toEqual({
+                clientToServer: 0,
+                serverToClient: 0,
+                onDemand: 0
+            });
+            expect(harness.session.diagnostics.failures).toContain('incomplete-ondemand-stream');
+            expect(harness.session.diagnostics.failures).toContain('ondemand-finish-pending-request');
+        } finally {
+            client.close();
+            await harness.close();
+        }
     });
 });
 
@@ -269,6 +439,106 @@ describe('tap game connection', () => {
             expect(recorder.failures).toContain('game-login-rejected');
             expect(recorder.records.some(record => record.type === 'login')).toBe(false);
         } finally {
+            login.packet.fill(0);
+            login.challenge.fill(0);
+        }
+    });
+    test('records reply 5 as a rejected attempt only after a prior logout', () => {
+        const login = syntheticLogin('frtapPlayer');
+        const recorder = new Recorder();
+        const modulusBytes = Math.ceil(login.privateKey.modulus.toString(16).length / 2);
+        let retry: { packet: Uint8Array; challenge: Uint8Array } | null = null;
+        try {
+            const first = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+            const firstIo = prepareGameConnection(first, login.packet, login.challenge);
+            firstIo.server(Uint8Array.of(2, 0, 0));
+
+            const logout = descriptor(protocol, 'server', 'LOGOUT');
+            const serverSeed = new Int32Array([0x10203040, 0x50607080, 0x12345678, 0x9abcdef0]);
+            for (let index = 0; index < serverSeed.length; index++) serverSeed[index] += 50;
+            const logoutFrame = encodeGameFrame(new Isaac(serverSeed), logout, new Uint8Array(Math.max(0, logout.length)));
+            serverSeed.fill(0);
+            firstIo.server(logoutFrame);
+            first.finish();
+
+            retry = syntheticLoginPacket(login.publicKey, 'frtapPlayer', 16);
+            const second = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+            const secondIo = prepareGameConnection(second, retry.packet, retry.challenge);
+            expect(() => secondIo.server(Uint8Array.of(5))).not.toThrow();
+            second.finish();
+
+            expect(recorder.records.filter(record => record.type === 'login')).toHaveLength(1);
+            expect(recorder.active).toMatchObject({ number: 1 });
+            expect(recorder.getDiagnostics({ clientToServer: 0, serverToClient: 0, onDemand: 0 })).toMatchObject({
+                rejectedLoginReplies: [5],
+                failures: [],
+                failedConnections: 0
+            });
+            expect(secondIo.downstream.at(-1)).toEqual(Uint8Array.of(5));
+        } finally {
+            retry?.packet.fill(0);
+            retry?.challenge.fill(0);
+            login.packet.fill(0);
+            login.challenge.fill(0);
+        }
+    });
+
+    test('rejects reply 5 without a logout boundary', () => {
+        const login = syntheticLogin('frtapPlayer');
+        const recorder = new Recorder();
+        const modulusBytes = Math.ceil(login.privateKey.modulus.toString(16).length / 2);
+        try {
+            const connection = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+            const io = prepareGameConnection(connection, login.packet, login.challenge);
+            expect(() => io.server(Uint8Array.of(5))).toThrow('tap session failed');
+            expect(recorder.failures).toContain('game-login-rejected');
+            expect(recorder.failedConnections).toBe(1);
+            expect(recorder.getDiagnostics({ clientToServer: 0, serverToClient: 0, onDemand: 0 }).rejectedLoginReplies).toEqual([]);
+        } finally {
+            login.packet.fill(0);
+            login.challenge.fill(0);
+        }
+    });
+
+    test('rejects trailing data on a post-logout reply 5', () => {
+        const login = syntheticLogin('frtapPlayer');
+        const recorder = new Recorder();
+        const modulusBytes = Math.ceil(login.privateKey.modulus.toString(16).length / 2);
+        let retry: { packet: Uint8Array; challenge: Uint8Array } | null = null;
+        try {
+            establishLoggedOutSegment(login, recorder, modulusBytes);
+            retry = syntheticLoginPacket(login.publicKey, 'frtapPlayer', 16);
+            const connection = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+            const io = prepareGameConnection(connection, retry.packet, retry.challenge);
+            expect(() => io.server(Uint8Array.of(5, 0))).toThrow('tap session failed');
+            connection.finish();
+            expect(recorder.failures).toContain('game-login-reply-extra');
+            expect(recorder.getDiagnostics({ clientToServer: 0, serverToClient: 0, onDemand: 0 }).rejectedLoginReplies).toEqual([]);
+        } finally {
+            retry?.packet.fill(0);
+            retry?.challenge.fill(0);
+            login.packet.fill(0);
+            login.challenge.fill(0);
+        }
+    });
+
+    test('keeps a truncated login reply fatal after logout', () => {
+        const login = syntheticLogin('frtapPlayer');
+        const recorder = new Recorder();
+        const modulusBytes = Math.ceil(login.privateKey.modulus.toString(16).length / 2);
+        let retry: { packet: Uint8Array; challenge: Uint8Array } | null = null;
+        try {
+            establishLoggedOutSegment(login, recorder, modulusBytes);
+            retry = syntheticLoginPacket(login.publicKey, 'frtapPlayer', 16);
+            const connection = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+            const io = prepareGameConnection(connection, retry.packet, retry.challenge);
+            io.server(new Uint8Array(0));
+            connection.finish();
+            expect(recorder.failures).toContain('incomplete-game-handshake');
+            expect(recorder.getDiagnostics({ clientToServer: 0, serverToClient: 0, onDemand: 0 }).rejectedLoginReplies).toEqual([]);
+        } finally {
+            retry?.packet.fill(0);
+            retry?.challenge.fill(0);
             login.packet.fill(0);
             login.challenge.fill(0);
         }
@@ -445,6 +715,24 @@ function prepareGameConnection(connection: GameConnection, packet: Uint8Array, c
     return { upstream, downstream, server };
 }
 
+function establishLoggedOutSegment(
+    login: { privateKey: RsaPrivateKey; packet: Uint8Array; challenge: Uint8Array },
+    recorder: Recorder,
+    modulusBytes: number
+): void {
+    const connection = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+    const io = prepareGameConnection(connection, login.packet, login.challenge);
+    io.server(Uint8Array.of(2, 0, 0));
+
+    const logout = descriptor(protocol, 'server', 'LOGOUT');
+    const serverSeed = new Int32Array([0x10203040, 0x50607080, 0x12345678, 0x9abcdef0]);
+    for (let index = 0; index < serverSeed.length; index++) serverSeed[index] += 50;
+    const logoutFrame = encodeGameFrame(new Isaac(serverSeed), logout, new Uint8Array(Math.max(0, logout.length)));
+    serverSeed.fill(0);
+    io.server(logoutFrame);
+    connection.finish();
+}
+
 function syntheticLogin(
     username: string,
     keyFormat: 'pkcs1' | 'pkcs8' = 'pkcs1',
@@ -534,3 +822,94 @@ function sampleRecording(): { records: RecordingRecord[]; bundle: { format: 1; a
     ];
     return { records, bundle };
 }
+
+type TapUpstreamMessageHandler = (send: (bytes: Uint8Array) => void, message: unknown) => void;
+type TapHttpHandler = (request: Request) => Response | Promise<Response>;
+
+async function startTapHarness(
+    onUpstreamMessage: TapUpstreamMessageHandler,
+    handleHttp: TapHttpHandler
+): Promise<{ session: TapSession; publicKey: KeyObject; close: () => Promise<void> }> {
+    const root = mkdtempSync(join(tmpdir(), 'tap-lifecycle-'));
+    const engineDir = join(root, 'engine');
+    const publicKey = writeTapEngineFixture(engineDir);
+    const upstream = Bun.serve({
+        hostname: '127.0.0.1',
+        port: 0,
+        fetch(request, server) {
+            if (request.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+                if (!server.upgrade(request, { data: {} })) return new Response('upgrade rejected', { status: 400 });
+                return undefined;
+            }
+            return handleHttp(request);
+        },
+        websocket: {
+            message(socket, message) {
+                onUpstreamMessage(bytes => socket.send(bytes), message);
+            }
+        }
+    });
+    let session: TapSession;
+    try {
+        session = await startTap({
+            engineDir,
+            origin: upstream.url.origin,
+            recordingPath: join(root, 'recording.jsonl'),
+            cachePath: join(root, 'cache.json'),
+            accountPrefix: 'qa',
+            clientCommit: 'a'.repeat(40),
+            contentCommit: 'b'.repeat(40)
+        });
+    } catch (error) {
+        await upstream.stop(true);
+        rmSync(root, { recursive: true, force: true });
+        throw error;
+    }
+    return {
+        session,
+        publicKey,
+        async close() {
+            try {
+                await session.close();
+            } finally {
+                await upstream.stop(true);
+                rmSync(root, { recursive: true, force: true });
+            }
+        }
+    };
+}
+
+function writeTapEngineFixture(engineDir: string): KeyObject {
+    const clientDir = join(engineDir, 'src/network/game/client');
+    const serverDir = join(engineDir, 'src/network/game/server');
+    const utilDir = join(engineDir, 'src/util');
+    const configDir = join(engineDir, 'data/config');
+    mkdirSync(clientDir, { recursive: true });
+    mkdirSync(serverDir, { recursive: true });
+    mkdirSync(utilDir, { recursive: true });
+    mkdirSync(configDir, { recursive: true });
+    const declarations = (descriptors: Descriptor[], className: string): string => [
+        `export class ${className} {`,
+        ...descriptors.map(item => `    static readonly ${item.name} = new Protocol(${item.id}, ${item.length});`),
+        '}'
+    ].join('\n');
+    writeFileSync(join(clientDir, 'ClientGameProt.ts'), declarations(protocol.client, 'ClientGameProt'));
+    writeFileSync(join(serverDir, 'ServerGameProt.ts'), declarations(protocol.server, 'ServerGameProt'));
+    writeFileSync(join(serverDir, 'ServerGameZoneProt.ts'), '');
+    writeFileSync(join(utilDir, 'WorldConfig.ts'), 'const worldConfig = { revision: 377 };');
+    const pair = generateKeyPairSync('rsa', { modulusLength: 1024 });
+    const pem = Buffer.from(pair.privateKey.export({ format: 'pem', type: 'pkcs1' }));
+    try {
+        writeFileSync(join(configDir, 'private.pem'), pem);
+    } finally {
+        pem.fill(0);
+    }
+    for (const args of [
+        ['git', '-C', engineDir, 'init', '-q'],
+        ['git', '-C', engineDir, '-c', 'user.name=Tap test', '-c', 'user.email=tap-test@example.invalid', 'commit', '--allow-empty', '-q', '-m', 'fixture']
+    ]) {
+        if (Bun.spawnSync(args).exitCode !== 0) throw new Error('tap test engine git setup failed');
+    }
+    return pair.publicKey;
+}
+
