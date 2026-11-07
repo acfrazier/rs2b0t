@@ -144,6 +144,22 @@ interface Assembly {
     chunks: Map<number, Uint8Array>;
 }
 
+export type OnDemandFinishPredicate =
+    | 'client-handshake'
+    | 'server-handshake'
+    | 'client-buffer'
+    | 'server-buffer'
+    | 'pending-chunk'
+    | 'pending-request'
+    | 'pending-assembly';
+
+export class OnDemandFinishError extends Error {
+    constructor(readonly predicates: readonly OnDemandFinishPredicate[]) {
+        super('truncated OnDemand stream');
+        this.name = 'OnDemandFinishError';
+    }
+}
+
 export class OnDemandStream {
     private clientBuffer: Uint8Array = new Uint8Array();
     private serverBuffer: Uint8Array = new Uint8Array();
@@ -164,6 +180,18 @@ export class OnDemandStream {
 
     get pendingCount(): number {
         return this.pending.size;
+    }
+
+    get hasPendingWork(): boolean {
+        return (
+            !this.clientHandshaken ||
+            this.serverHandshakeBytes !== 0 ||
+            this.clientBuffer.length !== 0 ||
+            this.serverBuffer.length !== 0 ||
+            this.pendingChunk !== null ||
+            this.pending.size !== 0 ||
+            this.assemblies.size !== 0
+        );
     }
 
     pushClient(chunk: Uint8Array): void {
@@ -242,17 +270,16 @@ export class OnDemandStream {
     }
 
     finish(): void {
-        if (
-            !this.clientHandshaken ||
-            this.serverHandshakeBytes !== 0 ||
-            this.clientBuffer.length !== 0 ||
-            this.serverBuffer.length !== 0 ||
-            this.pendingChunk !== null ||
-            this.pending.size !== 0 ||
-            this.assemblies.size !== 0
-        ) {
-            throw new Error('truncated OnDemand stream');
-        }
+        if (!this.hasPendingWork) return;
+        const predicates: OnDemandFinishPredicate[] = [];
+        if (!this.clientHandshaken) predicates.push('client-handshake');
+        if (this.serverHandshakeBytes !== 0) predicates.push('server-handshake');
+        if (this.clientBuffer.length !== 0) predicates.push('client-buffer');
+        if (this.serverBuffer.length !== 0) predicates.push('server-buffer');
+        if (this.pendingChunk !== null) predicates.push('pending-chunk');
+        if (this.pending.size !== 0) predicates.push('pending-request');
+        if (this.assemblies.size !== 0) predicates.push('pending-assembly');
+        throw new OnDemandFinishError(predicates);
     }
 }
 
