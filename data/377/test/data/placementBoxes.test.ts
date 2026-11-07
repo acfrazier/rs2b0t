@@ -201,7 +201,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
         }
     });
 
-    test('fishing camps: every spot placement near the camp sits inside the camp box', () => {
+    test('fishing camps: every spot the camp owns sits inside the camp box', () => {
         const { npcs } = load377World();
         const spots = npcs.filter(n => n.display === 'Fishing spot');
         expect(spots.length > 0, 'the 377 content places no Fishing spot npcs').toBe(true);
@@ -209,6 +209,14 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
             const radius = camp.campRadius ?? DEFAULT_CAMP_RADIUS;
             const near = spots.filter(n => cheb(camp.spot.x, camp.spot.z, n.x, n.z) <= radius + 8);
             for (const spot of near) {
+                // Why: a spot just outside the box is only this camp's miss when no other camp is closer;
+                // a neighbour's fishery (the Ardougne castle garden spots near the Seers camp) is not ours.
+                const contested = FISHING_LOCATIONS.some(other => {
+                    if (other === camp) return false;
+                    const otherRadius = other.campRadius ?? DEFAULT_CAMP_RADIUS;
+                    return cheb(other.spot.x, other.spot.z, spot.x, spot.z) < cheb(camp.spot.x, camp.spot.z, spot.x, spot.z);
+                });
+                if (contested) continue;
                 expect(cheb(camp.spot.x, camp.spot.z, spot.x, spot.z) <= radius,
                     `${camp.name}: Fishing spot at ${spot.x},${spot.z} sits outside the ${radius}-tile box at ${camp.spot.x},${camp.spot.z}`).toBe(true);
             }
