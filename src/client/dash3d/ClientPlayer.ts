@@ -14,6 +14,8 @@ import ClientEntity from '#/client/dash3d/ClientEntity.js';
 import Model from '#/client/dash3d/Model.js';
 
 import Packet from '#/client/io/Packet.js';
+import { assertPacketConsumed } from '#/client/io/packetGuard.js';
+import { ServerProt } from '#/client/io/ServerProt.js';
 
 import { TypedArray1d } from '#/client/util/Arrays.js';
 
@@ -340,6 +342,10 @@ export default class ClientPlayer extends ClientEntity {
         }
         this.baseId <<= 0x1n;
         this.baseId += BigInt(this.gender);
+
+        if (Client.STRICT_PACKETS) {
+            assertPacketConsumed(ServerProt.PLAYER_INFO, buf.length, buf.pos);
+        }
     }
 
     override getTempModel(): Model | null {

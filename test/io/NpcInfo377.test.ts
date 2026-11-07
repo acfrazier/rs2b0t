@@ -1,15 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 
 import { NpcUpdate } from '../../src/client/dash3d/ClientNpc.js';
-import { decodeNpcInfo377, NPC_NEW_INDEX_SENTINEL_377 } from '../../src/client/dash3d/npcInfo377.js';
-import { BitWriter377, signed5 } from '../../src/client/dash3d/playerInfo377.js';
-import Packet from '../../src/client/io/Packet.js';
-import type { Descriptor, FrameRecord } from '../../tools/tap-377/format.js';
+import { Client } from '../../src/client/shell/Client.js';
+import type { Descriptor, FrameRecord, LoginRecord } from '../../tools/tap-377/format.js';
+import { BitWriter377, encodeSigned5, signed5 } from './bitWriter377.js';
+import { freshClient, runNpcInfo, seedNpcs } from './infoClient377.js';
 import { loadReplayRecordings } from './replay/recording.js';
 
-function packet(bytes: number[] | Uint8Array): Packet {
-    return new Packet(bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes));
-}
+const NPC_NEW_INDEX_SENTINEL_377 = 16383;
 
 function encodeG2(out: number[], value: number): void {
     out.push((value >> 8) & 0xff, value & 0xff);
@@ -45,10 +43,6 @@ function encodeG4Alt2(out: number[], value: number): void {
     out.push(raw[2]!, raw[3]!, raw[0]!, raw[1]!);
 }
 
-function encodeSigned5(value: number): number {
-    return value & 31;
-}
-
 const NPC_BLOCK_MASK = NpcUpdate.CHANGETYPE | NpcUpdate.FACEENTITY | NpcUpdate.HITMARK | NpcUpdate.SPOTANIM | NpcUpdate.SAY | NpcUpdate.FACESQUARE | NpcUpdate.ANIM | NpcUpdate.HITMARK2;
 
 function oldUpdateFrame(mask: number, body: number[]): Uint8Array {
@@ -58,8 +52,7 @@ function oldUpdateFrame(mask: number, body: number[]): Uint8Array {
     bits.write(2, 0);
     bits.write(14, NPC_NEW_INDEX_SENTINEL_377);
     bits.align();
-    const bytes = [...bits.finish(), mask & 0xff, ...body];
-    return Uint8Array.from(bytes);
+    return Uint8Array.from([...bits.finish(), mask & 0xff, ...body]);
 }
 
 function frameBody(hex: string, descriptor: Descriptor): Uint8Array {
@@ -106,14 +99,17 @@ describe('377 npc info', () => {
         bits.write(2, 3);
         bits.write(14, NPC_NEW_INDEX_SENTINEL_377);
         bits.align();
-        const decoded = decodeNpcInfo377(packet([...bits.finish(), 0, 0]));
-        expect(decoded.oldVisibleCount).toBe(5);
-        expect(decoded.oldVisible[0]?.movement).toBeNull();
-        expect(decoded.oldVisible[2]?.movement).toEqual({ kind: 'step', firstDirection: 4, secondDirection: null });
-        expect(decoded.oldVisible[3]?.movement).toEqual({ kind: 'step', firstDirection: 1, secondDirection: 7 });
-        expect(decoded.oldVisible[4]?.removed).toBe(true);
-        expect(decoded.updates[0]?.actor).toEqual({ kind: 'old', ordinal: 1 });
-        expect(decoded.updates[1]?.actor).toEqual({ kind: 'old', ordinal: 3 });
+        const client = freshClient();
+        seedNpcs(client, 5);
+        runNpcInfo(client, Uint8Array.from([...bits.finish(), 0, 0]));
+        expect(client.npcCount).toBe(4);
+        expect(client.npcIds[0]).toBe(1);
+        expect(client.npc[1]?.routeX[0]).toBe(10);
+        expect(client.npc[3]?.routeX[0]).toBe(11);
+        expect(client.npc[3]?.routeZ[0]).toBe(10);
+        expect(client.npc[4]?.routeX[0]).toBe(11);
+        expect(client.npc[4]?.routeZ[0]).toBe(10);
+        expect(client.npc[5]?.cycle).not.toBe(Client.loopCycle);
     });
 
     test('new-npc signed offsets definition and stop sentinel decode', () => {
@@ -127,13 +123,13 @@ describe('377 npc info', () => {
         bits.write(13, 321);
         bits.write(14, NPC_NEW_INDEX_SENTINEL_377);
         bits.align();
-        const decoded = decodeNpcInfo377(packet([...bits.finish(), 0]));
-        expect(decoded.additions).toHaveLength(1);
-        expect(decoded.updates[0]?.actor).toEqual({ kind: 'new', index: 10 });
-        expect(decoded.updates[0]?.blocks).toEqual([]);
-        expect(decoded.additions[0]?.index).toBe(10);
-        expect(decoded.additions[0]?.typeId).toBe(321);
-        expect(decoded.additions[0]?.movement).toEqual({ kind: 'offset', dx: 15, dz: -16, jump: true });
+        const client = freshClient();
+        runNpcInfo(client, Uint8Array.from([...bits.finish(), 0]));
+        expect(client.npcCount).toBe(1);
+        expect(client.npcIds[0]).toBe(10);
+        expect(client.npc[10]?.type?.id).toBe(321);
+        expect(client.npc[10]?.routeX[0]).toBe(15);
+        expect(client.npc[10]?.routeZ[0]).toBe(-16);
         expect(signed5(encodeSigned5(-16))).toBe(-16);
     });
 
@@ -157,36 +153,61 @@ describe('377 npc info', () => {
         body.push(16);
         encodeG1Alt2(body, 17);
 
-        const decoded = decodeNpcInfo377(packet(oldUpdateFrame(NPC_BLOCK_MASK, body)));
-        expect(decoded.updates[0]?.blocks.map(block => block.kind)).toEqual(['changeType', 'faceEntity', 'damage', 'spotanim', 'say', 'faceCoordinate', 'anim', 'damage2']);
-        const blocks = decoded.updates[0]!.blocks;
-        expect(blocks[0]).toEqual({ kind: 'changeType', typeId: 77 });
-        expect(blocks[1]).toEqual({ kind: 'faceEntity', wireValue: 6 });
-        expect(blocks[2]).toEqual({ kind: 'damage', amount: 10, type: 11, health: 12, totalHealth: 13 });
-        expect(blocks[3]).toEqual({ kind: 'spotanim', id: 4, height: -3, delay: 0x4567 });
-        expect(blocks[4]).toEqual({ kind: 'say', text: 'yo' });
-        expect(blocks[5]).toEqual({ kind: 'faceCoordinate', x: 0x1122, z: 0x3344 });
-        expect(blocks[6]).toEqual({ kind: 'anim', seqId: 7, delay: 8 });
-        expect(blocks[7]).toEqual({ kind: 'damage2', amount: 14, type: 15, health: 16, totalHealth: 17 });
+        const client = freshClient();
+        seedNpcs(client, 1);
+        runNpcInfo(client, oldUpdateFrame(NPC_BLOCK_MASK, body));
+        const npc = client.npc[1];
+        expect(npc?.type?.id).toBe(77);
+        expect(npc?.faceEntity).toBe(6);
+        expect(npc?.damageValues[0]).toBe(10);
+        expect(npc?.damageTypes[0]).toBe(11);
+        expect(npc?.spotanimId).toBe(4);
+        expect(npc?.chatMessage).toBe('yo');
+        expect(npc?.faceSquareX).toBe(0x1122);
+        expect(npc?.faceSquareZ).toBe(0x3344);
+        expect(npc?.primaryAnim).toBe(7);
+        expect(npc?.primaryAnimDelay).toBe(8);
+        expect(npc?.health).toBe(16);
+        expect(npc?.totalHealth).toBe(17);
+        expect(npc?.damageValues[1]).toBe(14);
+        expect(npc?.damageTypes[1]).toBe(15);
+        expect(npc?.combatCycle).toBe(Client.loopCycle + 300);
     });
 
-    test('face-entity 65535 sentinel decodes as 65535 wire and animation sentinels are -1', () => {
-        const decodedFace = decodeNpcInfo377(packet(oldUpdateFrame(NpcUpdate.FACEENTITY, [0xff, 0xff])));
-        expect(decodedFace.updates[0]?.blocks).toEqual([{ kind: 'faceEntity', wireValue: 65535 }]);
+    test('face-entity 65535 sentinel decodes as -1 and animation sentinels are -1', () => {
+        const face = freshClient();
+        seedNpcs(face, 1);
+        runNpcInfo(face, oldUpdateFrame(NpcUpdate.FACEENTITY, [0xff, 0xff]));
+        expect(face.npc[1]?.faceEntity).toBe(-1);
 
         const body: number[] = [];
         encodeG2(body, 65535);
         encodeG4Alt2(body, 0);
         encodeG2(body, 65535);
         encodeG1Alt3(body, 0);
-        const decoded = decodeNpcInfo377(packet(oldUpdateFrame(NpcUpdate.SPOTANIM | NpcUpdate.ANIM, body)));
-        expect(decoded.updates[0]?.blocks).toEqual([
-            { kind: 'spotanim', id: -1, height: 0, delay: 0 },
-            { kind: 'anim', seqId: -1, delay: 0 }
-        ]);
+        const client = freshClient();
+        seedNpcs(client, 1);
+        runNpcInfo(client, oldUpdateFrame(NpcUpdate.SPOTANIM | NpcUpdate.ANIM, body));
+        expect(client.npc[1]?.spotanimId).toBe(-1);
+        expect(client.npc[1]?.primaryAnim).toBe(-1);
     });
 
-    test('377 recordings decode NPC_INFO payloads through the 377 handler', () => {
+    test('frame truncation trailing bytes and old-visible count mismatch are rejected', () => {
+        expect(() => runNpcInfo(freshClient(), Uint8Array.from([1]))).toThrow();
+
+        const trailing = Uint8Array.from([0, 0]);
+        expect(() => runNpcInfo(freshClient(), trailing)).toThrow();
+
+        const bits = new BitWriter377();
+        bits.write(8, 1);
+        bits.write(1, 0);
+        bits.write(14, NPC_NEW_INDEX_SENTINEL_377);
+        bits.align();
+        const mismatch = freshClient();
+        expect(() => runNpcInfo(mismatch, bits.finish())).toThrow();
+    });
+
+    test('377 recordings decode NPC_INFO payloads through getNpcPos', () => {
         const recordings = loadReplayRecordings(377);
         const npcInfo = recordings[0]!.protocol.server.find(descriptor => descriptor.name === 'NPC_INFO');
         if (!npcInfo) {
@@ -196,7 +217,14 @@ describe('377 npc info', () => {
         expect(npcInfo.length).toBe(-2);
         let frames = 0;
         for (const recording of recordings) {
+            let client = freshClient();
             for (const record of recording.records) {
+                if (record.type === 'login') {
+                    if (!(record as LoginRecord).reconnect) {
+                        client = freshClient();
+                    }
+                    continue;
+                }
                 if (record.type !== 'frame' || record.direction !== 'in') {
                     continue;
                 }
@@ -206,7 +234,8 @@ describe('377 npc info', () => {
                     continue;
                 }
                 const body = frameBody(frame.bytes, npcInfo);
-                decodeNpcInfo377(packet(body), body.length);
+                Client.loopCycle++;
+                runNpcInfo(client, body);
                 frames++;
             }
         }

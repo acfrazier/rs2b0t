@@ -1,14 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 
 import ClientPlayer, { PlayerUpdate } from '../../src/client/dash3d/ClientPlayer.js';
-import { BitWriter377, PLAYER_NEW_INDEX_SENTINEL_377, decodePlayerInfo377, parsePlayerAppearance377, signed5 } from '../../src/client/dash3d/playerInfo377.js';
 import Packet from '../../src/client/io/Packet.js';
-import type { Descriptor, FrameRecord } from '../../tools/tap-377/format.js';
+import { Client } from '../../src/client/shell/Client.js';
+import type { Descriptor, FrameRecord, LoginRecord, CheckpointRecord } from '../../tools/tap-377/format.js';
+import { BitWriter377, encodeSigned5, signed5 } from './bitWriter377.js';
+import { freshClient, runPlayerInfo, seedPlayers } from './infoClient377.js';
 import { loadReplayRecordings } from './replay/recording.js';
 
-function packet(bytes: number[] | Uint8Array): Packet {
-    return new Packet(bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes));
-}
+const PLAYER_NEW_INDEX_SENTINEL_377 = 2047;
 
 function encodeG2(out: number[], value: number): void {
     out.push((value >> 8) & 0xff, value & 0xff);
@@ -34,10 +34,6 @@ function encodeG4Alt2(out: number[], value: number): void {
     const raw = new Uint8Array(4);
     new DataView(raw.buffer).setInt32(0, value);
     out.push(raw[2]!, raw[3]!, raw[0]!, raw[1]!);
-}
-
-function encodeSigned5(value: number): number {
-    return value & 31;
 }
 
 const PLAYER_BLOCK_MASK =
@@ -107,7 +103,7 @@ describe('377 player info', () => {
     test('setAppearance reads two signed head-icon bytes and not a 289 bitmask', () => {
         const appearance = appearanceBytesForTest();
         const player = new ClientPlayer();
-        player.setAppearance(packet(appearance));
+        player.setAppearance(new Packet(Uint8Array.from(appearance)));
         expect(player.gender).toBe(1);
         expect(player.headiconPk).toBe(-2);
         expect(player.headiconPrayer).toBe(-1);
@@ -145,17 +141,25 @@ describe('377 player info', () => {
             if (operation === 0) {
                 bytes.push(0);
             }
-            const decoded = decodePlayerInfo377(packet(bytes));
+            const client = freshClient();
+            client.localPlayer.routeX[0] = 10;
+            client.localPlayer.routeZ[0] = 10;
+            client.ptype = 90;
+            runPlayerInfo(client, Uint8Array.from(bytes));
+            expect(client.ptype).toBe(-1);
             if (operation === 0) {
-                expect(decoded.localMovement).toBeNull();
-                expect(decoded.updates).toHaveLength(1);
-                expect(decoded.updates[0]?.actor).toEqual({ kind: 'local' });
+                expect(client.localPlayer.routeX[0]).toBe(10);
+                expect(client.localPlayer.routeZ[0]).toBe(10);
             } else if (operation === 1) {
-                expect(decoded.localMovement).toEqual({ kind: 'step', firstDirection: 6, secondDirection: null });
+                expect(client.localPlayer.routeX[0]).toBe(10);
+                expect(client.localPlayer.routeZ[0]).toBe(9);
             } else if (operation === 2) {
-                expect(decoded.localMovement).toEqual({ kind: 'step', firstDirection: 2, secondDirection: 7 });
+                expect(client.localPlayer.routeX[0]).toBe(12);
+                expect(client.localPlayer.routeZ[0]).toBe(10);
             } else {
-                expect(decoded.localMovement).toEqual({ kind: 'teleport', plane: 3, x: 37, z: 91, jump: true });
+                expect(client.minusedlevel).toBe(3);
+                expect(client.localPlayer.routeX[0]).toBe(37);
+                expect(client.localPlayer.routeZ[0]).toBe(91);
             }
         }
     });
@@ -180,16 +184,17 @@ describe('377 player info', () => {
         bits.write(2, 3);
         bits.write(11, PLAYER_NEW_INDEX_SENTINEL_377);
         bits.align();
-        const bytes = [...bits.finish(), 0, 0];
-        const decoded = decodePlayerInfo377(packet(bytes));
-        expect(decoded.oldVisibleCount).toBe(5);
-        expect(decoded.oldVisible[0]?.removed).toBe(false);
-        expect(decoded.oldVisible[0]?.movement).toBeNull();
-        expect(decoded.oldVisible[2]?.movement).toEqual({ kind: 'step', firstDirection: 4, secondDirection: null });
-        expect(decoded.oldVisible[3]?.movement).toEqual({ kind: 'step', firstDirection: 1, secondDirection: 7 });
-        expect(decoded.oldVisible[4]?.removed).toBe(true);
-        expect(decoded.updates[0]?.actor).toEqual({ kind: 'old', ordinal: 1 });
-        expect(decoded.updates[1]?.actor).toEqual({ kind: 'old', ordinal: 3 });
+        const client = freshClient();
+        seedPlayers(client, 5);
+        runPlayerInfo(client, Uint8Array.from([...bits.finish(), 0, 0]));
+        expect(client.playerCount).toBe(4);
+        expect(client.playerIds[0]).toBe(1);
+        expect(client.players[1]?.routeX[0]).toBe(10);
+        expect(client.players[3]?.routeX[0]).toBe(11);
+        expect(client.players[3]?.routeZ[0]).toBe(10);
+        expect(client.players[4]?.routeX[0]).toBe(11);
+        expect(client.players[4]?.routeZ[0]).toBe(10);
+        expect(client.players[5]?.cycle).not.toBe(Client.loopCycle);
     });
 
     test('new-player offsets are signed and the stop sentinel is not added', () => {
@@ -203,10 +208,12 @@ describe('377 player info', () => {
         bits.write(5, encodeSigned5(15));
         bits.write(11, PLAYER_NEW_INDEX_SENTINEL_377);
         bits.align();
-        const decoded = decodePlayerInfo377(packet(bits.finish()));
-        expect(decoded.additions).toHaveLength(1);
-        expect(decoded.additions[0]?.index).toBe(7);
-        expect(decoded.additions[0]?.movement).toEqual({ kind: 'offset', dx: -16, dz: 15, jump: true });
+        const client = freshClient();
+        runPlayerInfo(client, bits.finish());
+        expect(client.playerCount).toBe(1);
+        expect(client.playerIds[0]).toBe(7);
+        expect(client.players[7]?.routeX[0]).toBe(-16);
+        expect(client.players[7]?.routeZ[0]).toBe(15);
         expect(signed5(encodeSigned5(-16))).toBe(-16);
         expect(signed5(encodeSigned5(15))).toBe(15);
     });
@@ -244,49 +251,43 @@ describe('377 player info', () => {
         encodeG1Alt3(body, 16);
         body.push(17);
 
-        const decoded = decodePlayerInfo377(packet(localUpdateFrame(PLAYER_BLOCK_MASK | PlayerUpdate.BIG_UPDATE, body)));
-        expect(decoded.updates).toHaveLength(1);
-        expect(decoded.updates[0]?.actor).toEqual({ kind: 'local' });
-        const blocks = decoded.updates[0]!.blocks;
-        expect(blocks.map(block => block.kind)).toEqual(['anim', 'say', 'exactMove', 'faceEntity', 'faceCoordinate', 'spotanim', 'appearance', 'damage', 'chat', 'damage2']);
-        expect(blocks[0]).toEqual({ kind: 'anim', seqId: 0x1234, delay: 9 });
-        expect(blocks[1]).toEqual({ kind: 'say', text: 'hey' });
-        expect(blocks[2]).toEqual({
-            kind: 'exactMove',
-            startX: 3,
-            startZ: 4,
-            endX: 5,
-            endZ: 6,
-            startDelay: 0x0102,
-            endDelay: 0x0304,
-            direction: 7
-        });
-        expect(blocks[3]).toEqual({ kind: 'faceEntity', wireValue: 5 });
-        expect(blocks[4]).toEqual({ kind: 'faceCoordinate', x: 0x1122, z: 0x3344 });
-        expect(blocks[5]).toEqual({ kind: 'spotanim', id: 2, height: -2, delay: 0x1234 });
-        const appearanceBlock = blocks[6];
-        if (appearanceBlock?.kind !== 'appearance') {
-            throw new Error('expected appearance block');
-        }
-        expect(appearanceBlock.appearance.gender).toBe(1);
-        expect(appearanceBlock.appearance.headiconPk).toBe(-2);
-        expect(appearanceBlock.appearance.headiconPrayer).toBe(-1);
-        expect(appearanceBlock.appearance.equipment).toEqual(new Array(12).fill(0));
-        expect(appearanceBlock.appearance.colours).toEqual([0, 1, 2, 3, 4]);
-        expect(appearanceBlock.appearance.sequences).toEqual([-1, 1, -1, 2, 3, 4, 5]);
-        expect(appearanceBlock.appearance.usernameBase37).toBe(0x0102_0304_0506_0708n);
-        expect(appearanceBlock.appearance.combatLevel).toBe(99);
-        expect(appearanceBlock.appearance.skillLevel).toBe(1200);
-        expect(blocks[7]).toEqual({ kind: 'damage', amount: 10, type: 11, health: 12, totalHealth: 13 });
-        const chat = blocks[8];
-        if (chat?.kind !== 'chat') {
-            throw new Error('expected chat block');
-        }
-        expect(chat.colour).toBe(0xa1);
-        expect(chat.effect).toBe(0xb2);
-        expect(chat.rights).toBe(2);
-        expect([...chat.packed]).toEqual([1, 128, 255]);
-        expect(blocks[9]).toEqual({ kind: 'damage2', amount: 14, type: 15, health: 16, totalHealth: 17 });
+        const client = freshClient();
+        runPlayerInfo(client, localUpdateFrame(PLAYER_BLOCK_MASK | PlayerUpdate.BIG_UPDATE, body));
+        const player = client.localPlayer;
+        expect(player.primaryAnim).toBe(0x1234);
+        expect(player.primaryAnimDelay).toBe(9);
+        expect(player.chatColour).toBe(0xa1);
+        expect(player.chatEffect).toBe(0xb2);
+        expect(player.exactStartX).toBe(3);
+        expect(player.exactStartZ).toBe(4);
+        expect(player.exactEndX).toBe(5);
+        expect(player.exactEndZ).toBe(6);
+        expect(player.exactMoveEnd).toBe(0x0102 + Client.loopCycle);
+        expect(player.exactMoveStart).toBe(0x0304 + Client.loopCycle);
+        expect(player.exactMoveFacing).toBe(7);
+        expect(player.faceEntity).toBe(5);
+        expect(player.faceSquareX).toBe(0x1122);
+        expect(player.faceSquareZ).toBe(0x3344);
+        expect(player.spotanimId).toBe(2);
+        expect(player.headiconPk).toBe(-2);
+        expect(player.headiconPrayer).toBe(-1);
+        expect(player.gender).toBe(1);
+        expect(player.combatLevel).toBe(99);
+        expect(player.skillLevel).toBe(1200);
+        expect(player.damageValues[0]).toBe(10);
+        expect(player.damageTypes[0]).toBe(11);
+        expect(player.health).toBe(16);
+        expect(player.totalHealth).toBe(17);
+        expect(player.combatCycle).toBe(Client.loopCycle + 300);
+        expect(player.damageValues[1]).toBe(14);
+        expect(player.damageTypes[1]).toBe(15);
+    });
+
+    test('say block sets chatMessage from gjstr', () => {
+        const client = freshClient();
+        runPlayerInfo(client, localUpdateFrame(PlayerUpdate.SAY, [...Buffer.from('hey\n')]));
+        expect(client.localPlayer.chatMessage).toBe('hey');
+        expect(client.localPlayer.chatTimer).toBe(150);
     });
 
     test('animation and spotanim 65535 sentinels decode as -1', () => {
@@ -295,23 +296,36 @@ describe('377 player info', () => {
         encodeG1Alt3(body, 0);
         encodeG2Alt2(body, 65535);
         encodeG4Alt2(body, 0);
-        const decoded = decodePlayerInfo377(packet(localUpdateFrame(PlayerUpdate.ANIM | PlayerUpdate.SPOTANIM, body)));
-        expect(decoded.updates[0]?.blocks).toEqual([
-            { kind: 'anim', seqId: -1, delay: 0 },
-            { kind: 'spotanim', id: -1, height: 0, delay: 0 }
-        ]);
+        const client = freshClient();
+        runPlayerInfo(client, localUpdateFrame(PlayerUpdate.ANIM | PlayerUpdate.SPOTANIM, body));
+        expect(client.localPlayer.primaryAnim).toBe(-1);
+        expect(client.localPlayer.spotanimId).toBe(-1);
+    });
+
+    test('face-entity 65535 sentinel and 32768+2047 player slot', () => {
+        const absentBody: number[] = [];
+        encodeG2Alt2(absentBody, 65535);
+        const absent = freshClient();
+        runPlayerInfo(absent, localUpdateFrame(PlayerUpdate.FACEENTITY, absentBody));
+        expect(absent.localPlayer.faceEntity).toBe(-1);
+
+        const body: number[] = [];
+        encodeG2Alt2(body, 32768 + 2047);
+        const client = freshClient();
+        runPlayerInfo(client, localUpdateFrame(PlayerUpdate.FACEENTITY, body));
+        expect(client.localPlayer.faceEntity).toBe(32768 + 2047);
     });
 
     test('appearance trailing bytes fail closed and truncation throws', () => {
         const short = appearanceBytesForTest();
         short.pop();
         const shortBody = [short.length, ...[...short].reverse()];
-        expect(() => decodePlayerInfo377(packet(localUpdateFrame(PlayerUpdate.APPEARANCE, shortBody)))).toThrow();
+        expect(() => runPlayerInfo(freshClient(), localUpdateFrame(PlayerUpdate.APPEARANCE, shortBody))).toThrow();
 
         const long = appearanceBytesForTest();
         long.push(0);
         const longBody = [long.length, ...[...long].reverse()];
-        expect(() => decodePlayerInfo377(packet(localUpdateFrame(PlayerUpdate.APPEARANCE, longBody)))).toThrow('appearance_block_trailing_bytes');
+        expect(() => runPlayerInfo(freshClient(), localUpdateFrame(PlayerUpdate.APPEARANCE, longBody))).toThrow();
     });
 
     test('appearance transmog branch stops equipment after the 65535 prefix', () => {
@@ -323,15 +337,38 @@ describe('377 player info', () => {
         }
         appearance.push(0, 0, 0, 0, 0, 0, 0, 0, 1);
         encodeG2(appearance, 2);
-        const parsed = parsePlayerAppearance377(Uint8Array.from(appearance));
-        expect(parsed.equipment[0]).toBe(65535);
-        expect(parsed.equipment.slice(1).every(part => part === undefined)).toBe(true);
-        expect(parsed.npcTransform).toBe(77);
-        expect(parsed.headiconPk).toBe(1);
-        expect(parsed.headiconPrayer).toBe(0);
+        const body = [appearance.length, ...[...appearance].reverse()];
+        const client = freshClient();
+        runPlayerInfo(client, localUpdateFrame(PlayerUpdate.APPEARANCE, body));
+        expect(client.localPlayer.appearance[0]).toBe(65535);
+        expect(client.localPlayer.transmog?.id).toBe(77);
+        expect(client.localPlayer.headiconPk).toBe(1);
+        expect(client.localPlayer.headiconPrayer).toBe(0);
     });
 
-    test('377 recordings decode PLAYER_INFO payloads through the 377 handler', () => {
+    test('frame truncation trailing bytes and old-visible count mismatch are rejected', () => {
+        expect(() => runPlayerInfo(freshClient(), Uint8Array.from([0]))).toThrow();
+
+        const trailing = localUpdateFrame(0, []);
+        const withTrail = Uint8Array.from([...trailing, 0]);
+        const trailClient = freshClient();
+        trailClient.ptype = 90;
+        expect(() => runPlayerInfo(trailClient, withTrail)).toThrow();
+        expect(trailClient.ptype).toBe(90);
+
+        const bits = new BitWriter377();
+        bits.write(1, 0);
+        bits.write(8, 2);
+        bits.write(1, 0);
+        bits.write(1, 0);
+        bits.write(11, PLAYER_NEW_INDEX_SENTINEL_377);
+        bits.align();
+        const mismatch = freshClient();
+        seedPlayers(mismatch, 1);
+        expect(() => runPlayerInfo(mismatch, bits.finish())).toThrow();
+    });
+
+    test('377 recordings decode PLAYER_INFO payloads through getPlayerPos', () => {
         const recordings = loadReplayRecordings(377);
         const playerInfo = recordings[0]!.protocol.server.find(descriptor => descriptor.name === 'PLAYER_INFO');
         if (!playerInfo) {
@@ -340,8 +377,29 @@ describe('377 player info', () => {
         expect(playerInfo.id).toBe(90);
         expect(playerInfo.length).toBe(-2);
         let frames = 0;
+        let checkpointsCompared = 0;
+        let checkpointMismatches = 0;
         for (const recording of recordings) {
+            let client = freshClient();
             for (const record of recording.records) {
+                if (record.type === 'login') {
+                    if (!(record as LoginRecord).reconnect) {
+                        client = freshClient();
+                    }
+                    continue;
+                }
+                if (record.type === 'checkpoint') {
+                    const checkpoint = record as CheckpointRecord;
+                    if (checkpoint.state.ingame) {
+                        checkpointsCompared++;
+                        const x = checkpoint.state.mapBuildBaseX + client.localPlayer.routeX[0];
+                        const z = checkpoint.state.mapBuildBaseZ + client.localPlayer.routeZ[0];
+                        if (x !== checkpoint.state.serverTile.x || z !== checkpoint.state.serverTile.z || client.minusedlevel !== checkpoint.state.serverTile.level) {
+                            checkpointMismatches++;
+                        }
+                    }
+                    continue;
+                }
                 if (record.type !== 'frame' || record.direction !== 'in') {
                     continue;
                 }
@@ -351,10 +409,13 @@ describe('377 player info', () => {
                     continue;
                 }
                 const body = frameBody(frame.bytes, playerInfo);
-                decodePlayerInfo377(packet(body), body.length);
+                Client.loopCycle++;
+                runPlayerInfo(client, body);
                 frames++;
             }
         }
         expect(frames).toBeGreaterThan(0);
+        expect(checkpointsCompared).toBeGreaterThan(0);
+        expect(checkpointMismatches).toBe(0);
     });
 });

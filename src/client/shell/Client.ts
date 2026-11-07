@@ -3977,12 +3977,12 @@ export class Client extends GameShell {
             e.secondaryAnimCycle++;
 
             if (e.secondaryAnimFrame < seq.numFrames && e.secondaryAnimCycle > seq.getDelay(e.secondaryAnimFrame)) {
-                e.secondaryAnimCycle = 0;
+                e.secondaryAnimCycle = 1;
                 e.secondaryAnimFrame++;
             }
 
             if (e.secondaryAnimFrame >= seq.numFrames) {
-                e.secondaryAnimCycle = 0;
+                e.secondaryAnimCycle = 1;
                 e.secondaryAnimFrame = 0;
             }
         }
@@ -3995,21 +3995,21 @@ export class Client extends GameShell {
             seq = SpotType.list[e.spotanimId].seq;
             e.spotanimCycle++;
 
-            while (seq && e.spotanimFrame < seq.numFrames && e.spotanimCycle > seq.getDelay(e.spotanimFrame)) {
-                e.spotanimCycle -= seq.getDelay(e.spotanimFrame);
+            // Java 377: single-step if, cycle = 1 (not while + subtract delay)
+            if (seq && e.spotanimFrame < seq.numFrames && e.spotanimCycle > seq.getDelay(e.spotanimFrame)) {
+                e.spotanimCycle = 1;
                 e.spotanimFrame++;
             }
 
-            if (seq && e.spotanimFrame >= seq.numFrames) {
-                if (e.spotanimFrame < 0 || e.spotanimFrame >= seq.numFrames) {
-                    e.spotanimId = -1;
-                }
+            if (seq && e.spotanimFrame >= seq.numFrames && (e.spotanimFrame < 0 || e.spotanimFrame >= seq.numFrames)) {
+                e.spotanimId = -1;
             }
         }
 
+        // Java: field1153 (exactMoveEnd) <= loop && field1154 (exactMoveStart) < loop — after exact-move done
         if (e.primaryAnim != -1 && e.primaryAnimDelay <= 1) {
             seq = SeqType.list[e.primaryAnim];
-            if (seq.preanim_move === PreanimMove.DELAYANIM && e.preanimRouteLength > 0 && Client.loopCycle >= e.exactMoveStart && Client.loopCycle > e.exactMoveEnd) {
+            if (seq.preanim_move === PreanimMove.DELAYANIM && e.preanimRouteLength > 0 && e.exactMoveEnd <= Client.loopCycle && e.exactMoveStart < Client.loopCycle) {
                 e.primaryAnimDelay = 1;
                 return;
             }
@@ -4019,8 +4019,8 @@ export class Client extends GameShell {
             seq = SeqType.list[e.primaryAnim];
             e.primaryAnimCycle++;
 
-            while (e.primaryAnimFrame < seq.numFrames && e.primaryAnimCycle > seq.getDelay(e.primaryAnimFrame)) {
-                e.primaryAnimCycle -= seq.getDelay(e.primaryAnimFrame);
+            if (e.primaryAnimFrame < seq.numFrames && e.primaryAnimCycle > seq.getDelay(e.primaryAnimFrame)) {
+                e.primaryAnimCycle = 1;
                 e.primaryAnimFrame++;
             }
 
@@ -4826,11 +4826,11 @@ export class Client extends GameShell {
                     if (this.projectX > -1) {
                         if (player.headiconPk !== -1) {
                             this.headicons[player.headiconPk]?.plotSprite(this.projectX - 12, this.projectY - y);
-                            y -= 25;
+                            y += 25;
                         }
                         if (player.headiconPrayer !== -1) {
                             this.headicons[player.headiconPrayer]?.plotSprite(this.projectX - 12, this.projectY - y);
-                            y -= 25;
+                            y += 25;
                         }
                     }
                 }
@@ -7956,6 +7956,8 @@ export class Client extends GameShell {
                 throw new Error('eek');
             }
         }
+
+        this.ptype = -1;
     }
 
     private getPlayerPosLocal(buf: Packet, _size: number): void {
@@ -8119,8 +8121,6 @@ export class Client extends GameShell {
         }
 
         buf.gBitEnd();
-        // Java getPlayerNewVis sets ptype=-1 after accessBytes; handler also clears.
-        this.ptype = -1;
     }
 
     private getPlayerPosExtended(buf: Packet, _size: number): void {
@@ -8233,6 +8233,9 @@ export class Client extends GameShell {
             buf.gdata_alt1(data, 0, length);
             this.playerAppearanceBuffer[index] = appearance;
             player.setAppearance(appearance);
+            if (Client.STRICT_PACKETS) {
+                assertPacketConsumed(ServerProt.PLAYER_INFO, appearance.length, appearance.pos);
+            }
         }
 
         if ((mask & PlayerUpdate.HITMARK) !== 0) {

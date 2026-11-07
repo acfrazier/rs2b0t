@@ -1,8 +1,10 @@
 import NpcType from '#/client/config/NpcType.js';
+import { resolveMultiNpc } from '#/client/config/resolveMultiloc.js';
 import SeqType from '#/client/config/SeqType.js';
 import SpotType from '#/client/config/SpotType.js';
 
 import ClientEntity from '#/client/dash3d/ClientEntity.js';
+import ClientLocAnim from '#/client/dash3d/ClientLocAnim.js';
 
 import AnimFrame from '#/client/dash3d/AnimFrame.js';
 import Model from '#/client/dash3d/Model.js';
@@ -73,6 +75,12 @@ export default class ClientNpc extends ClientEntity {
             return null;
         }
 
+        // NpcType.getTempModel does not auto-resolve multinpc (SC-e: no varProvider).
+        const type = resolveMultiNpc(this.type, ClientLocAnim.app?.var ?? []);
+        if (!type) {
+            return null;
+        }
+
         if (this.primaryAnim < 0 || this.primaryAnimDelay != 0) {
             const secondarySeq = SeqType.list[this.secondaryAnim];
             let secondaryTransform = -1;
@@ -80,7 +88,7 @@ export default class ClientNpc extends ClientEntity {
                 secondaryTransform = secondarySeq.frames[this.secondaryAnimFrame];
             }
 
-            return this.type.getTempModel(secondaryTransform, -1, null);
+            return type.getTempModel(secondaryTransform, -1, null);
         } else {
             const primarySeq = SeqType.list[this.primaryAnim];
             let primaryTransform = -1;
@@ -94,7 +102,7 @@ export default class ClientNpc extends ClientEntity {
                 secondaryTransform = secondarySeq.frames[this.secondaryAnimFrame];
             }
 
-            return this.type.getTempModel(primaryTransform, secondaryTransform, primarySeq.walkmerge);
+            return type.getTempModel(primaryTransform, secondaryTransform, primarySeq.walkmerge);
         }
     }
 
