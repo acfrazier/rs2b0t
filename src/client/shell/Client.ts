@@ -258,6 +258,10 @@ export class Client extends GameShell {
     private mapBuildLocationFile: number[] = [];
     private mapBuildGroundData: (Uint8Array | null)[] | null = null;
     private mapBuildLocationData: (Uint8Array | null)[] | null = null;
+    /** Java `sceneInstanced`: true after REBUILD_REGION until the next REBUILD_NORMAL. */
+    private sceneInstanced: boolean = false;
+    /** Java `sceneMapRegion[level][zoneX][zoneZ]`: instance template per 8x8 chunk (26 bits: level, source zone x, z, rotation), or -1. */
+    private sceneMapRegion: Int32Array[][] = new Int32Array3d(BuildArea.LEVELS, 13, 13);
     private world: World | null = null;
     private mapl: Uint8Array[][] | null = null;
     private groundh: Int32Array[][] | null = null;
@@ -5359,8 +5363,13 @@ export class Client extends GameShell {
         for (let i = 0; i < this.mapBuildGroundData.length; i++) {
             const data = this.mapBuildLocationData[i];
             if (data != null) {
-                const x = (this.mapBuildIndex[i] >> 8) * 64 - this.mapBuildBaseX;
-                const z = (this.mapBuildIndex[i] & 0xff) * 64 - this.mapBuildBaseZ;
+                let x = (this.mapBuildIndex[i] >> 8) * 64 - this.mapBuildBaseX;
+                let z = (this.mapBuildIndex[i] & 0xff) * 64 - this.mapBuildBaseZ;
+                if (this.sceneInstanced) {
+                    x = 10;
+                    z = 10;
+                }
+
                 if (!ClientBuild.checkLocations(data, x, z)) {
                     ready = false;
                 }
@@ -5393,63 +5402,59 @@ export class Client extends GameShell {
                 this.collision[level]?.reset();
             }
 
+            if (this.mapl) {
+                for (let level: number = 0; level < BuildArea.LEVELS; level++) {
+                    for (let x: number = 0; x < BuildArea.SIZE; x++) {
+                        this.mapl[level][x].fill(0);
+                    }
+                }
+            }
+
             const build: ClientBuild = new ClientBuild(BuildArea.SIZE, BuildArea.SIZE, this.groundh!, this.mapl!);
             const maps: number = this.mapBuildGroundData?.length ?? 0;
 
             ClientBuild.lowMem = World.lowMem;
 
-            if (this.mapBuildIndex) {
-                for (let index: number = 0; index < maps; index++) {
-                    const x: number = this.mapBuildIndex[index] >> 8;
-                    const z: number = this.mapBuildIndex[index] & 0xff;
+            this.out.p1Enc(ClientProt.NO_TIMEOUT);
 
-                    if (x === 33 && z >= 71 && z <= 73) {
-                        ClientBuild.lowMem = false;
-                        break;
-                    }
-                }
-            }
-
-            if (ClientBuild.lowMem) {
-                this.world?.fillBaseLevel(this.minusedlevel);
+            if (this.sceneInstanced) {
+                this.buildInstancedLand(build);
+                this.out.p1Enc(ClientProt.NO_TIMEOUT);
+                this.buildInstancedLocs(build);
             } else {
-                this.world?.fillBaseLevel(0);
-            }
-
-            if (this.mapBuildIndex && this.mapBuildGroundData) {
-                this.out.p1Enc(ClientProt.NO_TIMEOUT);
-
-                for (let i: number = 0; i < maps; i++) {
-                    const x: number = (this.mapBuildIndex[i] >> 8) * 64 - this.mapBuildBaseX;
-                    const z: number = (this.mapBuildIndex[i] & 0xff) * 64 - this.mapBuildBaseZ;
-                    const data: Uint8Array | null = this.mapBuildGroundData[i];
-
-                    if (data) {
-                        build.loadGround(data, (this.mapBuildCentreZoneX - 6) * 8, (this.mapBuildCentreZoneZ - 6) * 8, x, z);
-                    }
-                }
-
-                for (let i: number = 0; i < maps; i++) {
-                    const x: number = (this.mapBuildIndex[i] >> 8) * 64 - this.mapBuildBaseX;
-                    const z: number = (this.mapBuildIndex[i] & 0xff) * 64 - this.mapBuildBaseZ;
-                    const data: Uint8Array | null = this.mapBuildGroundData[i];
-
-                    if (!data && this.mapBuildCentreZoneZ < 800) {
-                        build.fadeAdjacent(z, x, 64, 64);
-                    }
-                }
-            }
-
-            if (this.mapBuildIndex && this.mapBuildLocationData) {
-                this.out.p1Enc(ClientProt.NO_TIMEOUT);
-
-                for (let i: number = 0; i < maps; i++) {
-                    const data: Uint8Array | null = this.mapBuildLocationData[i];
-
-                    if (data) {
+                if (this.mapBuildIndex && this.mapBuildGroundData) {
+                    for (let i: number = 0; i < maps; i++) {
                         const x: number = (this.mapBuildIndex[i] >> 8) * 64 - this.mapBuildBaseX;
                         const z: number = (this.mapBuildIndex[i] & 0xff) * 64 - this.mapBuildBaseZ;
-                        build.loadLocations(data, x, z, this.world, this.collision);
+                        const data: Uint8Array | null = this.mapBuildGroundData[i];
+
+                        if (data) {
+                            build.loadGround(data, (this.mapBuildCentreZoneX - 6) * 8, (this.mapBuildCentreZoneZ - 6) * 8, x, z, this.collision);
+                        }
+                    }
+
+                    for (let i: number = 0; i < maps; i++) {
+                        const x: number = (this.mapBuildIndex[i] >> 8) * 64 - this.mapBuildBaseX;
+                        const z: number = (this.mapBuildIndex[i] & 0xff) * 64 - this.mapBuildBaseZ;
+                        const data: Uint8Array | null = this.mapBuildGroundData[i];
+
+                        if (!data && this.mapBuildCentreZoneZ < 800) {
+                            build.fadeAdjacent(z, x, 64, 64);
+                        }
+                    }
+                }
+
+                this.out.p1Enc(ClientProt.NO_TIMEOUT);
+
+                if (this.mapBuildIndex && this.mapBuildLocationData) {
+                    for (let i: number = 0; i < maps; i++) {
+                        const data: Uint8Array | null = this.mapBuildLocationData[i];
+
+                        if (data) {
+                            const x: number = (this.mapBuildIndex[i] >> 8) * 64 - this.mapBuildBaseX;
+                            const z: number = (this.mapBuildIndex[i] & 0xff) * 64 - this.mapBuildBaseZ;
+                            build.loadLocations(data, x, z, this.world, this.collision);
+                        }
                     }
                 }
             }
@@ -5460,6 +5465,8 @@ export class Client extends GameShell {
             this.areaGame?.setPixels();
 
             this.out.p1Enc(ClientProt.NO_TIMEOUT);
+
+            this.world?.fillBaseLevel(Client.lowMem ? ClientBuild.minBuiltLevel : 0);
 
             for (let x: number = 0; x < BuildArea.SIZE; x++) {
                 for (let z: number = 0; z < BuildArea.SIZE; z++) {
@@ -5512,6 +5519,79 @@ export class Client extends GameShell {
                     const loc = this.onDemand?.getMapFile(x, z, 1) ?? -1;
                     if (loc != -1) {
                         this.onDemand?.prefetch(3, loc);
+                    }
+                }
+            }
+        }
+    }
+
+    private mapSquareIndex(mapSquare: number, data: (Uint8Array | null)[] | null): number {
+        if (!this.mapBuildIndex || !data) {
+            return -1;
+        }
+
+        for (let i: number = 0; i < this.mapBuildIndex.length; i++) {
+            if (this.mapBuildIndex[i] === mapSquare && data[i] != null) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private buildInstancedLand(build: ClientBuild): void {
+        for (let level: number = 0; level < BuildArea.LEVELS; level++) {
+            for (let zoneX: number = 0; zoneX < 13; zoneX++) {
+                for (let zoneZ: number = 0; zoneZ < 13; zoneZ++) {
+                    let loaded: boolean = false;
+                    const template: number = this.sceneMapRegion[level][zoneX][zoneZ];
+
+                    if (template !== -1) {
+                        const srcLevel: number = (template >> 24) & 0x3;
+                        const rotation: number = (template >> 1) & 0x3;
+                        const srcZoneX: number = (template >> 14) & 0x3ff;
+                        const srcZoneZ: number = (template >> 3) & 0x7ff;
+                        const index: number = this.mapSquareIndex((((srcZoneX / 8) | 0) << 8) + ((srcZoneZ / 8) | 0), this.mapBuildGroundData);
+
+                        if (index !== -1 && this.mapBuildGroundData) {
+                            build.loadGroundChunk(this.mapBuildGroundData[index]!, rotation, level, srcLevel, (srcZoneX & 0x7) * 8, (srcZoneZ & 0x7) * 8, zoneX * 8, zoneZ * 8, this.collision);
+                            loaded = true;
+                        }
+                    }
+
+                    if (!loaded) {
+                        build.clearChunk(level, zoneX * 8, zoneZ * 8);
+                    }
+                }
+            }
+        }
+
+        for (let zoneX: number = 0; zoneX < 13; zoneX++) {
+            for (let zoneZ: number = 0; zoneZ < 13; zoneZ++) {
+                if (this.sceneMapRegion[0][zoneX][zoneZ] === -1) {
+                    build.fadeAdjacent(zoneZ * 8, zoneX * 8, 8, 8);
+                }
+            }
+        }
+    }
+
+    private buildInstancedLocs(build: ClientBuild): void {
+        for (let level: number = 0; level < BuildArea.LEVELS; level++) {
+            for (let zoneX: number = 0; zoneX < 13; zoneX++) {
+                for (let zoneZ: number = 0; zoneZ < 13; zoneZ++) {
+                    const template: number = this.sceneMapRegion[level][zoneX][zoneZ];
+                    if (template === -1) {
+                        continue;
+                    }
+
+                    const srcLevel: number = (template >> 24) & 0x3;
+                    const rotation: number = (template >> 1) & 0x3;
+                    const srcZoneX: number = (template >> 14) & 0x3ff;
+                    const srcZoneZ: number = (template >> 3) & 0x7ff;
+                    const index: number = this.mapSquareIndex((((srcZoneX / 8) | 0) << 8) + ((srcZoneZ / 8) | 0), this.mapBuildLocationData);
+
+                    if (index !== -1 && this.mapBuildLocationData) {
+                        build.loadLocsChunk(this.mapBuildLocationData[index]!, rotation, level, srcLevel, (srcZoneX & 0x7) * 8, (srcZoneZ & 0x7) * 8, zoneX * 8, zoneZ * 8, this.world, this.collision);
                     }
                 }
             }
@@ -7109,153 +7189,7 @@ export class Client extends GameShell {
             }
 
             if (this.ptype === ServerProt.REBUILD_NORMAL) {
-                const zoneX: number = this.in.g2();
-                const zoneZ: number = this.in.g2();
-
-                if (this.mapBuildCentreZoneX === zoneX && this.mapBuildCentreZoneZ === zoneZ && this.sceneState === 2) {
-                    this.ptype = -1;
-                    return true;
-                }
-
-                this.mapBuildCentreZoneX = zoneX;
-                this.mapBuildCentreZoneZ = zoneZ;
-                this.mapBuildBaseX = (this.mapBuildCentreZoneX - 6) * 8;
-                this.mapBuildBaseZ = (this.mapBuildCentreZoneZ - 6) * 8;
-
-                this.withinTutorialIsland = false;
-                if ((this.mapBuildCentreZoneX / 8 == 48 || this.mapBuildCentreZoneX / 8 == 49) && this.mapBuildCentreZoneZ / 8 == 48) {
-                    this.withinTutorialIsland = true;
-                } else if (this.mapBuildCentreZoneX / 8 == 48 && this.mapBuildCentreZoneZ / 8 == 148) {
-                    this.withinTutorialIsland = true;
-                }
-
-                this.sceneState = 1;
-                this.sceneLoadStartTime = performance.now();
-
-                this.areaGame?.setPixels();
-                this.p12?.centreString('Loading - please wait.', 257, 151, Colour.BLACK);
-                this.p12?.centreString('Loading - please wait.', 256, 150, Colour.WHITE);
-                this.areaGame?.draw(4, 4);
-
-                let regions = 0;
-                for (let x = ((this.mapBuildCentreZoneX - 6) / 8) | 0; x <= (((this.mapBuildCentreZoneX + 6) / 8) | 0); x++) {
-                    for (let z = ((this.mapBuildCentreZoneZ - 6) / 8) | 0; z <= (((this.mapBuildCentreZoneZ + 6) / 8) | 0); z++) {
-                        regions++;
-                    }
-                }
-
-                this.mapBuildGroundData = new TypedArray1d(regions, null);
-                this.mapBuildLocationData = new TypedArray1d(regions, null);
-                this.mapBuildIndex = new Int32Array(regions);
-                this.mapBuildGroundFile = new Array(regions);
-                this.mapBuildLocationFile = new Array(regions);
-
-                let mapCount = 0;
-                for (let x = ((this.mapBuildCentreZoneX - 6) / 8) | 0; x <= (((this.mapBuildCentreZoneX + 6) / 8) | 0); x++) {
-                    for (let z = ((this.mapBuildCentreZoneZ - 6) / 8) | 0; z <= (((this.mapBuildCentreZoneZ + 6) / 8) | 0); z++) {
-                        this.mapBuildIndex[mapCount] = (x << 8) + z;
-
-                        if (this.withinTutorialIsland && (z == 49 || z == 149 || z == 147 || x == 50 || (x == 49 && z == 47))) {
-                            this.mapBuildGroundFile[mapCount] = -1;
-                            this.mapBuildLocationFile[mapCount] = -1;
-                            mapCount++;
-                        } else if (this.onDemand) {
-                            const landFile = (this.mapBuildGroundFile[mapCount] = this.onDemand.getMapFile(x, z, 0));
-                            if (landFile != -1) {
-                                this.onDemand.request(3, landFile);
-                            }
-
-                            const locFile = (this.mapBuildLocationFile[mapCount] = this.onDemand.getMapFile(x, z, 1));
-                            if (locFile != -1) {
-                                this.onDemand.request(3, locFile);
-                            }
-
-                            mapCount++;
-                        }
-                    }
-                }
-
-                const dx: number = this.mapBuildBaseX - this.mapBuildPrevBaseX;
-                const dz: number = this.mapBuildBaseZ - this.mapBuildPrevBaseZ;
-                this.mapBuildPrevBaseX = this.mapBuildBaseX;
-                this.mapBuildPrevBaseZ = this.mapBuildBaseZ;
-
-                for (let i: number = 0; i < 16384; i++) {
-                    const npc: ClientNpc | null = this.npc[i];
-                    if (npc) {
-                        for (let j: number = 0; j < 10; j++) {
-                            npc.routeX[j] -= dx;
-                            npc.routeZ[j] -= dz;
-                        }
-
-                        npc.x -= dx * 128;
-                        npc.z -= dz * 128;
-                    }
-                }
-
-                for (let i: number = 0; i < MAX_PLAYER_COUNT; i++) {
-                    const player: ClientPlayer | null = this.players[i];
-                    if (player) {
-                        for (let j: number = 0; j < 10; j++) {
-                            player.routeX[j] -= dx;
-                            player.routeZ[j] -= dz;
-                        }
-
-                        player.x -= dx * 128;
-                        player.z -= dz * 128;
-                    }
-                }
-
-                this.awaitingPlayerInfo = true;
-
-                let startTileX: number = 0;
-                let endTileX: number = BuildArea.SIZE;
-                let dirX: number = 1;
-                if (dx < 0) {
-                    startTileX = BuildArea.SIZE - 1;
-                    endTileX = -1;
-                    dirX = -1;
-                }
-
-                let startTileZ: number = 0;
-                let endTileZ: number = BuildArea.SIZE;
-                let dirZ: number = 1;
-                if (dz < 0) {
-                    startTileZ = BuildArea.SIZE - 1;
-                    endTileZ = -1;
-                    dirZ = -1;
-                }
-
-                for (let x: number = startTileX; x !== endTileX; x += dirX) {
-                    for (let z: number = startTileZ; z !== endTileZ; z += dirZ) {
-                        const lastX: number = x + dx;
-                        const lastZ: number = z + dz;
-
-                        for (let level: number = 0; level < BuildArea.LEVELS; level++) {
-                            if (lastX >= 0 && lastZ >= 0 && lastX < BuildArea.SIZE && lastZ < BuildArea.SIZE) {
-                                this.groundObj[level][x][z] = this.groundObj[level][lastX][lastZ];
-                            } else {
-                                this.groundObj[level][x][z] = null;
-                            }
-                        }
-                    }
-                }
-
-                for (let loc = this.locChanges.head(); loc !== null; loc = this.locChanges.next()) {
-                    loc.x -= dx;
-                    loc.z -= dz;
-
-                    if (loc.x < 0 || loc.z < 0 || loc.x >= BuildArea.SIZE || loc.z >= BuildArea.SIZE) {
-                        loc.unlink();
-                    }
-                }
-
-                if (this.minimapFlagX !== 0) {
-                    this.minimapFlagX -= dx;
-                    this.minimapFlagZ -= dz;
-                }
-
-                this.cinemaCam = false;
+                this.rebuildNormal();
 
                 this.ptype = -1;
                 return true;
@@ -7367,44 +7301,21 @@ export class Client extends GameShell {
             }
 
             if (this.ptype === ServerProt.UPDATE_ZONE_PARTIAL_FOLLOWS) {
-                this.zoneUpdateX = this.in.g1();
-                this.zoneUpdateZ = this.in.g1();
+                this.zoneUpdatePartialFollows();
 
                 this.ptype = -1;
                 return true;
             }
 
             if (this.ptype === ServerProt.UPDATE_ZONE_FULL_FOLLOWS) {
-                this.zoneUpdateX = this.in.g1();
-                this.zoneUpdateZ = this.in.g1();
-
-                for (let x: number = this.zoneUpdateX; x < this.zoneUpdateX + 8; x++) {
-                    for (let z: number = this.zoneUpdateZ; z < this.zoneUpdateZ + 8; z++) {
-                        if (this.groundObj[this.minusedlevel][x][z]) {
-                            this.groundObj[this.minusedlevel][x][z] = null;
-                            this.showObject(x, z);
-                        }
-                    }
-                }
-
-                for (let loc = this.locChanges.head(); loc !== null; loc = this.locChanges.next()) {
-                    if (loc.x >= this.zoneUpdateX && loc.x < this.zoneUpdateX + 8 && loc.z >= this.zoneUpdateZ && loc.z < this.zoneUpdateZ + 8 && loc.level === this.minusedlevel) {
-                        loc.endTime = 0;
-                    }
-                }
+                this.zoneUpdateFullFollows();
 
                 this.ptype = -1;
                 return true;
             }
 
             if (this.ptype === ServerProt.UPDATE_ZONE_PARTIAL_ENCLOSED) {
-                this.zoneUpdateX = this.in.g1();
-                this.zoneUpdateZ = this.in.g1();
-
-                while (this.in.pos < this.psize) {
-                    const opcode: number = this.in.g1();
-                    this.zonePacket(this.in, opcode);
-                }
+                this.zoneUpdatePartialEnclosed();
 
                 this.ptype = -1;
                 return true;
@@ -7460,245 +7371,616 @@ export class Client extends GameShell {
         return true;
     }
 
+    /** Java ptype 222: the scene centre arrives as zone z (`g2`) then zone x (`g2_alt3`). */
+    private rebuildNormal(): void {
+        const zoneZ: number = this.in.g2();
+        const zoneX: number = this.in.g2_alt3();
+        this.sceneInstanced = false;
+        this.rebuildScene(zoneX, zoneZ);
+    }
+
+    /** Java ptype 53: zone x, a 13x13x4 bitmask of instance templates (26 bits each), then zone z. */
+    private rebuildRegion(): void {
+        const zoneX: number = this.in.g2_alt2();
+
+        this.in.gBitStart();
+        for (let level: number = 0; level < BuildArea.LEVELS; level++) {
+            for (let x: number = 0; x < 13; x++) {
+                for (let z: number = 0; z < 13; z++) {
+                    if (this.in.gBit(1) === 1) {
+                        this.sceneMapRegion[level][x][z] = this.in.gBit(26);
+                    } else {
+                        this.sceneMapRegion[level][x][z] = -1;
+                    }
+                }
+            }
+        }
+        this.in.gBitEnd();
+
+        const zoneZ: number = this.in.g2_alt2();
+        this.sceneInstanced = true;
+        this.rebuildScene(zoneX, zoneZ);
+    }
+
+    private rebuildScene(zoneX: number, zoneZ: number): void {
+        if (this.mapBuildCentreZoneX === zoneX && this.mapBuildCentreZoneZ === zoneZ && this.sceneState === 2) {
+            return;
+        }
+
+        this.mapBuildCentreZoneX = zoneX;
+        this.mapBuildCentreZoneZ = zoneZ;
+        this.mapBuildBaseX = (this.mapBuildCentreZoneX - 6) * 8;
+        this.mapBuildBaseZ = (this.mapBuildCentreZoneZ - 6) * 8;
+
+        const centreMapX: number = (this.mapBuildCentreZoneX / 8) | 0;
+        const centreMapZ: number = (this.mapBuildCentreZoneZ / 8) | 0;
+        this.withinTutorialIsland = false;
+        if ((centreMapX === 48 || centreMapX === 49) && centreMapZ === 48) {
+            this.withinTutorialIsland = true;
+        }
+        if (centreMapX === 48 && centreMapZ === 148) {
+            this.withinTutorialIsland = true;
+        }
+
+        this.sceneState = 1;
+        this.sceneLoadStartTime = performance.now();
+
+        this.areaGame?.setPixels();
+        this.p12?.centreString('Loading - please wait.', 257, 151, Colour.BLACK);
+        this.p12?.centreString('Loading - please wait.', 256, 150, Colour.WHITE);
+        this.areaGame?.draw(4, 4);
+
+        if (!this.sceneInstanced) {
+            this.requestMapSquares();
+        } else {
+            this.requestInstanceMapSquares();
+        }
+
+        const dx: number = this.mapBuildBaseX - this.mapBuildPrevBaseX;
+        const dz: number = this.mapBuildBaseZ - this.mapBuildPrevBaseZ;
+        this.mapBuildPrevBaseX = this.mapBuildBaseX;
+        this.mapBuildPrevBaseZ = this.mapBuildBaseZ;
+
+        for (let i: number = 0; i < 16384; i++) {
+            const npc: ClientNpc | null = this.npc[i];
+            if (npc) {
+                for (let j: number = 0; j < 10; j++) {
+                    npc.routeX[j] -= dx;
+                    npc.routeZ[j] -= dz;
+                }
+
+                npc.x -= dx * 128;
+                npc.z -= dz * 128;
+            }
+        }
+
+        for (let i: number = 0; i < MAX_PLAYER_COUNT; i++) {
+            const player: ClientPlayer | null = this.players[i];
+            if (player) {
+                for (let j: number = 0; j < 10; j++) {
+                    player.routeX[j] -= dx;
+                    player.routeZ[j] -= dz;
+                }
+
+                player.x -= dx * 128;
+                player.z -= dz * 128;
+            }
+        }
+
+        this.awaitingPlayerInfo = true;
+
+        let startTileX: number = 0;
+        let endTileX: number = BuildArea.SIZE;
+        let dirX: number = 1;
+        if (dx < 0) {
+            startTileX = BuildArea.SIZE - 1;
+            endTileX = -1;
+            dirX = -1;
+        }
+
+        let startTileZ: number = 0;
+        let endTileZ: number = BuildArea.SIZE;
+        let dirZ: number = 1;
+        if (dz < 0) {
+            startTileZ = BuildArea.SIZE - 1;
+            endTileZ = -1;
+            dirZ = -1;
+        }
+
+        for (let x: number = startTileX; x !== endTileX; x += dirX) {
+            for (let z: number = startTileZ; z !== endTileZ; z += dirZ) {
+                const lastX: number = x + dx;
+                const lastZ: number = z + dz;
+
+                for (let level: number = 0; level < BuildArea.LEVELS; level++) {
+                    if (lastX >= 0 && lastZ >= 0 && lastX < BuildArea.SIZE && lastZ < BuildArea.SIZE) {
+                        this.groundObj[level][x][z] = this.groundObj[level][lastX][lastZ];
+                    } else {
+                        this.groundObj[level][x][z] = null;
+                    }
+                }
+            }
+        }
+
+        for (let loc = this.locChanges.head(); loc !== null; loc = this.locChanges.next()) {
+            loc.x -= dx;
+            loc.z -= dz;
+
+            if (loc.x < 0 || loc.z < 0 || loc.x >= BuildArea.SIZE || loc.z >= BuildArea.SIZE) {
+                loc.unlink();
+            }
+        }
+
+        if (this.minimapFlagX !== 0) {
+            this.minimapFlagX -= dx;
+            this.minimapFlagZ -= dz;
+        }
+
+        this.cinemaCam = false;
+    }
+
+    /** Requests the land and loc file of every map square within six zones of the scene centre. */
+    private requestMapSquares(): void {
+        const minX: number = ((this.mapBuildCentreZoneX - 6) / 8) | 0;
+        const maxX: number = ((this.mapBuildCentreZoneX + 6) / 8) | 0;
+        const minZ: number = ((this.mapBuildCentreZoneZ - 6) / 8) | 0;
+        const maxZ: number = ((this.mapBuildCentreZoneZ + 6) / 8) | 0;
+
+        const regions: number = (maxX - minX + 1) * (maxZ - minZ + 1);
+        this.mapBuildGroundData = new TypedArray1d(regions, null);
+        this.mapBuildLocationData = new TypedArray1d(regions, null);
+        this.mapBuildIndex = new Int32Array(regions);
+        this.mapBuildGroundFile = new Array(regions);
+        this.mapBuildLocationFile = new Array(regions);
+
+        let mapCount: number = 0;
+        for (let x: number = minX; x <= maxX; x++) {
+            for (let z: number = minZ; z <= maxZ; z++) {
+                this.mapBuildIndex[mapCount] = (x << 8) + z;
+
+                if (this.withinTutorialIsland && (z === 49 || z === 149 || z === 147 || x === 50 || (x === 49 && z === 47))) {
+                    this.mapBuildGroundFile[mapCount] = -1;
+                    this.mapBuildLocationFile[mapCount] = -1;
+                    mapCount++;
+                } else if (this.onDemand) {
+                    const landFile: number = (this.mapBuildGroundFile[mapCount] = this.onDemand.getMapFile(x, z, 0));
+                    if (landFile !== -1) {
+                        this.onDemand.request(3, landFile);
+                    }
+
+                    const locFile: number = (this.mapBuildLocationFile[mapCount] = this.onDemand.getMapFile(x, z, 1));
+                    if (locFile !== -1) {
+                        this.onDemand.request(3, locFile);
+                    }
+
+                    mapCount++;
+                }
+            }
+        }
+    }
+
+    /** Requests each distinct source map square named by the instance templates, in first-appearance order. */
+    private requestInstanceMapSquares(): void {
+        const squares: number[] = [];
+
+        for (let level: number = 0; level < BuildArea.LEVELS; level++) {
+            for (let zoneX: number = 0; zoneX < 13; zoneX++) {
+                for (let zoneZ: number = 0; zoneZ < 13; zoneZ++) {
+                    const template: number = this.sceneMapRegion[level][zoneX][zoneZ];
+                    if (template === -1) {
+                        continue;
+                    }
+
+                    const srcZoneX: number = (template >> 14) & 0x3ff;
+                    const srcZoneZ: number = (template >> 3) & 0x7ff;
+                    const square: number = (((srcZoneX / 8) | 0) << 8) + ((srcZoneZ / 8) | 0);
+                    if (!squares.includes(square)) {
+                        squares.push(square);
+                    }
+                }
+            }
+        }
+
+        const count: number = squares.length;
+        this.mapBuildGroundData = new TypedArray1d(count, null);
+        this.mapBuildLocationData = new TypedArray1d(count, null);
+        this.mapBuildIndex = new Int32Array(count);
+        this.mapBuildGroundFile = new Array(count);
+        this.mapBuildLocationFile = new Array(count);
+
+        for (let i: number = 0; i < count; i++) {
+            const square: number = (this.mapBuildIndex[i] = squares[i]);
+            const mapX: number = (square >> 8) & 0xff;
+            const mapZ: number = square & 0xff;
+
+            if (this.onDemand) {
+                const landFile: number = (this.mapBuildGroundFile[i] = this.onDemand.getMapFile(mapX, mapZ, 0));
+                if (landFile !== -1) {
+                    this.onDemand.request(3, landFile);
+                }
+
+                const locFile: number = (this.mapBuildLocationFile[i] = this.onDemand.getMapFile(mapX, mapZ, 1));
+                if (locFile !== -1) {
+                    this.onDemand.request(3, locFile);
+                }
+            } else {
+                this.mapBuildGroundFile[i] = -1;
+                this.mapBuildLocationFile[i] = -1;
+            }
+        }
+    }
+
+    /** Java ptype 75: zone x (`g1_alt2`), zone z (`g1_alt1`). */
+    private zoneUpdatePartialFollows(): void {
+        this.zoneUpdateX = this.in.g1_alt2();
+        this.zoneUpdateZ = this.in.g1_alt1();
+    }
+
+    /** Java ptype 40: zone z (`g1_alt3`) then zone x (`g1_alt2`), the reverse of ptype 75; clears the zone's objs and pending locs. */
+    private zoneUpdateFullFollows(): void {
+        this.zoneUpdateZ = this.in.g1_alt3();
+        this.zoneUpdateX = this.in.g1_alt2();
+
+        for (let x: number = this.zoneUpdateX; x < this.zoneUpdateX + 8; x++) {
+            for (let z: number = this.zoneUpdateZ; z < this.zoneUpdateZ + 8; z++) {
+                if (this.groundObj[this.minusedlevel][x][z]) {
+                    this.groundObj[this.minusedlevel][x][z] = null;
+                    this.showObject(x, z);
+                }
+            }
+        }
+
+        for (let loc = this.locChanges.head(); loc !== null; loc = this.locChanges.next()) {
+            if (loc.x >= this.zoneUpdateX && loc.x < this.zoneUpdateX + 8 && loc.z >= this.zoneUpdateZ && loc.z < this.zoneUpdateZ + 8 && loc.level === this.minusedlevel) {
+                loc.endTime = 0;
+            }
+        }
+    }
+
+    /** Java ptype 183: zone x (`g1`), zone z (`g1_alt1`), then child opcodes until the frame ends. */
+    private zoneUpdatePartialEnclosed(): void {
+        this.zoneUpdateX = this.in.g1();
+        this.zoneUpdateZ = this.in.g1_alt1();
+
+        while (this.in.pos < this.psize) {
+            const opcode: number = this.in.g1();
+            this.zonePacket(this.in, opcode);
+        }
+    }
+
+    /** Java `readZonePacket`: each child has its own field order and byte transforms; the tile is a nibble pair relative to the zone origin. */
     private zonePacket(buf: Packet, opcode: number): void {
+        if (opcode === ServerProt.P_LOCMERGE) {
+            this.zoneLocMerge(buf);
+        } else if (opcode === ServerProt.OBJ_REVEAL) {
+            this.zoneObjReveal(buf);
+        } else if (opcode === ServerProt.LOC_ANIM) {
+            this.zoneLocAnim(buf);
+        } else if (opcode === ServerProt.OBJ_ADD) {
+            this.zoneObjAdd(buf);
+        } else if (opcode === ServerProt.OBJ_COUNT) {
+            this.zoneObjCount(buf);
+        } else if (opcode === ServerProt.MAP_PROJANIM) {
+            this.zoneMapProjAnim(buf);
+        } else if (opcode === ServerProt.SOUND_AREA) {
+            this.zoneSoundArea(buf);
+        } else if (opcode === ServerProt.MAP_ANIM) {
+            this.zoneMapAnim(buf);
+        } else if (opcode === ServerProt.LOC_ADD_CHANGE) {
+            this.zoneLocAddChange(buf);
+        } else if (opcode === ServerProt.OBJ_DEL) {
+            this.zoneObjDel(buf);
+        } else if (opcode === ServerProt.LOC_DEL) {
+            this.zoneLocDel(buf);
+        } else if (Client.STRICT_PACKETS) {
+            throw new StrictPacketError(`T3 - unknown zone child ${opcode}`);
+        }
+    }
+
+    private zoneLocMerge(buf: Packet): void {
+        const id: number = buf.g2();
+        const info: number = buf.g1();
+        const shape: number = info >> 2;
+        const rotate: number = info & 0x3;
+        const layer: number = LOC_SHAPE_TO_LAYER[shape];
+        let west: number = buf.g1b_alt2();
+        const pos: number = buf.g1_alt1();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+        let east: number = buf.g1b_alt1();
+        const endCycle: number = buf.g2_alt2();
+        const pid: number = buf.g2_alt1();
+        let north: number = buf.g1b();
+        let south: number = buf.g1b_alt1();
+        const startCycle: number = buf.g2();
+
+        let player: ClientPlayer | null;
+        if (pid === this.selfSlot) {
+            player = this.localPlayer;
+        } else {
+            player = this.players[pid];
+        }
+
+        if (player && this.groundh) {
+            const loc: LocType = LocType.list(id);
+
+            const heightSW: number = this.groundh[this.minusedlevel][x][z];
+            const heightSE: number = this.groundh[this.minusedlevel][x + 1][z];
+            const heightNE: number = this.groundh[this.minusedlevel][x + 1][z + 1];
+            const heightNW: number = this.groundh[this.minusedlevel][x][z + 1];
+
+            const model = loc.getModel(shape, rotate, heightSW, heightSE, heightNE, heightNW, -1);
+            if (model) {
+                this.locChangeCreate(this.minusedlevel, x, z, layer, -1, 0, 0, startCycle + 1, endCycle + 1);
+
+                player.locStartCycle = startCycle + Client.loopCycle;
+                player.locStopCycle = endCycle + Client.loopCycle;
+                player.locModel = model;
+
+                let width: number = loc.width;
+                let height: number = loc.length;
+                if (rotate === LocAngle.NORTH || rotate === LocAngle.SOUTH) {
+                    width = loc.length;
+                    height = loc.width;
+                }
+
+                player.locOffsetX = x * 128 + width * 64;
+                player.locOffsetZ = z * 128 + height * 64;
+                player.locOffsetY = this.getAvH(player.locOffsetX, player.locOffsetZ, this.minusedlevel);
+
+                let tmp: number;
+                if (east > west) {
+                    tmp = east;
+                    east = west;
+                    west = tmp;
+                }
+
+                if (south > north) {
+                    tmp = south;
+                    south = north;
+                    north = tmp;
+                }
+
+                player.minTileX = x + east;
+                player.maxTileX = x + west;
+                player.minTileZ = z + south;
+                player.maxTileZ = z + north;
+            }
+        }
+    }
+
+    private zoneObjReveal(buf: Packet): void {
+        const pos: number = buf.g1_alt1();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+        const count: number = buf.g2_alt3();
+        const id: number = buf.g2_alt2();
+        const pid: number = buf.g2_alt2();
+
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE && pid !== this.selfSlot) {
+            if (!this.groundObj[this.minusedlevel][x][z]) {
+                this.groundObj[this.minusedlevel][x][z] = new LinkList();
+            }
+
+            const obj: ClientObj = new ClientObj(id, count);
+            this.groundObj[this.minusedlevel][x][z]?.push(obj);
+            this.showObject(x, z);
+        }
+    }
+
+    private zoneLocAnim(buf: Packet): void {
+        const seq: number = buf.g2();
+        const info: number = buf.g1_alt1();
+        let shape: number = info >> 2;
+        const rotate: number = info & 0x3;
+        const layer: number = LOC_SHAPE_TO_LAYER[shape];
+        const pos: number = buf.g1();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE - 1 && z < BuildArea.SIZE - 1 && this.world && this.groundh) {
+            const heightSW = this.groundh[this.minusedlevel][x][z];
+            const heightSE = this.groundh[this.minusedlevel][x + 1][z];
+            const heightNE = this.groundh[this.minusedlevel][x + 1][z + 1];
+            const heightNW = this.groundh[this.minusedlevel][x][z + 1];
+
+            if (layer == 0) {
+                const wall = this.world.getWall(this.minusedlevel, x, z);
+                if (wall) {
+                    const locId = (wall.typecode >> 14) & 0x7fff;
+                    if (shape == 2) {
+                        wall.model1 = new ClientLocAnim(locId, 2, rotate + 4, heightSW, heightSE, heightNE, heightNW, seq, false);
+                        wall.model2 = new ClientLocAnim(locId, 2, (rotate + 1) & 0x3, heightSW, heightSE, heightNE, heightNW, seq, false);
+                    } else {
+                        wall.model1 = new ClientLocAnim(locId, shape, rotate, heightSW, heightSE, heightNE, heightNW, seq, false);
+                    }
+                }
+            } else if (layer == 1) {
+                const decor = this.world.getDecor(this.minusedlevel, z, x);
+                if (decor) {
+                    decor.model = new ClientLocAnim((decor.typecode >> 14) & 0x7fff, 4, 0, heightSW, heightSE, heightNE, heightNW, seq, false);
+                }
+            } else if (layer == 2) {
+                const sprite = this.world.getScene(this.minusedlevel, x, z);
+                if (shape == 11) {
+                    shape = 10;
+                }
+
+                if (sprite) {
+                    sprite.model = new ClientLocAnim((sprite.typecode >> 14) & 0x7fff, shape, rotate, heightSW, heightSE, heightNE, heightNW, seq, false);
+                }
+            } else if (layer == 3) {
+                const decor = this.world.getGd(this.minusedlevel, x, z);
+                if (decor) {
+                    decor.model = new ClientLocAnim((decor.typecode >> 14) & 0x7fff, 22, rotate, heightSW, heightSE, heightNE, heightNW, seq, false);
+                }
+            }
+        }
+    }
+
+    private zoneObjAdd(buf: Packet): void {
+        const type: number = buf.g2();
+        const pos: number = buf.g1_alt2();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+        const count: number = buf.g2_alt2();
+
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
+            const obj: ClientObj = new ClientObj(type, count);
+            if (!this.groundObj[this.minusedlevel][x][z]) {
+                this.groundObj[this.minusedlevel][x][z] = new LinkList();
+            }
+
+            this.groundObj[this.minusedlevel][x][z]?.push(obj);
+            this.showObject(x, z);
+        }
+    }
+
+    private zoneObjCount(buf: Packet): void {
+        const pos: number = buf.g1();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+        const type: number = buf.g2();
+        const ocount: number = buf.g2();
+        const count: number = buf.g2();
+
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
+            const objs = this.groundObj[this.minusedlevel][x][z];
+            if (objs) {
+                for (let obj = objs.head(); obj !== null; obj = objs.next()) {
+                    if (obj.id === (type & 0x7fff) && obj.count === ocount) {
+                        obj.count = count;
+                        break;
+                    }
+                }
+
+                this.showObject(x, z);
+            }
+        }
+    }
+
+    private zoneMapProjAnim(buf: Packet): void {
         const pos: number = buf.g1();
         let x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
         let z: number = this.zoneUpdateZ + (pos & 0x7);
+        let x2: number = x + buf.g1b();
+        let z2: number = z + buf.g1b();
+        const targetEntity: number = buf.g2b();
+        const spotanim: number = buf.g2();
+        const h1: number = buf.g1() * 4;
+        const h2: number = buf.g1() * 4;
+        const t1: number = buf.g2();
+        const t2: number = buf.g2();
+        const angle: number = buf.g1();
+        const startpos: number = buf.g1();
 
-        if (opcode === ServerProt.LOC_ADD_CHANGE) {
-            const info: number = buf.g1();
-            const id: number = buf.g2();
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE && x2 >= 0 && z2 >= 0 && x2 < BuildArea.SIZE && z2 < BuildArea.SIZE && spotanim !== 65535) {
+            x = x * 128 + 64;
+            z = z * 128 + 64;
+            x2 = x2 * 128 + 64;
+            z2 = z2 * 128 + 64;
 
-            const shape: number = info >> 2;
-            const rotate: number = info & 0x3;
-            const layer: number = LOC_SHAPE_TO_LAYER[shape];
+            const proj: ClientProj = new ClientProj(spotanim, this.minusedlevel, x, this.getAvH(x, z, this.minusedlevel) - h1, z, t1 + Client.loopCycle, t2 + Client.loopCycle, angle, startpos, targetEntity, h2);
+            proj.setTarget(x2, this.getAvH(x2, z2, this.minusedlevel) - h2, z2, t1 + Client.loopCycle);
+            this.projectiles.push(proj);
+        }
+    }
 
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
-                this.locChangeCreate(this.minusedlevel, x, z, layer, id, shape, rotate, 0, -1);
-            }
-        } else if (opcode === ServerProt.LOC_DEL) {
-            const info: number = buf.g1();
+    /** Java ptype 41 (new in 377): an ambient sound at a tile, played when the local player is within `range` tiles. */
+    private zoneSoundArea(buf: Packet): void {
+        const pos: number = buf.g1();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+        const soundId: number = buf.g2();
+        const packed: number = buf.g1();
+        const range: number = (packed >> 4) & 0xf;
+        const loops: number = packed & 0x7;
 
-            const shape: number = info >> 2;
-            const rotate: number = info & 0x3;
-            const layer: number = LOC_SHAPE_TO_LAYER[shape];
+        if (
+            this.localPlayer &&
+            this.localPlayer.routeX[0] >= x - range &&
+            this.localPlayer.routeX[0] <= x + range &&
+            this.localPlayer.routeZ[0] >= z - range &&
+            this.localPlayer.routeZ[0] <= z + range &&
+            this.waveEnabled &&
+            !Client.lowMem &&
+            this.waveCount < 50
+        ) {
+            this.waveIds[this.waveCount] = soundId;
+            this.waveLoops[this.waveCount] = loops;
+            this.waveDelay[this.waveCount] = JagFX.delays[soundId];
+            this.waveCount++;
+        }
+    }
 
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
-                this.locChangeCreate(this.minusedlevel, x, z, layer, -1, shape, rotate, 0, -1);
-            }
-        } else if (opcode === ServerProt.LOC_ANIM) {
-            const info: number = buf.g1();
-            const seq: number = buf.g2();
+    private zoneMapAnim(buf: Packet): void {
+        const pos: number = buf.g1();
+        let x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        let z: number = this.zoneUpdateZ + (pos & 0x7);
+        const spotanim: number = buf.g2();
+        const height: number = buf.g1();
+        const time: number = buf.g2();
 
-            let shape: number = info >> 2;
-            const rotate = info & 0x3;
-            const layer: number = LOC_SHAPE_TO_LAYER[shape];
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
+            x = x * 128 + 64;
+            z = z * 128 + 64;
 
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE && this.world && this.groundh) {
-                const heightSW = this.groundh[this.minusedlevel][x][z];
-                const heightSE = this.groundh[this.minusedlevel][x + 1][z];
-                const heightNE = this.groundh[this.minusedlevel][x + 1][z + 1];
-                const heightNW = this.groundh[this.minusedlevel][x][z + 1];
+            const spot: MapSpotAnim = new MapSpotAnim(spotanim, this.minusedlevel, x, z, this.getAvH(x, z, this.minusedlevel) - height, Client.loopCycle, time);
+            this.spotanims.push(spot);
+        }
+    }
 
-                if (layer == 0) {
-                    const wall = this.world.getWall(this.minusedlevel, x, z);
-                    if (wall) {
-                        const locId = (wall.typecode >> 14) & 0x7fff;
-                        if (shape == 2) {
-                            wall.model1 = new ClientLocAnim(locId, 2, rotate + 4, heightSW, heightSE, heightNE, heightNW, seq, false);
-                            wall.model2 = new ClientLocAnim(locId, 2, (rotate + 1) & 0x3, heightSW, heightSE, heightNE, heightNW, seq, false);
-                        } else {
-                            wall.model1 = new ClientLocAnim(locId, shape, rotate, heightSW, heightSE, heightNE, heightNW, seq, false);
-                        }
-                    }
-                } else if (layer == 1) {
-                    const decor = this.world.getDecor(this.minusedlevel, z, x);
-                    if (decor) {
-                        decor.model = new ClientLocAnim((decor.typecode >> 14) & 0x7fff, 4, 0, heightSW, heightNE, heightNE, heightNW, seq, false);
-                    }
-                } else if (layer == 2) {
-                    const sprite = this.world.getScene(this.minusedlevel, x, z);
-                    if (shape == 11) {
-                        shape = 10;
-                    }
+    private zoneLocAddChange(buf: Packet): void {
+        const info: number = buf.g1_alt2();
+        const shape: number = info >> 2;
+        const rotate: number = info & 0x3;
+        const layer: number = LOC_SHAPE_TO_LAYER[shape];
+        const id: number = buf.g2_alt3();
+        const pos: number = buf.g1_alt1();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
 
-                    if (sprite) {
-                        sprite.model = new ClientLocAnim((sprite.typecode >> 14) & 0x7fff, shape, rotate, heightSW, heightSE, heightNE, heightNW, seq, false);
-                    }
-                } else if (layer == 3) {
-                    const decor = this.world.getGd(this.minusedlevel, x, z);
-                    if (decor) {
-                        decor.model = new ClientLocAnim((decor.typecode >> 14) & 0x7fff, 22, rotate, heightSW, heightSE, heightNE, heightNW, seq, false);
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
+            this.locChangeCreate(this.minusedlevel, x, z, layer, id, shape, rotate, 0, -1);
+        }
+    }
+
+    private zoneObjDel(buf: Packet): void {
+        const type: number = buf.g2_alt2();
+        const pos: number = buf.g1_alt1();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
+            const objs = this.groundObj[this.minusedlevel][x][z];
+            if (objs) {
+                for (let obj = objs.head(); obj !== null; obj = objs.next()) {
+                    if (obj.id === (type & 0x7fff)) {
+                        obj.unlink();
+                        break;
                     }
                 }
-            }
-        } else if (opcode === ServerProt.OBJ_ADD) {
-            const type: number = buf.g2();
-            const count: number = buf.g2();
 
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
-                const obj: ClientObj = new ClientObj(type, count);
-                if (!this.groundObj[this.minusedlevel][x][z]) {
-                    this.groundObj[this.minusedlevel][x][z] = new LinkList();
+                if (objs.head() === null) {
+                    this.groundObj[this.minusedlevel][x][z] = null;
                 }
 
-                this.groundObj[this.minusedlevel][x][z]?.push(obj);
                 this.showObject(x, z);
             }
-        } else if (opcode === ServerProt.OBJ_DEL) {
-            const type: number = buf.g2();
+        }
+    }
 
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
-                const objs = this.groundObj[this.minusedlevel][x][z];
-                if (objs) {
-                    for (let obj = objs.head(); obj !== null; obj = objs.next()) {
-                        if (obj.id === (type & 0x7fff)) {
-                            obj.unlink();
-                            break;
-                        }
-                    }
+    private zoneLocDel(buf: Packet): void {
+        const pos: number = buf.g1_alt3();
+        const x: number = this.zoneUpdateX + ((pos >> 4) & 0x7);
+        const z: number = this.zoneUpdateZ + (pos & 0x7);
+        const info: number = buf.g1_alt3();
+        const shape: number = info >> 2;
+        const rotate: number = info & 0x3;
+        const layer: number = LOC_SHAPE_TO_LAYER[shape];
 
-                    if (objs.head() === null) {
-                        this.groundObj[this.minusedlevel][x][z] = null;
-                    }
-
-                    this.showObject(x, z);
-                }
-            }
-        } else if (opcode === ServerProt.MAP_PROJANIM) {
-            let x2: number = x + buf.g1b();
-            let z2: number = z + buf.g1b();
-            const targetEntity: number = buf.g2b();
-            const spotanim: number = buf.g2();
-            const h1: number = buf.g1() * 4;
-            const h2: number = buf.g1() * 4;
-            const t1: number = buf.g2();
-            const t2: number = buf.g2();
-            const angle: number = buf.g1();
-            const startpos: number = buf.g1();
-
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE && x2 >= 0 && z2 >= 0 && x2 < BuildArea.SIZE && z2 < BuildArea.SIZE) {
-                x = x * 128 + 64;
-                z = z * 128 + 64;
-                x2 = x2 * 128 + 64;
-                z2 = z2 * 128 + 64;
-
-                const proj: ClientProj = new ClientProj(spotanim, this.minusedlevel, x, this.getAvH(x, z, this.minusedlevel) - h1, z, t1 + Client.loopCycle, t2 + Client.loopCycle, angle, startpos, targetEntity, h2);
-                proj.setTarget(x2, this.getAvH(x2, z2, this.minusedlevel) - h2, z2, t1 + Client.loopCycle);
-                this.projectiles.push(proj);
-            }
-        } else if (opcode === ServerProt.MAP_ANIM) {
-            const spotanim: number = buf.g2();
-            const height: number = buf.g1();
-            const time: number = buf.g2();
-
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
-                x = x * 128 + 64;
-                z = z * 128 + 64;
-
-                const spot: MapSpotAnim = new MapSpotAnim(spotanim, this.minusedlevel, x, z, this.getAvH(x, z, this.minusedlevel) - height, Client.loopCycle, time);
-                this.spotanims.push(spot);
-            }
-        } else if (opcode === ServerProt.OBJ_REVEAL) {
-            const id: number = buf.g2();
-            const count: number = buf.g2();
-            const pid: number = buf.g2();
-
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE && pid !== this.selfSlot) {
-                if (!this.groundObj[this.minusedlevel][x][z]) {
-                    this.groundObj[this.minusedlevel][x][z] = new LinkList();
-                }
-
-                const obj: ClientObj = new ClientObj(id, count);
-                this.groundObj[this.minusedlevel][x][z]?.push(obj);
-                this.showObject(x, z);
-            }
-        } else if (opcode === ServerProt.P_LOCMERGE) {
-            const info: number = buf.g1();
-            const shape: number = info >> 2;
-            const rotate: number = info & 0x3;
-            const layer: number = LOC_SHAPE_TO_LAYER[shape];
-
-            const id: number = buf.g2();
-            const t1: number = buf.g2();
-            const t2: number = buf.g2();
-            const pid: number = buf.g2();
-            let east: number = buf.g1b();
-            let south: number = buf.g1b();
-            let west: number = buf.g1b();
-            let north: number = buf.g1b();
-
-            let player: ClientPlayer | null;
-            if (pid === this.selfSlot) {
-                player = this.localPlayer;
-            } else {
-                player = this.players[pid];
-            }
-
-            if (player && this.groundh) {
-                const loc: LocType = LocType.list(id);
-
-                const heightSW: number = this.groundh[this.minusedlevel][x][z];
-                const heightSE: number = this.groundh[this.minusedlevel][x + 1][z];
-                const heightNE: number = this.groundh[this.minusedlevel][x + 1][z + 1];
-                const heightNW: number = this.groundh[this.minusedlevel][x][z + 1];
-
-                const model = loc.getModel(shape, rotate, heightSW, heightSE, heightNE, heightNW, -1);
-                if (model) {
-                    this.locChangeCreate(this.minusedlevel, x, z, layer, -1, 0, 0, t1 + 1, t2 + 1);
-
-                    player.locStartCycle = t1 + Client.loopCycle;
-                    player.locStopCycle = t2 + Client.loopCycle;
-                    player.locModel = model;
-
-                    let width: number = loc.width;
-                    let height: number = loc.length;
-                    if (rotate === LocAngle.NORTH || rotate === LocAngle.SOUTH) {
-                        width = loc.length;
-                        height = loc.width;
-                    }
-
-                    player.locOffsetX = x * 128 + width * 64;
-                    player.locOffsetZ = z * 128 + height * 64;
-                    player.locOffsetY = this.getAvH(player.locOffsetX, player.locOffsetZ, this.minusedlevel);
-
-                    let tmp: number;
-                    if (east > west) {
-                        tmp = east;
-                        east = west;
-                        west = tmp;
-                    }
-
-                    if (south > north) {
-                        tmp = south;
-                        south = north;
-                        north = tmp;
-                    }
-
-                    player.minTileX = x + east;
-                    player.maxTileX = x + west;
-                    player.minTileZ = z + south;
-                    player.maxTileZ = z + north;
-                }
-            }
-        } else if (opcode === ServerProt.OBJ_COUNT) {
-            const type: number = buf.g2();
-            const ocount: number = buf.g2();
-            const count: number = buf.g2();
-
-            if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
-                const objs = this.groundObj[this.minusedlevel][x][z];
-                if (objs) {
-                    for (let obj = objs.head(); obj !== null; obj = objs.next()) {
-                        if (obj.id === (type & 0x7fff) && obj.count === ocount) {
-                            obj.count = count;
-                            break;
-                        }
-                    }
-
-                    this.showObject(x, z);
-                }
-            }
+        if (x >= 0 && z >= 0 && x < BuildArea.SIZE && z < BuildArea.SIZE) {
+            this.locChangeCreate(this.minusedlevel, x, z, layer, -1, shape, rotate, 0, -1);
         }
     }
 

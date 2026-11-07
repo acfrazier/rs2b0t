@@ -34,7 +34,7 @@ export default class ClientLocAnim extends ModelSource {
 
         this.anim = seq === -1 ? null : SeqType.list[seq];
         this.animFrame = 0;
-        this.animCycle = Client.loopCycle;
+        this.animCycle = Client.loopCycle - 1;
 
         if (randomFrame && this.anim && this.anim.loops !== -1) {
             this.animFrame = (Math.random() * this.anim.numFrames) | 0;
