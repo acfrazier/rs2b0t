@@ -347,3 +347,32 @@ describe('377 IfType type 8', () => {
         expect(() => IfType.init(interfaceJag(data.data.subarray(0, data.pos)), null, [])).toThrow('IfType: trailing config bytes');
     });
 });
+
+describe('377 loc/npc/obj list slot bounds', () => {
+    test('LocType.list rejects id >= numDefinitions after the cache (Java LocType.java:164)', () => {
+        const { dat, idx } = locPair([new Uint8Array([0])]);
+        LocType.init(fakeJag({ 'loc.dat': dat, 'loc.idx': idx }));
+        expect(LocType.numDefinitions).toBe(1);
+        expect(LocType.list(-1).id).toBe(-1);
+        expect(LocType.list(0).id).toBe(0);
+        expect(() => LocType.list(1)).toThrow('LocType: id 1 out of range (count 1)');
+    });
+
+    test('NpcType.list rejects id >= numDefinitions after the cache (Java NpcType.java:384)', () => {
+        const { dat, idx } = locPair([new Uint8Array([0])]);
+        NpcType.init(fakeJag({ 'npc.dat': dat, 'npc.idx': idx }));
+        expect(NpcType.numDefinitions).toBe(1);
+        expect(NpcType.list(-1).id).toBe(-1);
+        expect(NpcType.list(0).id).toBe(0);
+        expect(() => NpcType.list(1)).toThrow('NpcType: id 1 out of range (count 1)');
+    });
+
+    test('ObjType.list rejects id >= numDefinitions after the cache (Java ObjType.java:188)', () => {
+        const { dat, idx } = locPair([new Uint8Array([0])]);
+        ObjType.init(fakeJag({ 'obj.dat': dat, 'obj.idx': idx }), true);
+        expect(ObjType.numDefinitions).toBe(1);
+        expect(ObjType.list(-1).id).toBe(-1);
+        expect(ObjType.list(0).id).toBe(0);
+        expect(() => ObjType.list(1)).toThrow('ObjType: id 1 out of range (count 1)');
+    });
+});

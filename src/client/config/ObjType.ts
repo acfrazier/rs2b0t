@@ -109,6 +109,15 @@ export default class ObjType {
             }
         }
 
+        // Java ObjType.java:188: field855.pos = field824[arg0] throws AIOOBE.
+        // Cache first so list(-1) still hits unused slots (id defaults to -1).
+        if (id < 0 || id >= this.numDefinitions) {
+            if (ObjType.STRICT) {
+                throw new Error(`ObjType: id ${id} out of range (count ${this.numDefinitions})`);
+            }
+            throw new RangeError(`Index ${id} out of bounds for length ${this.numDefinitions}`);
+        }
+
         this.recentPos = (this.recentPos + 1) % 10;
 
         const obj: ObjType = this.recent[this.recentPos]!;

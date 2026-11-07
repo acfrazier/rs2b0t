@@ -95,6 +95,15 @@ export default class NpcType {
             }
         }
 
+        // Java NpcType.java:384: field1460.pos = field1453[arg0] throws AIOOBE.
+        // Cache first so list(-1) still hits unused slots (id defaults to -1).
+        if (id < 0 || id >= this.numDefinitions) {
+            if (NpcType.STRICT) {
+                throw new Error(`NpcType: id ${id} out of range (count ${this.numDefinitions})`);
+            }
+            throw new RangeError(`Index ${id} out of bounds for length ${this.numDefinitions}`);
+        }
+
         this.recentPos = (this.recentPos + 1) % 20;
 
         const npc: NpcType = (this.recent[this.recentPos] = new NpcType());

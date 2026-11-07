@@ -318,9 +318,12 @@ describe('multinpc resolve', () => {
         child.multivarbit = -1;
         child.multivar = -1;
         child.head = Uint16Array.of(4);
-        child.model = null;
+        child.model = Uint16Array.of(91);
         child.recol_s = null;
         child.recol_d = null;
+        // Why: identity sentinel so deleting the getTempModel hop fails this test.
+        const tempSentinel = { id: 91 } as unknown as InstanceType<typeof Model>;
+        child.getTempModel = () => tempSentinel;
         const base = Object.create(NpcType.prototype) as InstanceType<typeof NpcType>;
         base.id = 3;
         base.multinpc = [9, -1];
@@ -338,7 +341,7 @@ describe('multinpc resolve', () => {
         Model.load = (id: number) => ({ id }) as never;
         try {
             expect((base.getHead() as unknown as { id: number }).id).toBe(4);
-            expect(base.getTempModel(-1, -1, null)).toBeNull();
+            expect(base.getTempModel(-1, -1, null)).toBe(tempSentinel);
             ClientLocAnim.app.var[0] = 1;
             expect(base.getHead()).toBeNull();
             expect(base.getTempModel(-1, -1, null)).toBeNull();

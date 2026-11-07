@@ -105,6 +105,15 @@ export default class LocType {
             }
         }
 
+        // Java LocType.java:164: field1621.pos = field1612[arg0] throws AIOOBE.
+        // Cache first so list(-1) still hits unused slots (id defaults to -1).
+        if (id < 0 || id >= this.numDefinitions) {
+            if (LocType.STRICT) {
+                throw new Error(`LocType: id ${id} out of range (count ${this.numDefinitions})`);
+            }
+            throw new RangeError(`Index ${id} out of bounds for length ${this.numDefinitions}`);
+        }
+
         this.recentPos = (this.recentPos + 1) % 10;
 
         const loc: LocType = this.recent[this.recentPos]!;
