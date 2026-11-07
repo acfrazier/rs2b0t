@@ -10,6 +10,7 @@ import CollisionMap from '#/client/dash3d/CollisionMap.js';
 import Model from '#/client/dash3d/Model.js';
 import type ModelSource from '#/client/dash3d/ModelSource.js';
 import { ClientProt } from '#/client/io/ClientProt.js';
+import { writeInvButtonD, writeMessagePublic, writeResumePCountDialog } from '#/client/io/gameOutbound.js';
 import { ServerProt } from '#/client/io/ServerProt.js';
 import WordFilter from '#/client/wordfilter/WordFilter.js';
 import WordPack from '#/client/wordfilter/WordPack.js';
@@ -1678,8 +1679,7 @@ export const actions = {
         if (!raw || !raw.ingame || !raw.out || !raw.dialogInputOpen) {
             return false;
         }
-        raw.out.p1Enc(ClientProt.RESUME_P_COUNTDIALOG);
-        raw.out.p4(Math.max(0, Math.floor(value)));
+        writeResumePCountDialog(raw.out, ClientProt.RESUME_P_COUNTDIALOG, Math.max(0, Math.floor(value)));
         raw.dialogInputOpen = false;
         return true;
     },
@@ -1710,11 +1710,7 @@ export const actions = {
             com.swapSlots(from, to);
         }
 
-        raw.out.p1Enc(ClientProt.INV_BUTTOND);
-        raw.out.p2(comId);
-        raw.out.p2(from);
-        raw.out.p2(to);
-        raw.out.p1(mode);
+        writeInvButtonD(raw.out, ClientProt.INV_BUTTOND, to, mode, comId, from);
         return true;
     },
 
@@ -1725,13 +1721,7 @@ export const actions = {
             return false;
         }
 
-        raw.out.p1Enc(ClientProt.MESSAGE_PUBLIC);
-        raw.out.p1(0);
-        const start = raw.out.pos;
-        raw.out.p1(0);
-        raw.out.p1(0);
-        WordPack.pack(raw.out, message);
-        raw.out.psize1(raw.out.pos - start);
+        writeMessagePublic(raw.out, ClientProt.MESSAGE_PUBLIC, 0, 0, packed => WordPack.pack(packed, message));
 
         // Why: the server never sends a public line back to whoever said it, so the client echoes its own as it writes the packet. Without this the operator watches a shop that looks mute while everyone else reads it.
         const player = raw.localPlayer;
