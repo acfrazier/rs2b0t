@@ -117,7 +117,9 @@ interface Api {
 const client = deployIsolatedClient(`hs${Date.now().toString(36).slice(-6)}`);
 const browser = await launchBrowser({ swiftshader: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-const user = `hs${Date.now().toString(36).slice(-5)}`;
+// Why: USER_NAME lets a shared-engine run attribute its account (e.g. the fairy-ring live-cell frtap prefix);
+// the default keeps every unattributed run on its own fresh hs name.
+const user = process.env.USER_NAME || `hs${Date.now().toString(36).slice(-5)}`;
 
 try {
     await page.goto(`${base}${client.page}`);
