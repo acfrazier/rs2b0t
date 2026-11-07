@@ -856,7 +856,8 @@ test('entityOverlays dispatches every 377 chat effect to its Java renderer', () 
         const localPlayer = {
             isReady: (): boolean => true,
             height: 100,
-            headicons: 0,
+            headiconPk: -1,
+            headiconPrayer: -1,
             chatMessage: 'Hello',
             chatColour: 0,
             chatEffect: effect,

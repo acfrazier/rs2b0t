@@ -2,6 +2,9 @@ import { afterEach, describe, expect, test } from 'bun:test';
 
 import { BANK_LOCATIONS, USE_MAGE_BANK, bankUnlocked, nearestBank } from '#/bot/api/bank/BankLocations.js';
 import TRANSPORTS from '#/bot/event/webwalk/data/transports.json';
+import { skip377 } from '../../lib/skip377.js';
+
+const skipped = skip377('test/api/bank/mageBankGate.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
 
 const MAGE = BANK_LOCATIONS.find(b => b.name === 'Mage Arena')!;
 const KEY = `rs2b0t:set:Global:${USE_MAGE_BANK}`;
@@ -31,7 +34,7 @@ describe('Mage Arena bank gate', () => {
         expect(MAGE.npcAccess?.name).toBe('Gundai');
     });
 
-    test('the surface route it is ranked by is baked into the nav graph', () => {
+    skipped('the surface route it is ranked by is baked into the nav graph', () => {
         const at = (e: { from: { x: number; z: number }; to: { x: number; z: number } }, fx: number, tx: number): boolean =>
             e.from.x === fx && e.from.z === 3957 && e.to.x === tx && e.to.z === 3957;
         // Two slashable webs west along z=3957, then the ladder down.

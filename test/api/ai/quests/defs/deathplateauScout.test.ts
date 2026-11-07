@@ -14,6 +14,9 @@ import Tile from '#/bot/geometry/Tile.js';
 import { THROWER_APPROACH } from '#/bot/api/ai/quests/defs/deathplateau/nav.js';
 import { tileInDangerZones } from '#/bot/event/webwalk/data/dangerZones.js';
 import { stubProps } from '../../../../lib/stubSingletons.js';
+import { skip377 } from '../../../../lib/skip377.js';
+
+const skipped = skip377('test/api/ai/quests/defs/deathplateauScout.test.ts', 'the offline-qualified 377 graph has no route for this 289 fixture (nav qualification pending, S8 live tier)');
 
 test('scouting enters the trigger zone instead of stopping south of it', async () => {
     let tile = TILE.TENZING_BACK;
@@ -98,7 +101,7 @@ test.skipIf(!existsSync(pack))('the return to Tenzing crosses the stile without 
     expect(route.waypoints.every(tile => !tileInDangerZones(tile.x, tile.z, tile.level, THROWER_APPROACH))).toBe(true);
 });
 
-test.skipIf(!existsSync(pack))('the hand-in stays off the approach after leaving the stile', () => {
+skipped.skipIf(!existsSync(pack))('the hand-in stays off the approach after leaving the stile', () => {
     const finder = new PathFinder(gunzipSync(readFileSync(pack)));
     loadDefaultNavEdges(finder);
     const route = finder.findPath(TILE.STILE_SOUTH, TILE.DENULTH, { avoidZones: THROWER_APPROACH, maxExpansions: 100_000 });

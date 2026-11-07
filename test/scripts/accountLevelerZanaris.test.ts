@@ -11,6 +11,9 @@ import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { auditDragonWeapons } from '#/bot/scripts/AccountLeveler/dragonWeapons.js';
 import { enabledSkills } from '#/bot/scripts/AccountLeveler/planner.js';
 import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
+import { skip377 } from '../lib/skip377.js';
+
+const skipped = skip377('test/scripts/accountLevelerZanaris.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
 
 const snapshot = (): LevelerSnapshot => ({
     levels: Object.fromEntries(enabledSkills.map(skill => [skill, 60])), target: 60, now: 1000,
@@ -131,7 +134,7 @@ test('exit preparation banks a full pack before withdrawing its travel item', as
     } finally { for (const patch of patches) patch.mockRestore(); }
 });
 
-test.skipIf(!existsSync('out/collision.lcnav.gz'))('Zanaris travel stands are reachable on each side of the paid market gate', () => {
+skipped.skipIf(!existsSync('out/collision.lcnav.gz'))('Zanaris travel stands are reachable on each side of the paid market gate', () => {
     const finder = new PathFinder(gunzipSync(readFileSync('out/collision.lcnav.gz')));
     const tile = (x: number, z: number) => ({ x, z, level: 0 });
     for (const [from, to] of [

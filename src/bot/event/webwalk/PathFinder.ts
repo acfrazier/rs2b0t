@@ -115,6 +115,8 @@ export interface TransportEdgeData {
     blacklistReason?: string;
     /** Optional plan-time gates (curated travel / state-aware activations). */
     requires?: TransportRequires;
+    /** Extra game ticks a priced 377 stair or telejump handler spends, from tools/nav/stair-prices.json. */
+    extraTicks?: number;
 }
 
 export type NavRequest =

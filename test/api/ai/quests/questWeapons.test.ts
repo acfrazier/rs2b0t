@@ -54,6 +54,11 @@ describe('dragon melee is gated on a quest as well as the level', () => {
         const heroes = wieldable(60, q => q === "Hero's Quest").filter(w => w.tier === 'Dragon').map(w => w.name);
         expect(heroes).toEqual(['Dragon battleaxe', 'Dragon mace']);
     });
+
+    test('Monkey Madness unlocks the dragon scimitar (tier60.rs2:14)', () => {
+        const monkey = wieldable(60, q => q === 'Monkey Madness').filter(w => w.tier === 'Dragon').map(w => w.name);
+        expect(monkey).toEqual(['Dragon scimitar']);
+    });
 });
 
 describe('picking from what the account actually has', () => {

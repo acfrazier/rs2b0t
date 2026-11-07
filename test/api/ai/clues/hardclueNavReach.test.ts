@@ -11,6 +11,9 @@ import { PathFinder, type NavPoint } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { richTransportQuestMap } from '#/bot/event/webwalk/transportQuestReqs.js';
 import { emptyWorldStateData, type WorldStateData } from '#/bot/event/webwalk/worldStateData.js';
+import { skip377 } from '../../../lib/skip377.js';
+
+const skipped = skip377('test/api/ai/clues/hardclueNavReach.test.ts', 'no 377 hard clue destination sits behind a quest (the 289 gnome and Karamja rows are not in the 377 cluedb)');
 
 // Why: audit-clues.ts plans with no world state, which fails open on every gated edge; this asks what is still shut with the quests done and the gate kit in the pack.
 
@@ -98,7 +101,8 @@ function unreachable(finder: PathFinder, state: WorldStateData): number[] {
 
 describe('hard clue destinations, quests complete and the gate kit carried', () => {
     test('every hard clue has a coord or a talk anchor', () => {
-        expect(HARD.length).toBe(64);
+        // 377 sells 31 hard clues: 13 sextant dig rows, 17 riddle rows and one map row (the 289 cluedb had 64).
+        expect(HARD.length).toBe(31);
         expect(HARD.filter(id => destination(id) === null)).toEqual([]);
     });
 
@@ -114,7 +118,7 @@ describe('hard clue destinations, quests complete and the gate kit carried', () 
         ).toEqual([]);
     }, 120_000);
 
-    test('the quests are what open the gnome and Karamja destinations', () => {
+    skipped('the quests are what open the gnome and Karamja destinations', () => {
         const finder = loadFinder();
         if (!finder) {
             return;

@@ -65,10 +65,10 @@ function rsaPublicFromDer(der: Uint8Array): EngineLoginKey {
 }
 
 function pemBody(pem: Buffer): Uint8Array {
-    const text = pem.toString('utf8');
-    const match = /-----BEGIN (?:RSA )?PRIVATE KEY-----([\s\S]*?)-----END (?:RSA )?PRIVATE KEY-----/.exec(text);
-    if (!match) throw new Error('not a PEM private key');
-    return Buffer.from(match[1].replace(/\s+/g, ''), 'base64');
+    const lines = pem.toString('utf8').split(/\r?\n/);
+    const body = lines.filter(line => line.trim() !== '' && !line.startsWith('-----')).join('');
+    if (body === '' || lines.length === 0 || !lines[0].startsWith('-----')) throw new Error('not a PEM private key');
+    return Buffer.from(body, 'base64');
 }
 
 /** Public half of `ENGINE_DIR/data/config/private.pem`, same values `deploy-local-key.sh` bakes. */

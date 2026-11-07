@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import * as Jungle from '#/bot/api/ai/quests/defs/legends/jungle.js';
 import { LQ_TILE } from '#/bot/api/ai/quests/defs/legends/areas.js';
 import { inKharazi } from '#/bot/api/ai/clues/kharaziTravel.js';
@@ -28,6 +28,12 @@ import { Reach } from '#/bot/api/walking/Reach.js';
 import * as primitives from '#/bot/api/ai/quests/exec/primitives.js';
 import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import type { WorldStateData } from '#/bot/event/webwalk/worldStateData.js';
+import { installLegacyClueRows } from '../../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 let here: Tile;
 let walks: { tile: Tile; opts: WalkResilientOptions }[];

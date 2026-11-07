@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { reader, type InvItemSnapshot } from '#/bot/adapter/ClientAdapter.js';
 import { Bank } from '#/bot/api/bank/Bank.js';
 import { ClueExecutor } from '#/bot/api/ai/clues/ClueExecutor.js';
@@ -12,6 +12,12 @@ import { Traversal } from '#/bot/api/walking/Traversal.js';
 import Tile from '#/bot/geometry/Tile.js';
 import { SettingsBag } from '#/bot/runtime/Settings.js';
 import ArdyFighter from '#/bot/scripts/ArdyFighter/ArdyFighter.js';
+import { installLegacyClueRows } from '../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 const item = (id: number, name: string): InvItemSnapshot => ({ id, name, count: 1, slot: 0, comId: 3214, ops: ['Wield'] });
 const weapon = item(1333, 'Rune scimitar');

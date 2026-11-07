@@ -55,7 +55,7 @@ export function dragonPrayer(s: LevelerSnapshot, memory: SessionMemory, random: 
         needs: [...gear, { item: 'Dragonfire shield', count: 1, carry: 1, equip: true }, { item: 'Lobster', count: 40, carry: 20 }, { item: 'Coins', count: 200, carry: 200 }],
         settings: { combatStyle: 'melee', meleeStyle: 'strength', weapon, loadout: '', food: 'Lobster', foodWithdraw: 20,
             usePotions: false, useSpecial: false, buryBones: true, solveClues: false, bankCommonJunk: false,
-            loot: ['Dragon bones', 'Dragonhide'],
+            loot: ['Dragon bones', green ? 'Green dragonhide' : 'Blue dragonhide'],
             ...(green ? { escape: 'Flee to bank' } : { site: 'taverley-blue', leaveVia: 'walk' }) }
     };
 }

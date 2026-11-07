@@ -80,7 +80,7 @@ export const SETTINGS: SettingsSchema = {
     solveClues: { type: 'boolean', default: true, label: 'Solve clue drops', group: 'Clues', help: 'green dragons drop hard clues — the trail runs out of the wilderness and back' },
 
     escape: { type: 'string', default: 'Flee to bank', options: ['Flee to bank', 'Teleport to Varrock'], label: 'Escape mode', group: 'Wilderness', help: 'Teleport brings Varrock runes and runs south to level 20 to cast (teleports are blocked above level 20 wilderness)' },
-    loot: { type: 'string[]', default: DEFAULT_LOOT, options: DROPS, label: 'Loot to pick up (drop table)', group: 'Banking & loot', help: 'Dragon bones + Dragonhide + the rest of the green dragon table; everything picked up is banked.' },
+    loot: { type: 'string[]', default: DEFAULT_LOOT, options: DROPS, label: 'Loot to pick up (drop table)', group: 'Banking & loot', help: 'Dragon bones + Green dragonhide + the rest of the green dragon table; everything picked up is banked.' },
     buryBones: { type: 'boolean', default: false, label: 'Bury dragon bones', group: 'Banking & loot', help: `bury ${BONE_NAME} for Prayer xp instead of banking them (always looted when on) — they are the most valuable drop, so this trades gold for xp` },
     bankCommonJunk: { type: 'boolean', default: true, label: 'Also grab shared gems/junk', group: 'Banking & loot' },
     anchorTile: { type: 'tile', default: DEFAULT_ANCHOR, label: 'Dragon field tile', group: 'Location' },
@@ -108,8 +108,8 @@ let PANIC_HP = 0.3;
 let RUNES_WITHDRAW = 150;
 let FOOD_WITHDRAW = 20;
 let LOOT_SET = new Set<string>();
-/** DROP_DB names it plainly 'Dragonhide'. The headline drop for the rate line. */
-const HIDE_NAME = 'Dragonhide';
+/** The headline drop for the rate line; the 377 drop table names each hide by colour. */
+const HIDE_NAME = 'Green dragonhide';
 let BANK_COMMON = true;
 let TELE_ESCAPE = false;
 let ANCHOR = DEFAULT_ANCHOR;

@@ -4,6 +4,7 @@ import { Npc } from '#/bot/api/npcs/Npcs.js';
 import { Traversal } from '#/bot/api/walking/Traversal.js';
 import { Reachability } from '#/bot/event/webwalk/geometry/Reachability.js';
 import * as supply from '#/bot/scripts/JiveDragons/supply.js';
+import { skip377 } from '../../lib/skip377.js';
 import { restoreScenario, scenario } from './scheduler.fixture.js';
 
 afterEach(restoreScenario);
@@ -90,15 +91,20 @@ test('a scene rebuild cannot release an abandoned living target for pickup', asy
     expect(state.takes).toBe(0);
 });
 
-for (const [site, style] of [['taverley-blue', 'range'], ['heroes-blue', 'mage'], ['brimhaven-iron', 'melee']]) {
-    test(`${site} ${style} also defers loot for its owned target`, async () => {
-        const { state, task, engage } = await scenario(site, style);
-        expect(await task('LootCorpse').validate()).toBe(true);
-        await engage();
-        await task('LootCorpse').execute();
-        expect(state.takes).toBe(0);
-    });
+const defersLoot = async (site: string, style: string): Promise<void> => {
+    const { state, task, engage } = await scenario(site, style);
+    expect(await task('LootCorpse').validate()).toBe(true);
+    await engage();
+    await task('LootCorpse').execute();
+    expect(state.takes).toBe(0);
+};
+
+for (const [site, style] of [['taverley-blue', 'range'], ['heroes-blue', 'mage']]) {
+    test(`${site} ${style} also defers loot for its owned target`, () => defersLoot(site, style));
 }
+
+const skipped = skip377('test/scripts/JiveDragons/lifecycle.test.ts', 'the 377 drop_tables carry no iron_dragon.rs2, so Brimhaven iron dragons have no loot to validate (S9 KNOWN GAP)');
+skipped('brimhaven-iron melee also defers loot for its owned target', () => defersLoot('brimhaven-iron', 'melee'));
 
 test('a chase stall abandons credit without releasing the living target for loot', async () => {
     const { bot, fight, state, engage } = await scenario('brimhaven-iron', 'melee');

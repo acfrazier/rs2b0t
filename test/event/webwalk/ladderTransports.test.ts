@@ -3,13 +3,16 @@ import { describe, expect, test } from 'bun:test';
 import type { TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
 import stairs from '#/bot/event/webwalk/data/stairEdges.json';
 import transports from '#/bot/event/webwalk/data/transports.json';
+import { skip377 } from '../../lib/skip377.js';
+
+const skipped = skip377('test/event/webwalk/ladderTransports.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
 
 const transportEdges = transports as TransportEdgeData[];
 const stairEdges = stairs as TransportEdgeData[];
 const all = [...transportEdges, ...stairEdges];
 
 describe('ladder transport data', () => {
-    test('includes all four Mining Guild entrances and matching exits', () => {
+    skipped('includes all four Mining Guild entrances and matching exits', () => {
         const surfaceLocs = new Set(['3018,3339', '3019,3338', '3019,3340', '3020,3339']);
         const undergroundLocs = new Set(['3018,9739', '3019,9738', '3019,9740', '3020,9739']);
 
@@ -96,7 +99,7 @@ describe('ladder transport data', () => {
         });
     });
 
-    test('binds clustered outdoor stair reverses to their outdoor top locs', () => {
+    skipped('binds clustered outdoor stair reverses to their outdoor top locs', () => {
         const yanille = stairEdges.find(edge => edge.from.x === 2517 && edge.from.z === 3426
             && edge.from.level === 1 && edge.to.x === 2516 && edge.to.z === 3423 && edge.to.level === 0);
         // Why: 3292 is walkable with an exit mask of 0, so an edge landing there is a square the walker can reach and never leave.

@@ -15,7 +15,8 @@ const SHANTAY_EXIT = {
     locX: 3302,
     locZ: 3116,
     debugName: 'shantay_pass_henge_doorway',
-    options: ['Go-through', 'Look-at']
+    options: ['Go-through', 'Look-at'],
+    extraTicks: 0
 } as const satisfies TransportEdgeData;
 
 const DX = [0, 1, 0, -1, 1, 1, -1, -1] as const;

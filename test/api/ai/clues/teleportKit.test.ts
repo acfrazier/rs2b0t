@@ -72,17 +72,21 @@ describe('teleportKitFor — members and quest gates', () => {
             })
         );
         expect(kit.usable).toEqual(
-            expect.arrayContaining(['varrock', 'lumbridge', 'falador', 'camelot', 'ardougne', 'watchtower', 'trollheim'])
+            expect.arrayContaining(['varrock', 'lumbridge', 'falador', 'camelot', 'ardougne', 'watchtower'])
         );
+        // 377 has no Trollheim spell: the catalog's spell set ends at the Watchtower teleport.
+        expect(kit.usable).not.toContain('trollheim');
         expect(runeNames(kit)).toEqual(['Air rune', 'Earth rune', 'Fire rune', 'Law rune', 'Water rune']);
     });
 });
 
 describe('teleportKitFor — jewellery', () => {
-    test('glory and the dueling ring need no magic, so a level-1 account still keeps them', () => {
-        const kit = teleportKitFor(state({ skills: { magic: 1 } }));
-        expect(kit.jewelleryPrefixes).toContain('amulet of glory(');
-        expect(kit.jewelleryPrefixes).toContain('ring of dueling');
+    test('glory needs no magic, and the dueling ring needs only a members world (377 catalog), so a level-1 members account keeps both', () => {
+        expect(teleportKitFor(state({ skills: { magic: 1 } })).jewelleryPrefixes).toContain('amulet of glory(');
+        expect(teleportKitFor(state({ skills: { magic: 1 } })).jewelleryPrefixes).not.toContain('ring of dueling');
+        const members = teleportKitFor(state({ members: true, skills: { magic: 1 } }));
+        expect(members.jewelleryPrefixes).toContain('amulet of glory(');
+        expect(members.jewelleryPrefixes).toContain('ring of dueling');
     });
 
     test('the games necklace drops out on a free world', () => {

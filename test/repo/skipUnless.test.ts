@@ -105,12 +105,12 @@ describe('skipUnless detects the local inputs', () => {
         const dir = mkdtempSync(join(tmpdir(), 'skip-engine-'));
         try {
             mkdirSync(join(dir, 'src/util'), { recursive: true });
-            // A revision the committed 289 client is not on.
-            writeFileSync(join(dir, 'src/util/WorldConfig.ts'), 'revision: 377\n');
+            // A revision the committed 377 client is not on.
+            writeFileSync(join(dir, 'src/util/WorldConfig.ts'), 'revision: 289\n');
             process.env.ENGINE_DIR = dir;
             resetSkipInputs();
             const why = missingInput('engine');
-            expect(why).toContain('engine is revision 377');
+            expect(why).toContain('engine is revision 289');
             const run = quietly(() => skipUnless('engine'));
             expect(run.value).toBe(true);
             expect(run.lines[0]).toContain('SKIP: test/repo/skipUnless.test.ts: ENGINE_DIR absent or on another revision');

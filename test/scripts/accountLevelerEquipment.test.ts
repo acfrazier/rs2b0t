@@ -52,7 +52,8 @@ test('melee kit keeps existing usable gear when no purchase is affordable', () =
 
 test('ranged upgrades only choose usable strung bow ids', () => {
     expect(rangedBow(snapshot({ ranged: 40 }, { coins: 0, '#857': 1 }))).toEqual({ item: 'Yew shortbow', id: 857, count: 1, carry: 1, equip: true });
-    expect(rangedBow(snapshot({ ranged: 30 }, { coins: 500000, '#857': 1, '#64': 10, 'yew shortbow': 11 })).id).toBe(843);
+    // 377 shopdb sells the Maple shortbow, so level 30 buys it; '#64' is the unstrung maple shortbow (obj.pack:65) and must not count as the strung 853.
+    expect(rangedBow(snapshot({ ranged: 30 }, { coins: 500000, '#857': 1, '#64': 10, 'yew shortbow': 11 })).id).toBe(853);
     expect(rangedBow(snapshot({ ranged: 1 } )).id).toBe(841);
 });
 

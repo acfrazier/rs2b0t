@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { reader, type InvItemSnapshot, type NpcSnapshot } from '#/bot/adapter/ClientAdapter.js';
 import { fightGuardian, GuardianEncounter } from '#/bot/api/ai/clues/Guardian.js';
 import { GuardianProtection } from '#/bot/api/ai/clues/guardianKit.js';
@@ -20,6 +20,12 @@ import { ChatDialog } from '#/bot/api/ui/dialogue/ChatDialog.js';
 import Tile from '#/bot/geometry/Tile.js';
 import { Reachability } from '#/bot/event/webwalk/geometry/Reachability.js';
 import { Traversal } from '#/bot/api/walking/Traversal.js';
+import { installLegacyClueRows } from '../../../lib/legacyClueRows.js';
+
+// 377 sells none of the clue rows this file's scenarios use; see test/lib/legacyClueRows.ts.
+let restoreClueRows: () => void;
+beforeAll(() => { restoreClueRows = installLegacyClueRows(); });
+afterAll(() => restoreClueRows());
 
 let tick: number;
 let pack: InvItemSnapshot[];

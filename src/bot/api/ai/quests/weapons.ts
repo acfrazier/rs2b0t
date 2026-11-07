@@ -33,8 +33,9 @@ const TIERS: readonly { tier: string; attack: number }[] = [
 /** Melee types within a tier, best first. */
 const TYPES: readonly string[] = ['scimitar', 'longsword', 'battleaxe', 'sword', 'mace', 'dagger', 'warhammer'];
 
-// Why: `tier60.rs2` gates dragon melee on a quest as well as Attack 60, so a level check alone withdraws a weapon that can't be wielded.
+// Why: `tier60.rs2` gates dragon melee on a quest as well as Attack 60 (the scimitar on Monkey Madness at :14), so a level check alone withdraws a weapon that can't be wielded.
 const QUEST_GATE: Readonly<Record<string, string>> = {
+    'Dragon scimitar': 'Monkey Madness',
     'Dragon longsword': 'Lost City',
     'Dragon dagger': 'Lost City',
     'Dragon battleaxe': "Hero's Quest",
