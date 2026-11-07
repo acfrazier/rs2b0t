@@ -140,9 +140,20 @@ describe('non-vacuous replay scene checkpoints', () => {
         expect(() => readReplayCheckpoint(client, adapter)).toThrow('no populated world or collision');
     });
 
+    test('a tile that is blocked while still UNLOADED is not a built tile until land clears the bit', () => {
+        const client = scene();
+        populateWorld(client.world);
+        client.collision[0]!.blockGround(52, 52);
+        expect(client.collision[0]!.flags[CollisionMap.index(52, 52)] & CollisionFlag.UNLOADED).toBe(CollisionFlag.UNLOADED);
+        expect(() => readReplayCheckpoint(client, adapter)).toThrow('no populated world or collision');
+        client.collision[0]!.flags[CollisionMap.index(52, 52)] &= ~CollisionFlag.UNLOADED;
+        expect(readReplayCheckpoint(client, adapter).sceneBuild).toEqual({ locCount: 1, collisionZoneTiles: 1 });
+    });
+
     test('sceneInstanced comes from the client, never from a reader fallback', () => {
         const client = scene();
         populateWorld(client.world);
+        client.collision[0]!.flags[CollisionMap.index(52, 52)] = CollisionFlag._OPEN;
         client.collision[0]!.blockGround(52, 52);
         expect(readReplayCheckpoint(client, adapter).state.sceneInstanced).toBe(true);
         client.sceneInstanced = false;

@@ -61,7 +61,7 @@ const MINIMAP_ROTATE = [
 ];
 
 // prettier-ignore
-const TEXTURE_AVERAGE = Uint16Array.of(
+export const TEXTURE_AVERAGE = Uint16Array.of(
     41,
     39248,
     41,
@@ -74,7 +74,9 @@ const TEXTURE_AVERAGE = Uint16Array.of(
     28992,
     41, 41, 41, 41, 41,
     5056,
-    41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41, 41,
+    41, 41, 41,
+    7079,
+    41, 41, 41, 41, 41, 41, 41, 41, 41, 41,
     3131,
     41, 41, 41
 );
@@ -188,7 +190,9 @@ export default class World {
 
         for (let stx: number = 0; stx < this.maxTileX; stx++) {
             for (let stz: number = 0; stz < this.maxTileZ; stz++) {
-                this.squares[level][stx][stz] = new Square(level, stx, stz);
+                if (!this.squares[level][stx][stz]) {
+                    this.squares[level][stx][stz] = new Square(level, stx, stz);
+                }
             }
         }
     }
