@@ -222,7 +222,7 @@
     },
     {
       "path": "data/377/test/api/market/catalog.test.ts",
-      "sha256": "9fef63f57dab7f692149fc2981d8d7bcde5d52a7e72dded2d44548ccf862f5b9",
+      "sha256": "5ebbf7cc4c3cf7e53294c591d4c2356c75b154eb1bba3399306b39f4dc85fbc9",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -240,7 +240,7 @@
     },
     {
       "path": "data/377/test/data/placementBoxes.test.ts",
-      "sha256": "b1d32ab77553e118739336c09244f805bfe78155378dd8eeae06820b70268a5e",
+      "sha256": "ead7ae6fd3b72240f680a08ee8a075ca8b55736a8a25c4a0890135c56d01f42e",
       "kind": "edition",
       "qualification": "offline"
     },

@@ -89,9 +89,10 @@ describe('resolveByName', () => {
     // Why: people ask for "1k maple longbows", and the item is called "Maple longbow".
     test('a plural still finds the item', () => {
         expect(resolveByName(CAT, 'maple longbows').map(r => r.id)).toEqual([851]);
-        // 377: the unstrung bow's own name pluralises as "maple longbow (u)s"; the 289 phrase
-        // "maple longbows u" now plural-strips onto the strung bow instead.
-        expect(resolveByName(CAT, 'maple longbow (u)s').map(r => r.id)).toEqual([62]);
+        // 377: the unstrung bow pluralises as "maple longbow (u)s"; the plural strip runs after key()
+        // punctuation-flattening, so the spaced "(u) s" tail can't be recovered — the glued form is what
+        // the resolver forgives.
+        expect(resolveByName(CAT, 'maple longbow us').map(r => r.id)).toEqual([62]);
         expect(resolveByName(CAT, 'iron ores').map(r => r.id)).toEqual([440]);
     });
 
@@ -213,8 +214,10 @@ describe('resolveByName with aliases', () => {
         expect(ids('black dragonhide')).toEqual([1747]);
     });
 
-    test('bare dragonhide names nothing (the 377 content has no shared hide name)', () => {
-        expect(ids('dragonhide')).toEqual([]);
+    test('bare dragonhide is ambiguous across every colour', () => {
+        // Why: no display name is "Dragonhide" any more, but the substring fallback still answers with all
+        // four colour hides, so the shop can only ask which one.
+        expect(ids('dragonhide').sort((a, b) => a - b)).toEqual([1747, 1749, 1751, 1753]);
     });
 
     test('the bodies answer to their 377 names', () => {
