@@ -247,11 +247,9 @@ export function runClueAudit(opts: ClueAuditOptions = {}, log: (m: string) => vo
     for (const [idStr, clue] of Object.entries(CLUE_DB)) {
         const id = Number(idStr);
         const expected = KNOWN_UNREACHABLE.has(id);
-        // Allowlisted rows cover two kinds of known gap: a crossing the baked nav pack cannot route (the
-        // original mechanism) and a search clue whose content coord is stale against the pack (S9 377:
-        // the content fix is pending, the solver still abandons cleanly). The row's text says which.
-        const searchCoordProblem = /^search: (no searchable loc within 1|searchable .* off the clue coord)/.test(problem);
         const fail = (problem: string, unreachable = false): void => {
+            // Allowlisted rows cover nav gaps and stale search coords (S9 377); the row's text says which.
+            const searchCoordProblem = /^search: (no searchable loc within 1|searchable .* off the clue coord)/.test(problem);
             if (expected && (unreachable || searchCoordProblem)) {
                 expectedAbandon.add(id);
                 log(`EXPECTED-ABANDON ${clue.obj} [${id}] ${clue.type}: ${problem}`);

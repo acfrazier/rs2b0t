@@ -52,24 +52,33 @@ function engineRevision(dir: string): number | null {
 }
 
 const engine377 = ENGINE.length > 0 && existsSync(ENGINE) && engineRevision(ENGINE) === 377;
-const content377 = CONTENT.length > 0
-    && existsSync(join(CONTENT, 'pack', 'npc.pack'))
-    && existsSync(join(CONTENT, 'scripts', '_unpack', '377'));
+const content377 = CONTENT.length > 0 && existsSync(join(CONTENT, 'pack', 'npc.pack')) && existsSync(join(CONTENT, 'scripts', '_unpack', '377'));
 
 if (!engine377 || !content377) {
-    const why = !engine377
-        ? `ENGINE_DIR absent or on another revision (needs the 377 engine, got ${ENGINE || 'unset'})`
-        : 'CONTENT_DIR absent (needs the 377 content: pack/npc.pack and scripts/_unpack/377)';
+    const why = !engine377 ? `ENGINE_DIR absent or on another revision (needs the 377 engine, got ${ENGINE || 'unset'})` : 'CONTENT_DIR absent (needs the 377 content: pack/npc.pack and scripts/_unpack/377)';
     console.log(`SKIP: test/data/placementBoxes.test.ts: ${why}`);
 }
 
 const cheb = (ax: number, az: number, bx: number, bz: number): number => Math.max(Math.abs(ax - bx), Math.abs(az - bz));
 
 /** One 377 loc placement. */
-interface LocAt { id: number; x: number; z: number; level: number }
+interface LocAt {
+    id: number;
+    x: number;
+    z: number;
+    level: number;
+}
 
 /** One 377 npc placement with its wander fields. */
-interface NpcAt { id: number; x: number; z: number; level: number; maxrange: number; wanderrange: number; display: string }
+interface NpcAt {
+    id: number;
+    x: number;
+    z: number;
+    level: number;
+    maxrange: number;
+    wanderrange: number;
+    display: string;
+}
 
 let cache: { locs: LocAt[]; locNamesById: Map<number, string>; npcs: NpcAt[]; displayById: Map<number, string> } | null = null;
 
@@ -144,7 +153,7 @@ function load377World(): { locs: LocAt[]; locNamesById: Map<number, string>; npc
                 level: Number(spawn[1]),
                 maxrange,
                 wanderrange,
-                display: debugname ? displayById.get(id) ?? debugname : `#${id}`
+                display: debugname ? (displayById.get(id) ?? debugname) : `#${id}`
             });
         }
     }
@@ -158,10 +167,16 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
         const placedByOre = new Map<string, LocAt[]>();
         for (const [ore, ids] of Object.entries(ROCK_TYPES)) {
             const idSet = new Set(ids);
-            placedByOre.set(ore.toLowerCase(), locs.filter(l => idSet.has(l.id)));
+            placedByOre.set(
+                ore.toLowerCase(),
+                locs.filter(l => idSet.has(l.id))
+            );
         }
         // The Shilo gem rocks are the gemrock loc, not a ROCK_TYPES ore.
-        placedByOre.set('gem rocks', locs.filter(l => l.id === 2111));
+        placedByOre.set(
+            'gem rocks',
+            locs.filter(l => l.id === 2111)
+        );
         for (const camp of MINING_LOCATIONS) {
             const radius = DEFAULT_CAMP_RADIUS;
             const inside = (tile: { x: number; z: number }): boolean => cheb(camp.spot.x, camp.spot.z, tile.x, tile.z) <= radius;
@@ -217,8 +232,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
                     return cheb(other.spot.x, other.spot.z, spot.x, spot.z) < cheb(camp.spot.x, camp.spot.z, spot.x, spot.z);
                 });
                 if (contested) continue;
-                expect(cheb(camp.spot.x, camp.spot.z, spot.x, spot.z) <= radius,
-                    `${camp.name}: Fishing spot at ${spot.x},${spot.z} sits outside the ${radius}-tile box at ${camp.spot.x},${camp.spot.z}`).toBe(true);
+                expect(cheb(camp.spot.x, camp.spot.z, spot.x, spot.z) <= radius, `${camp.name}: Fishing spot at ${spot.x},${spot.z} sits outside the ${radius}-tile box at ${camp.spot.x},${camp.spot.z}`).toBe(true);
             }
             expect(near.length > 0, `${camp.name}: no Fishing spot placement anywhere near the camp`).toBe(true);
         }
@@ -232,8 +246,7 @@ describe.skipIf(!engine377 || !content377)('377 placement-derived camp boxes (co
             const near = cows.filter(n => cheb(field.anchor.x, field.anchor.z, n.x, n.z) <= leash);
             expect(near.length >= 3, `${field.name}: only ${near.length} Cow spawns inside the ${leash}-tile leash`).toBe(true);
             for (const cow of near) {
-                expect(isCowFieldLootTile(field.anchor, leash, { x: cow.x, z: cow.z, level: cow.level }),
-                    `${field.name}: spawn ${cow.x},${cow.z} fails the loot leash`).toBe(true);
+                expect(isCowFieldLootTile(field.anchor, leash, { x: cow.x, z: cow.z, level: cow.level }), `${field.name}: spawn ${cow.x},${cow.z} fails the loot leash`).toBe(true);
             }
         }
     });

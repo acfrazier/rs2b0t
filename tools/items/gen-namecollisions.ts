@@ -8,7 +8,6 @@ import { parseObjPack } from './parse.js';
 const CONTENT = process.env.CONTENT_DIR ?? join(homedir(), 'code', 'rs2b2t-content');
 const OUT = resolveOut('src/bot/data/nameCollisions.ts');
 
-
 interface Named {
     obj: string;
     name: string;
@@ -50,21 +49,15 @@ function usable(word: string): boolean {
     return word.length > 1 && !/\d/.test(word);
 }
 
-/** Words that say what the group already says, so they can narrow nothing. */
-// Why: the 377 content repeats whole display names inside debugnames ("unstrung_onyx_amulet" under the
-// group "Onyx amulet"), and those echo tokens poison resolveAliased: any customer query containing them
-// ("strung sapphire amulet", "loop half of a key") loses the words to the alias set and then filters to
-// empty, because no single member's word list contains them all. Gated behind --name-echo-filter so the
-// committed 289 table keeps regenerating byte-identical.
+// Words a group already says can narrow nothing; --name-echo-filter drops them (377 debugnames echo whole
+// display names, which poisons resolveAliased) while default off keeps the 289 table byte-identical.
 const STOPWORDS = new Set(['of', 'a', 'the', 'and']);
 
 /** Debugname tokens minus inter-member shares; with the echo filter, minus the name's own tokens too. */
 function distinguish(objs: readonly string[], nameTokens: readonly string[], echoFilter: boolean): string[][] {
     const tokens = objs.map(o => o.split('_').filter(Boolean));
     const shared = tokens[0]!.filter(t => tokens.every(other => other.includes(t)));
-    return tokens.map(t =>
-        t.filter(x => !shared.includes(x) && !(echoFilter && (nameTokens.includes(x) || STOPWORDS.has(x))))
-    );
+    return tokens.map(t => t.filter(x => !shared.includes(x) && !(echoFilter && (nameTokens.includes(x) || STOPWORDS.has(x)))));
 }
 
 function generate(echoFilter: boolean): string {
@@ -95,7 +88,11 @@ function generate(echoFilter: boolean): string {
         .map(([key, members]) => {
             const sorted = [...members].sort((a, b) => a.id - b.id);
             const nameTokens = key.split(/[^a-z0-9]+/).filter(Boolean);
-            const parts = distinguish(sorted.map(m => m.obj), nameTokens, echoFilter);
+            const parts = distinguish(
+                sorted.map(m => m.obj),
+                nameTokens,
+                echoFilter
+            );
             return {
                 name: display.get(key)!,
                 objs: sorted.map((m, i) => ({ ...m, words: parts[i]!.filter(usable) }))
@@ -103,16 +100,16 @@ function generate(echoFilter: boolean): string {
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 
-    // Why: with the echo filter, a word must not collide with any group's display name either: "amulet"
-    // survives the Onyx group (the Whoopsie certs distinguish a cert amulet) yet still poisons
-    // "strung sapphire amulet", because the word filter then eats the query's tail and resolves empty.
+    // Why: "amulet" leaks from the Whoopsie cert family and eats the tail of "strung sapphire amulet"; certs
+    // never appear in a catalog (the noted-of mapping removes them), so their words are dropped outright.
     if (echoFilter) {
-        const nameWords = new Set(rows.flatMap(r => r.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)));
         for (const row of rows) {
-            for (const member of row.objs) {
-                member.words = member.words.filter(w => !nameWords.has(w));
-            }
+            row.objs = row.objs.filter(m => !m.obj.startsWith('cert_'));
         }
+        // Groups left with a single member after the cert cut are no longer collisions.
+        const kept = rows.filter(r => r.objs.length > 1);
+        rows.length = 0;
+        rows.push(...kept);
     }
 
     const thin = rows.filter(r => r.objs.some(o => o.words.length === 0)).length;

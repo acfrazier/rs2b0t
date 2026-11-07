@@ -1,14 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import {
-    buildCatalog,
-    clientName,
-    displayName,
-    notedId,
-    resolveByName,
-    searchCatalog,
-    unnotedId
-} from '#/bot/api/market/catalog.js';
+import { buildCatalog, clientName, displayName, notedId, resolveByName, searchCatalog, unnotedId } from '#/bot/api/market/catalog.js';
 import type { ObjRecord } from '#/bot/adapter/ClientAdapter.js';
 
 function rec(id: number, name: string, over: Partial<ObjRecord> = {}): ObjRecord {
@@ -63,7 +55,11 @@ describe('unnotedId / notedId', () => {
 
 describe('searchCatalog', () => {
     test('substring match, case-insensitive, unnoted only', () => {
-        expect(searchCatalog(CAT, 'maple').map(r => r.id).sort((a, b) => a - b)).toEqual([62, 851]);
+        expect(
+            searchCatalog(CAT, 'maple')
+                .map(r => r.id)
+                .sort((a, b) => a - b)
+        ).toEqual([62, 851]);
     });
 
     test('empty query returns everything up to the limit', () => {
@@ -72,7 +68,7 @@ describe('searchCatalog', () => {
 });
 
 describe('resolveByName', () => {
-// Why: bows share names with unstrung variants; only the strung item is wearable.
+    // Why: bows share names with unstrung variants; only the strung item is wearable.
     test('a bare bow name is the strung one', () => {
         expect(resolveByName(CAT, 'maple longbow').map(r => r.id)).toEqual([851]);
     });
@@ -264,7 +260,11 @@ describe('resolveByName with aliases', () => {
     test('an alias label is searchable from the panel', () => {
         expect(searchCatalog(ALIAS_CAT, 'loop half').map(r => r.id)).toEqual([987]);
         // 377: the bodies' own names read "Green d'hide body", so the panel query keys on 'd hide body'.
-        expect(searchCatalog(ALIAS_CAT, 'd hide body').map(r => r.id).sort((a, b) => a - b)).toEqual([1135, 2499, 2501, 2503]);
+        expect(
+            searchCatalog(ALIAS_CAT, 'd hide body')
+                .map(r => r.id)
+                .sort((a, b) => a - b)
+        ).toEqual([1135, 2499, 2501, 2503]);
     });
 });
 
