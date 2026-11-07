@@ -1,15 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { BANK_LOCATIONS } from '#/bot/api/bank/BankLocations.js';
 import Tile from '#/bot/geometry/Tile.js';
-import {
-    WOODCUTTING_LOCATIONS,
-    WOODCUTTING_LOCATION_OPTIONS,
-    resolveWoodcuttingLocation,
-    ENT_NPC_IDS,
-    ENT_LIFE_TICKS,
-    isEntNpcId,
-    entNpcOnTile
-} from '#/bot/data/woodcuttingLocations.js';
+import { WOODCUTTING_LOCATIONS, WOODCUTTING_LOCATION_OPTIONS, resolveWoodcuttingLocation, ENT_NPC_IDS, ENT_LIFE_TICKS, isEntNpcId, entNpcOnTile } from '#/bot/data/woodcuttingLocations.js';
 
 const bankTiles = new Set(BANK_LOCATIONS.map(b => `${b.tile.x},${b.tile.z},${b.tile.level}`));
 
@@ -20,13 +12,12 @@ describe('resolveWoodcuttingLocation', () => {
     });
 
     test('Use Closest near Draynor willows', () => {
-        expect(resolveWoodcuttingLocation('Use Closest', new Tile(3087, 3234, 0))?.name).toBe(
-            'Draynor Willows'
-        );
+        expect(resolveWoodcuttingLocation('Use Closest', new Tile(3087, 3234, 0))?.name).toBe('Draynor Willows');
     });
 
     test('Use Closest near Seers maples', () => {
-        expect(resolveWoodcuttingLocation('Use Closest', new Tile(2728, 3501, 0))?.name).toBe('Seers Maples');
+        // 377: the maple stand moved into the grove at 2722,3572, so the probe stands there.
+        expect(resolveWoodcuttingLocation('Use Closest', new Tile(2722, 3572, 0))?.name).toBe('Seers Maples');
     });
 
     test('Use Closest still snaps even NW of Crafting Guild (no chunk gate)', () => {
@@ -35,22 +26,13 @@ describe('resolveWoodcuttingLocation', () => {
     });
 
     test('named match is case-insensitive', () => {
-        expect(resolveWoodcuttingLocation('edgeville yews', new Tile(0, 0, 0))?.name).toBe(
-            'Edgeville Yews'
-        );
+        expect(resolveWoodcuttingLocation('edgeville yews', new Tile(0, 0, 0))?.name).toBe('Edgeville Yews');
     });
 });
 
 describe('WOODCUTTING_LOCATIONS table', () => {
     test('dropdown is Auto + Use Closest + Use Start Position + Use Custom Position + legacy None + camps', () => {
-        expect(WOODCUTTING_LOCATION_OPTIONS).toEqual([
-            'Auto',
-            'Use Closest',
-            'Use Start Position',
-            'Use Custom Position',
-            'None',
-            ...WOODCUTTING_LOCATIONS.map(l => l.name)
-        ]);
+        expect(WOODCUTTING_LOCATION_OPTIONS).toEqual(['Auto', 'Use Closest', 'Use Start Position', 'Use Custom Position', 'None', ...WOODCUTTING_LOCATIONS.map(l => l.name)]);
     });
 
     test('every bankStand is a known BANK_LOCATIONS tile', () => {
@@ -61,11 +43,7 @@ describe('WOODCUTTING_LOCATIONS table', () => {
     });
 
     test('core catalog entries are verified; tick-manip camps may be provisional', () => {
-        const provisional = new Set([
-            'S Falador Oaks',
-            'Lumbridge Farmer Willows',
-            'Lumbridge Castle Willows'
-        ]);
+        const provisional = new Set(['S Falador Oaks', 'Lumbridge Farmer Willows', 'Lumbridge Castle Willows']);
         for (const loc of WOODCUTTING_LOCATIONS) {
             if (provisional.has(loc.name)) {
                 expect(loc.verified, loc.name).toBe(false);

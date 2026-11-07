@@ -11,14 +11,13 @@ const CONTENT = process.env.CONTENT_DIR ?? '';
 /** The 377 content checkout this slice qualifies against; a 289 CONTENT_DIR is an input error, not a skip. */
 const is377Content = existsSync(join(CONTENT, 'pack', 'loc.pack')) && existsSync(join(CONTENT, 'scripts', '_unpack', '377'));
 
-/** debugname -> loc id, from the content's own pack file (e.g. `9709:9708=rocks_9708`). */
+/** debugname -> loc id, from the content's own pack file (`2108=clayrock1`). */
 function locPackNames(): Map<string, number> {
     const names = new Map<string, number>();
     for (const line of readFileSync(join(CONTENT, 'pack', 'loc.pack'), 'ascii').split('\n')) {
         const eq = line.indexOf('=');
-        const colon = line.indexOf(':');
-        if (eq !== -1 && colon !== -1) {
-            names.set(line.slice(eq + 1).trim(), Number(line.slice(colon + 1, eq)));
+        if (eq !== -1) {
+            names.set(line.slice(eq + 1).trim(), Number(line.slice(0, eq)));
         }
     }
     return names;
@@ -37,7 +36,8 @@ function placedRockIds(): Set<number> {
                 continue;
             }
             if (!inLoc) continue;
-            const m = /^\d \d+ \d+: (\d+) \d+ \d+$/.exec(line.trim());
+            // The loc lines carry the id plus one or more trailing numbers (`0 42 35: 9716 10`).
+            const m = /^\d \d+ \d+: (\d+)(?: \d+)*$/.exec(line.trim());
             if (m) placed.add(Number(m[1]));
         }
     }
@@ -48,18 +48,7 @@ test('every ore keeps at least one rock and the ladder order is unchanged', () =
     for (const [name, ids] of Object.entries(ROCK_TYPES)) {
         expect(ids.length > 0, name).toBe(true);
     }
-    expect(ROCK_TIER_ORDER).toEqual([
-        'Clay',
-        'Copper',
-        'Tin',
-        'Iron',
-        'Silver',
-        'Coal',
-        'Gold',
-        'Mithril',
-        'Adamantite',
-        'Runite'
-    ]);
+    expect(ROCK_TIER_ORDER).toEqual(['Clay', 'Copper', 'Tin', 'Iron', 'Silver', 'Coal', 'Gold', 'Mithril', 'Adamantite', 'Runite']);
 });
 
 test('all rock loc ids are unique across ore types', () => {

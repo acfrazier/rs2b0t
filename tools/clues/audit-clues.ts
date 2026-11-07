@@ -248,8 +248,9 @@ export function runClueAudit(opts: ClueAuditOptions = {}, log: (m: string) => vo
         const id = Number(idStr);
         const expected = KNOWN_UNREACHABLE.has(id);
         const fail = (problem: string, unreachable = false): void => {
-            // Allowlisted rows cover nav gaps and stale search coords (S9 377); the row's text says which.
-            const searchCoordProblem = /^search: (no searchable loc within 1|searchable .* off the clue coord)/.test(problem);
+            // Allowlisted rows cover nav gaps and stale search coords (S9 377); the `search: ` prefix is the
+            // renderer's, so the regex matches the bare problem text.
+            const searchCoordProblem = /^(no searchable loc within 1|searchable .* off the clue coord)/.test(problem);
             if (expected && (unreachable || searchCoordProblem)) {
                 expectedAbandon.add(id);
                 log(`EXPECTED-ABANDON ${clue.obj} [${id}] ${clue.type}: ${problem}`);

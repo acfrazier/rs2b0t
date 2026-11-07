@@ -12,11 +12,7 @@ import Tile from '../geometry/Tile.js';
 
 export const SHILO_WATER_VENDOR = { keeper: 'Obli', stand: new Tile(2825, 2959, 0), item: 'Vial of water' } as const;
 import { cookSurfaceForFishCamp } from './cookingRanges.js';
-import {
-    locationOptions,
-    resolveGatheringLocation,
-    type GatheringLocation
-} from './gatheringLocations.js';
+import { locationOptions, resolveGatheringLocation, type GatheringLocation } from './gatheringLocations.js';
 
 /** Fishing camps from rs2b2tgathering.csv and live checks. `rangeStand` is set when a useful cook surface is near the pier. */
 export interface FishingLocation extends GatheringLocation {
@@ -38,9 +34,7 @@ function withCampCook(loc: FishingLocation): FishingLocation {
         rangeStand: cook.stand,
         rangeName: cook.locName,
         obstacles: loc.obstacles ?? ['door', 'gate'],
-        notes: [loc.notes, cook.notes ? `cook: ${cook.label ?? cook.locName}` : null]
-            .filter(Boolean)
-            .join('; ')
+        notes: [loc.notes, cook.notes ? `cook: ${cook.label ?? cook.locName}` : null].filter(Boolean).join('; ')
     };
 }
 
@@ -163,7 +157,8 @@ export const FISHING_LOCATIONS: FishingLocation[] = (
             name: 'Shilo Village',
             spot: new Tile(2841, 2970, 0),
             bankStand: BANK.shilo,
-            campRadius: 48,
+            // The river spots run to 2807,3021 (query-tiles loc 2841,2970), so the leash covers them.
+            campRadius: 56,
             chaseRadius: 28,
             verified: false,
             resources: ['trout', 'salmon'],

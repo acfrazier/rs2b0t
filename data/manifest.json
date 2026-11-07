@@ -115,7 +115,7 @@
     },
     {
       "path": "data/377/src/bot/data/fishingLocations.ts",
-      "sha256": "53f85650912daf68f799468b1e2a7b4471ed0f231504f62493cd9fc963302f3d",
+      "sha256": "3535529193ec7fde442970b6b034c7137bc46800c5c88345e2b6b5eaa00c9b8e",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -139,7 +139,7 @@
     },
     {
       "path": "data/377/src/bot/data/miningLocations.ts",
-      "sha256": "ff536a5cc6f3b20dc06edb33e2f0d61f1d08fdbdad16f9ab36012f24b31f15d9",
+      "sha256": "e83b1622bf4be7ae3486f7c6b2d51876389487b9e764e76965a7da93571eb3a3",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -181,7 +181,7 @@
     },
     {
       "path": "data/377/src/bot/data/woodcuttingLocations.ts",
-      "sha256": "e80829cd3a24352ba513d4e3bacbc5f72e44887faba80ca54228c5518b8c3689",
+      "sha256": "f95b85b970ea9d36bc753bcf83b3f17b594c27f599258e61f516fcb4e2fce1d7",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -253,7 +253,7 @@
     },
     {
       "path": "data/377/test/data/mining-rocks.test.ts",
-      "sha256": "1bb94041dae161853d037d5e76334fd94f51cce62b05da6a86110e0568cf4594",
+      "sha256": "1b0e872c8f5ea16c38b57a99f968a0491674d7f05c61ee280d4bc9a5d392b26f",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -265,13 +265,13 @@
     },
     {
       "path": "data/377/test/data/placementBoxes.test.ts",
-      "sha256": "2b13031e43e395525ce12fd8dafa02c5dfd97b6a99777462159998dc386318a0",
+      "sha256": "5b006175ab03fa8aa0e90926df20dd3aaaffa99e7867a0e01a425d5cc38b3267",
       "kind": "edition",
       "qualification": "offline"
     },
     {
       "path": "data/377/test/data/WoodcuttingLocations.test.ts",
-      "sha256": "f8b6c737dfacab198937fab0f9e3de6c2b84c2b47550b11012dbda706cbe19fa",
+      "sha256": "96e887c891b5bcec97d5ea8c92551a77c11fe9fcbb511afb56e594c8f642c70d",
       "kind": "edition",
       "qualification": "offline"
     },
