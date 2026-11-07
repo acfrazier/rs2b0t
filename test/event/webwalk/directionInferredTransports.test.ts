@@ -4,9 +4,6 @@ import transports from '#/bot/event/webwalk/data/transports.json';
 import { specialCrossingAt } from '#/bot/event/webwalk/data/specialCrossings.js';
 import type { TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
 import { specialRequiresAt } from '#/bot/event/webwalk/specialRequires.js';
-import { mageArenaBarrierEdges } from '#/bot/event/webwalk/travelCatalog.js';
-import { emptyWorldStateData, worldStateFromData } from '#/bot/event/webwalk/worldStateData.js';
-import { meetsRequires } from '#/bot/event/webwalk/requires.js';
 
 /**
  * Direction-inferred transports (#403): one loc placement, content picks side from
@@ -69,35 +66,5 @@ describe('direction-inferred dual edges (#403)', () => {
     test("McGrubor's loose railing: dual Squeeze-through edges", () => {
         expect(directed('Loose Railing', { x: 2661, z: 3500 }, { x: 2662, z: 3500 })).toBeDefined();
         expect(directed('Loose Railing', { x: 2662, z: 3500 }, { x: 2661, z: 3500 })).toBeDefined();
-    });
-
-    test('Mage Arena mystic portal: dual curated edges, inbound gear-gated', () => {
-        const edges = mageArenaBarrierEdges();
-        expect(edges).toHaveLength(2);
-        const inbound = edges.find(e => e.debugName === 'magearena_scan_in');
-        const outbound = edges.find(e => e.debugName === 'magearena_scan_out');
-        expect(inbound).toMatchObject({
-            from: { x: 3105, z: 3954, level: 0 },
-            to: { x: 3105, z: 3952, level: 0 },
-            locName: 'Mystic portal',
-            action: 'Walk-through',
-            locId: 2880
-        });
-        expect(outbound).toMatchObject({
-            from: { x: 3105, z: 3952, level: 0 },
-            to: { x: 3105, z: 3954, level: 0 }
-        });
-        expect(inbound?.requires?.forbidEntranaRestricted).toBe(true);
-        expect(outbound?.requires?.forbidEntranaRestricted).toBeUndefined();
-
-        const bare = worldStateFromData({ ...emptyWorldStateData(), members: true });
-        const geared = worldStateFromData({
-            ...emptyWorldStateData(),
-            members: true,
-            entranaRestrictedGear: true
-        });
-        expect(meetsRequires(inbound?.requires, bare).ok).toBe(true);
-        expect(meetsRequires(inbound?.requires, geared).ok).toBe(false);
-        expect(meetsRequires(outbound?.requires, geared).ok).toBe(true);
     });
 });

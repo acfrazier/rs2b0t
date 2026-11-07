@@ -28,7 +28,7 @@ describe('ladder climb-up approaches', () => {
         downLandings.set(key, set);
     }
 
-    test('every two-way ladder climbs up from where it drops you', () => {
+    test('every two-way ladder climbs up from where it drops you, bar the two landings 377 makes inoperable', () => {
         const wrong: string[] = [];
         for (const r of rows) {
             if (r.locX === undefined || r.locZ === undefined || r.to.level <= r.from.level) {
@@ -49,7 +49,12 @@ describe('ladder climb-up approaches', () => {
                 );
             }
         }
-        expect(wrong).toEqual([]);
+        // The generator refuses to anchor a climb on a landing the server would not accept (derive-ladders.py pair_up_approaches): in the 377 pack (2667,3429) is diagonal to the Tower ladder at (2668,3428), and (3042,3380) level 1 carries a wall face (mask 4) between it and the ladder at (3042,3379), so both climbs start from the open side instead. The list is asserted both ways so it cannot go stale.
+        const NOT_OPERABLE_LANDINGS = [
+            'loc (2668,3428) ranging_ladder_up: up from (2668,3429) but down lands (2667,3429)',
+            'loc (3042,3379) ladder: up from (3043,3379) but down lands (3042,3380)'
+        ];
+        expect(wrong).toEqual(NOT_OPERABLE_LANDINGS);
     });
 
     test('the Seers house ladder that made clue 3507 unsolvable is anchored at its foot', () => {

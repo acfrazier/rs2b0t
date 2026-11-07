@@ -72,7 +72,8 @@ describe('revision-377 offline route corpus', () => {
             extraTicks: 0
         });
         expect(middle).toMatchObject({
-            from: { x: 3103, z: 3161, level: 1 },
+            // The loc stands at 1_48_49_31_23 (3103,3159); the walker's cardinal goals accept 3103,3158 and 3103,3161, and the generator takes the one nearest the placement, which is the tile the upper stair drops you on.
+            from: { x: 3103, z: 3158, level: 1 },
             to: { x: 3104, z: 3161, level: 2 },
             kind: 'stair',
             extraTicks: 0

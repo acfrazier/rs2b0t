@@ -9,14 +9,12 @@ import { PathFinder, type NavPoint, type TransportEdgeData } from '#/bot/event/w
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { richTransportQuestMap } from '#/bot/event/webwalk/transportQuestReqs.js';
 import { emptyWorldStateData, type WorldStateData } from '#/bot/event/webwalk/worldStateData.js';
-import { CLUE_DB } from '#/bot/api/ai/clues/data/cluedb.js';
-import { PACK_UNREACHABLE } from '#/bot/api/ai/clues/data/unreachable.js';
-import { skip377 } from '../../lib/skip377.js';
 
-const skipped = skip377('test/event/webwalk/gutanothBattlement.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
-
-/** trail_clue_hard_sextant024, 04 degrees 03 minutes South, 03 degrees 11 minutes East. */
-const OGRE_CITY_DIG = 3546;
+/**
+ * The Ogre city dig tile (2542,3031): the 289 trail_clue_hard_sextant024 spot (04 degrees 03 minutes South, 03 degrees 11 minutes East).
+ * 377 trail_hard.enum lists only sextant001-013, so the clue is never dispensed; the tile is still on the 377 map, which is what this routes to.
+ */
+const OGRE_CITY_DIG: NavPoint = { x: 2542, z: 3031, level: 0 };
 const CATHERBY: NavPoint = { x: 2725, z: 3491, level: 0 };
 
 const rows = transports as unknown as TransportEdgeData[];
@@ -46,7 +44,7 @@ describe("the Gu'Tanoth battlement", () => {
         }
     });
 
-    skipped('the stand tiles are the loc placements, one tile either side', () => {
+    test('the stand tiles are the loc placements, one tile either side', () => {
         for (const e of battlements) {
             expect(e.locX).toBe(2507);
             expect([3011, 3012]).toContain(e.locZ!);
@@ -85,11 +83,8 @@ function kitted(quests: boolean): WorldStateData {
 }
 
 describe.skipIf(!HAS_COLLISION_PACK)('the ogre city dig', () => {
-    skipped('routes over the gate, the battlement and the chasm, in that order', () => {
-        const dig = CLUE_DB[OGRE_CITY_DIG]!.coord!;
-        expect(dig).toEqual({ x: 2542, z: 3031, level: 0 });
-
-        const route = loadFinder().findPath(CATHERBY, dig, { state: kitted(true), useTeleportCatalog: false });
+    test('routes over the gate, the battlement and the chasm, in that order', () => {
+        const route = loadFinder().findPath(CATHERBY, OGRE_CITY_DIG, { state: kitted(true), useTeleportCatalog: false });
         expect(route.ok).toBe(true);
         if (!route.ok) {
             return;
@@ -103,12 +98,7 @@ describe.skipIf(!HAS_COLLISION_PACK)('the ogre city dig', () => {
 
     // Why: `oploc1,ganothbattlement` reads the market bits, which only a Watch Tower account has set, so the
     // Why: route has to be pruned at plan time rather than walked to a wall the guard will not let it over.
-    skipped('an account without Watch Tower is not routed there at all', () => {
-        const dig = CLUE_DB[OGRE_CITY_DIG]!.coord!;
-        expect(loadFinder().findPath(CATHERBY, dig, { state: kitted(false), useTeleportCatalog: false }).ok).toBe(false);
+    test('an account without Watch Tower is not routed there at all', () => {
+        expect(loadFinder().findPath(CATHERBY, OGRE_CITY_DIG, { state: kitted(false), useTeleportCatalog: false }).ok).toBe(false);
     }, 120_000);
-
-    test('it is no longer allowlisted as a destination the pack cannot reach', () => {
-        expect(PACK_UNREACHABLE[OGRE_CITY_DIG]).toBeUndefined();
-    });
 });

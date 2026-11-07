@@ -296,43 +296,25 @@ export function wildyLeverEdges(): TransportEdgeData[] {
     ];
 }
 
-// Why: magearena has no journal state, so planning checks membership and gear (scripts/areas/area_mage_arena/scripts/mage_arena.rs2:91-106).
+/**
+ * Mage Arena cellar levers: scripts/areas/area_mage_arena/scripts/mage_arena.rs2:1-22 teleports to 0_39_73_43_40 (to_cellar, lever 5959 at 3090,3956) and 0_48_61_18_52 (from_cellar, lever 5960 at 2539,4712).
+ * The 377 pack still places the 289 cellar ladders (locs 2871/2872) but no script handles them, so the levers are the only way down to Gundai.
+ */
+export const MAGE_ARENA_LEVER = {
+    surface: parseLcCoord('0_48_61_18_52'),
+    cellar: parseLcCoord('0_39_73_43_40')
+} as const;
 
-/** Mage Arena outdoor barrier edges. */
-export function mageArenaBarrierEdges(): TransportEdgeData[] {
-    // Placements: 0_48_61_33_49 + 0_48_61_34_49, i.e. (3105|3106, 3953).
-    const locX = 3105;
-    const locZ = 3953;
-    const north = { x: 3105, z: 3954, level: 0 };
-    const south = { x: 3105, z: 3952, level: 0 };
-    const inbound: TransportRequires = {
-        members: true,
-        forbidEntranaRestricted: true
-    };
-    const outbound: TransportRequires = { members: true };
-    const mk = (
-        from: NavPoint,
-        to: NavPoint,
-        debug: string,
-        requires: TransportRequires
-    ): TransportEdgeData => ({
-        from: { ...from },
-        to: { ...to },
-        locName: 'Mystic portal',
-        action: 'Walk-through',
-        kind: 'gate',
-        locId: 2880,
-        locX,
-        locZ,
-        debugName: debug,
-        options: ['Walk-through'],
-        requires
-    });
+/** Both lever teleports; the stand is the lever's own tile, which is also where each pull lands. */
+export function mageArenaLeverEdges(): TransportEdgeData[] {
+    const members: TransportRequires = { members: true };
     return [
-        mk(north, south, 'magearena_scan_in', inbound),
-        mk(south, north, 'magearena_scan_out', outbound)
+        edge(MAGE_ARENA_LEVER.surface, MAGE_ARENA_LEVER.cellar, 'Lever', 'Pull', 'portal', 'magearena_lever_to_cellar', members),
+        edge(MAGE_ARENA_LEVER.cellar, MAGE_ARENA_LEVER.surface, 'Lever', 'Pull', 'portal', 'magearena_lever_from_cellar', members)
     ];
 }
+
+// 377 has no Mage Arena barrier: loc 2880 (magearena_scan) is placed in no map near 3105,3953 (it appears only in m28_68 level 1), and 3105,3952 / 3105,3954 are blocked by cavewall locs 1489, so the 289 mystic-portal rows could never be walked. The arena is entered by the lever edges above.
 
 // scripts/quests/quest_totem/scripts/quest_totem.rs2:1-4 opens only from the north side, so this is an exit-only edge.
 // The 377-derived door pass drops this handler's one-way instance; restore the direction that works.
@@ -612,7 +594,7 @@ export function curatedTravelEdges(): TransportEdgeData[] {
         // Session multiloc: portal x return, gated by WorldState.essenceExitReturn; replaces the 4 Sedridor-only rows transports.json used to carry.
         ...essenceExitEdges(),
         ...wildyLeverEdges(),
-        ...mageArenaBarrierEdges(),
+        ...mageArenaLeverEdges(),
         ...handelmortDoorEdges(),
         ...agilityShortcutEdges(),
         ...elkoyMazeEdges(),
@@ -632,9 +614,9 @@ export const TRAVEL_FAMILIES = [
     'spell_teleport',
     'jewellery_teleport',
     'wildy_lever',
+    'mage_arena_lever',
     'essence_entry',
     'essence_exit',
-    'mage_arena_barrier',
     'handelmort_door',
     'agility_shortcut',
     'elkoy_maze',

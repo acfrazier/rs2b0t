@@ -11,9 +11,6 @@ import { PathFinder, type NavPoint } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { richTransportQuestMap } from '#/bot/event/webwalk/transportQuestReqs.js';
 import { emptyWorldStateData, type WorldStateData } from '#/bot/event/webwalk/worldStateData.js';
-import { skip377 } from '../../../lib/skip377.js';
-
-const skipped = skip377('test/api/ai/clues/hardclueNavReach.test.ts', 'no 377 hard clue destination sits behind a quest (the 289 gnome and Karamja rows are not in the 377 cluedb)');
 
 // Why: audit-clues.ts plans with no world state, which fails open on every gated edge; this asks what is still shut with the quests done and the gate kit in the pack.
 
@@ -118,14 +115,14 @@ describe('hard clue destinations, quests complete and the gate kit carried', () 
         ).toEqual([]);
     }, 120_000);
 
-    skipped('the quests are what open the gnome and Karamja destinations', () => {
+    // 377 trail_hard.enum lists 31 clues (13 sextant, 17 riddle, 1 map): none of their destinations sits in the gnome or Karamja areas the quests opened at 289, so completing quests must not change which of them are reachable.
+    test('completing quests opens no hard clue destination that was shut without them', () => {
         const finder = loadFinder();
         if (!finder) {
             return;
         }
         const withQuests = new Set(unreachable(finder, kitted(true)));
         const without = unreachable(finder, kitted(false));
-        const opened = without.filter(id => !withQuests.has(id));
-        expect(opened.length).toBeGreaterThan(0);
+        expect(without.filter(id => !withQuests.has(id))).toEqual([]);
     }, 240_000);
 });

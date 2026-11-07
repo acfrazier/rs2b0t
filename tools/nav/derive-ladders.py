@@ -138,6 +138,7 @@ class CollisionPack:
         count = struct.unpack_from("<H", raw, 8)[0]
         self.walk: dict[tuple[int, int, int], bytes] = {}
         self.exit: dict[tuple[int, int, int], bytes] = {}
+        self.wall: dict[tuple[int, int, int], bytes] = {}
         pos = 10
         for _ in range(count):
             mx, mz, mask = raw[pos : pos + 3]
@@ -150,6 +151,7 @@ class CollisionPack:
                 self.walk[(mx, mz, level)] = raw[pos : pos + 512]
                 pos += 512
                 if version >= 2:
+                    self.wall[(mx, mz, level)] = raw[pos : pos + 2048]
                     pos += 2048
         if pos != len(raw):
             raise SystemExit(f"Collision pack is truncated or has trailing bytes: read {pos} of {len(raw)}")
@@ -170,6 +172,14 @@ class CollisionPack:
     def sealed(self, x: int, z: int, level: int) -> bool:
         """Walkable tile with no exit."""
         return self.exit_mask(x, z, level) == 0
+
+    def wall_mask(self, x: int, z: int, level: int) -> int:
+        """Per-tile wall faces, the same nibble the walker's PathFinder.wallMask reads; zero in a version 1 pack."""
+        wall = self.wall.get((x >> 6, z >> 6, level))
+        if wall is None:
+            return 0
+        index = (x & 0x3F) * 64 + (z & 0x3F)
+        return (wall[index >> 1] >> 4 if index & 1 else wall[index >> 1]) & 0xF
 
 
 def offsets(radius: int) -> list[tuple[int, int]]:
@@ -192,6 +202,50 @@ def snap(pack: CollisionPack, target: Target) -> Target | None:
         if not pack.sealed(x, z, target.level):
             return Target(x, z, target.level)
     return fallback
+
+
+# A Climb is accepted from a cardinal neighbour of the loc's footprint with no wall between the two (the walker's PathFinder.cardinalGoals rule).
+STAND_SIDES = ((0, 1, 1 << 2), (1, 0, 1 << 3), (0, -1, 1 << 0), (-1, 0, 1 << 1))
+FOOTPRINT_RADIUS = 2
+
+
+def operable_stands(pack: CollisionPack, target: Target) -> set[tuple[int, int]]:
+    """Walkable tiles beside a blocking placement's footprint with no wall facing it; empty when the placement is walkable."""
+    if pack.walkable(target.x, target.z, target.level):
+        return set()
+    solid = {(target.x, target.z)}
+    stack = [(target.x, target.z)]
+    while stack:
+        cx, cz = stack.pop()
+        for dx, dz, _ in STAND_SIDES:
+            nx, nz = cx + dx, cz + dz
+            if max(abs(nx - target.x), abs(nz - target.z)) > FOOTPRINT_RADIUS or (nx, nz) in solid or pack.walkable(nx, nz, target.level):
+                continue
+            solid.add((nx, nz))
+            stack.append((nx, nz))
+    stands: set[tuple[int, int]] = set()
+    for sx, sz in solid:
+        for dx, dz, facing in STAND_SIDES:
+            cx, cz = sx + dx, sz + dz
+            if pack.walkable(cx, cz, target.level) and not pack.wall_mask(cx, cz, target.level) & facing:
+                stands.add((cx, cz))
+    return stands
+
+
+def stand_candidates(pack: CollisionPack, target: Target) -> list[Target]:
+    """Tiles to climb from, best first: for a blocking placement only tiles the server accepts (never across its own wall or from a diagonal), otherwise snap()'s tile."""
+    stands = operable_stands(pack, target)
+    if not stands:
+        fallback = snap(pack, target)
+        return [fallback] if fallback else []
+    ordered: list[tuple[int, int]] = []
+    for dx, dz in SNAP_OFFSETS:
+        tile = (target.x + dx, target.z + dz)
+        if tile in stands and tile not in ordered:
+            ordered.append(tile)
+    ordered.extend(sorted(stands - set(ordered)))
+    ordered.sort(key=lambda tile: pack.sealed(tile[0], tile[1], target.level))
+    return [Target(x, z, target.level) for x, z in ordered]
 
 
 COORD_RE = re.compile(r"^(\d+)_(\d+)_(\d+)_(\d+)_(\d+)$")
@@ -274,6 +328,29 @@ def select_switch(body: str, placement: EffectivePlacement, switch_type: str) ->
     return body[: match.start()] + (selected or fallback) + body[closing + 1 :]
 
 
+LOC_COORD_IF_RE = re.compile(r"if\s*\(\s*loc_coord(?:\s*\(\s*\))?\s*=\s*(\d+_\d+_\d+_\d+_\d+)\s*\)\s*{")
+
+
+def select_loc_coord_ifs(body: str, placement: EffectivePlacement) -> str:
+    """Resolve `if(loc_coord = <coord>) { ... }` special cases for one placement.
+
+    Why: 377 ladders.rs2 `ladder_1755` special-cases the Zanaris placement with an early `return` instead of a `switch_coord`, so without this every placement of that ladder looks like it has two destinations.
+    """
+    while True:
+        match = LOC_COORD_IF_RE.search(body)
+        if not match:
+            return body
+        opening = body.find("{", match.start())
+        closing = matching_brace(body, opening)
+        block = body[opening + 1 : closing]
+        if match.group(1) != coord_text(placement):
+            body = body[: match.start()] + body[closing + 1 :]
+        elif re.search(r"\breturn\s*;", block):
+            return body[: match.start()] + block
+        else:
+            body = body[: match.start()] + block + body[closing + 1 :]
+
+
 def call_arguments(text: str, names: tuple[str, ...]) -> list[str]:
     calls: list[str] = []
     token = re.compile(r"(?<![a-zA-Z0-9_])(" + "|".join(re.escape(name) for name in names) + r")\s*\(")
@@ -347,7 +424,7 @@ def resolve_expression(expression: str, placement: EffectivePlacement, stand: Ta
 
 
 def destinations(debug_name: str, body: str, placement: EffectivePlacement, stand: Target) -> tuple[list[Target], str | None]:
-    body = select_switch(select_switch(body, placement, "int"), placement, "coord")
+    body = select_loc_coord_ifs(select_switch(select_switch(body, placement, "int"), placement, "coord"), placement)
 
     # Zanaris's ladder_from_cellar returns early with a special destination instead of z - 6400.
     if debug_name == "ladder_from_cellar":
@@ -395,6 +472,8 @@ def destinations(debug_name: str, body: str, placement: EffectivePlacement, stan
 ALWAYS_ACTIVE_LADDER_DEBUGS = frozenset(
     {
         "ladder",
+        # 377 names the Mining Guild ladder by id; its Mining 60 check (mining_guild.rs2:1-8) is plan-time state in specialRequires.TRANSPORT_SKILL_GATES, as miningguildladder was at 289.
+        "ladder_2113",
         "laddertop",
         "laddermiddle",
         "ladder_directional",
@@ -470,7 +549,7 @@ def make_edge(config, placement: EffectivePlacement, action: str, source: Target
     return edge
 
 
-def pair_up_approaches(edges: list[dict]) -> int:
+def pair_up_approaches(edges: list[dict], pack: CollisionPack) -> int:
     """Use the paired climb-down landing as the climb-up approach.
 
     snap() can pick an unreachable diagonal. The reverse landing is a usable
@@ -503,6 +582,10 @@ def pair_up_approaches(edges: list[dict]) -> int:
         if (edge["from"]["x"], edge["from"]["z"]) == (lx, lz):
             continue
         if max(abs(lx - edge["locX"]), abs(lz - edge["locZ"])) > 2:
+            continue
+        # Why: the down edge's landing is the climber's own tile snapped to walkable, which can sit across a wall from the loc (the Black Knights' banquet ladder); never pair an approach the server would refuse.
+        stands = operable_stands(pack, Target(edge["locX"], edge["locZ"], edge["from"]["level"]))
+        if stands and (lx, lz) not in stands:
             continue
         edge["from"]["x"], edge["from"]["z"] = lx, lz
         moved += 1
@@ -570,7 +653,8 @@ def main() -> None:
     for loc_id, config in sorted(ladder_configs.items()):
         for placement in placed_by_id[loc_id]:
             source_raw = Target(placement.x, placement.z, placement.level)
-            snapped_source = snap(collision, source_raw)
+            candidates = stand_candidates(collision, source_raw)
+            snapped_source = candidates[0] if candidates else None
             source = snapped_source or source_raw
             source_reason = None
             if snapped_source is None:
@@ -582,7 +666,14 @@ def main() -> None:
                     continue
                 interactions += 1
                 body = handlers.get((config.debug_name, op), "")
+                # Why: a climb lands on the climber's own x,z one level away, so of the tiles the server accepts the stand is the one whose landing is walkable (the Black Knights' banquet ladder lands inside a wall from its east side).
+                op_source = source
                 raw_targets, disabled_reason = destinations(config.debug_name, body, placement, source)
+                for candidate in candidates:
+                    candidate_targets, candidate_reason = destinations(config.debug_name, body, placement, candidate)
+                    if candidate_targets and all(collision.walkable(t.x, t.z, t.level) for t in candidate_targets):
+                        op_source, raw_targets, disabled_reason = candidate, candidate_targets, candidate_reason
+                        break
                 if config.debug_name == "dragonshipladdertop2" and len(raw_targets) == 2:
                     normal, fallback = raw_targets
                     raw_targets = [normal if collision.walkable(normal.x, normal.z, normal.level) else fallback]
@@ -590,7 +681,7 @@ def main() -> None:
                 disabled_reason = disabled_reason or source_reason
                 price = enrichment.extra_ticks(prices, config.debug_name, op) if body else None
                 if not raw_targets:
-                    generated.append(make_edge(config, placement, action, source, source, disabled_reason, price))
+                    generated.append(make_edge(config, placement, action, op_source, op_source, disabled_reason, price))
                     continue
                 for raw_target in raw_targets:
                     target = snap(collision, raw_target)
@@ -599,7 +690,7 @@ def main() -> None:
                         unsnappable += 1
                         target = raw_target
                         reason = reason or "The scripted destination has no walkable tile within two squares in this collision pack."
-                    generated.append(make_edge(config, placement, action, source, target, reason, price))
+                    generated.append(make_edge(config, placement, action, op_source, target, reason, price))
     data_dir = args.rs2b0t / "src" / "bot" / "event" / "webwalk" / "data"
     transport_path = data_dir / "transports.json"
     stair_path = data_dir / "stairEdges.json"
@@ -611,7 +702,7 @@ def main() -> None:
     generated_stairs = [edge for edge in generated if edge["kind"] == "stair"]
     output_transports = transports + generated_transports
     output_stairs = stairs + generated_stairs
-    repaired = pair_up_approaches(output_stairs) + pair_up_approaches(output_transports)
+    repaired = pair_up_approaches(output_stairs, collision) + pair_up_approaches(output_transports, collision)
     write_json(transport_path, output_transports, args.check)
     write_json(stair_path, output_stairs, args.check)
 

@@ -10,9 +10,6 @@ import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import doorsJson from '#/bot/event/webwalk/data/doors.json';
 import stairsJson from '#/bot/event/webwalk/data/stairEdges.json';
 import transports from '#/bot/event/webwalk/data/transports.json';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/trapdoorMines.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
 
 /** Edgeville dungeon surface trapdoor (#285). */
 const EDGEVILLE_TRAP = {
@@ -23,9 +20,9 @@ const EDGEVILLE_TRAP = {
     kind: 'dungeon'
 } as const;
 
-/** Falador party-room trapdoor into the Dwarven Mine (surface hop used by mining seeds). */
+/** Falador party-room trapdoor into the Dwarven Mine (surface hop used by mining seeds). The stand is the walkable tile west of the 377 placement: the tile south of it is blocked in the 377 pack. */
 const DWARVEN_TRAP = {
-    from: { x: 3019, z: 3449, level: 0 },
+    from: { x: 3018, z: 3450, level: 0 },
     to: { x: 3019, z: 9849, level: 0 },
     locName: 'Trapdoor',
     action: 'Climb-down',
@@ -71,19 +68,14 @@ function loadDefaultPack(): PathFinder {
 }
 
 describe('Trapdoor closed/open metadata', () => {
-    skipped('Edgeville and Dwarven Mine trapdoors pair closed locId with openLocId', () => {
-        for (const expected of [EDGEVILLE_TRAP, DWARVEN_TRAP]) {
-            const edge = findEdge(expected);
-            expect(edge, JSON.stringify(expected.from)).toBeDefined();
-            expect(edge!.locId).toBeDefined();
-            expect(edge!.openLocId).toBeDefined();
-            expect(edge!.locId).not.toBe(edge!.openLocId);
-            // Conventional pair for generic trapdoor
-            expect(edge!.locId).toBe(1568);
-            expect(edge!.openLocId).toBe(1570);
-            expect(edge!.locX).toBeDefined();
-            expect(edge!.locZ).toBeDefined();
-        }
+    // 377 content general_use/scripts/trapdoors.rs2:37 and pack/loc.pack:11868: the Falador party-room trapdoor is `fai_dwarf_trapdoor_down`, a single-state loc (no open twin), not the 1568/1570 pair of 289.
+    test('the walker recognises the placed 377 Dwarven Mine trapdoor and refuses the 289 trapdoor id at that tile', () => {
+        const edge = findEdge(DWARVEN_TRAP)!;
+        expect(edge).toBeDefined();
+        const transport = { locName: edge.locName, action: edge.action, locX: edge.locX!, locZ: edge.locZ!, locId: edge.locId, openLocId: edge.openLocId };
+        const at = { tile: () => ({ x: edge.locX!, z: edge.locZ! }) };
+        expect(matchesTransportLoc(transport, { id: 11867, ...at })).toBe(true);
+        expect(matchesTransportLoc(transport, { id: 1568, ...at })).toBe(false);
     });
 
     test('matchesTransportLoc accepts closed placement and open transform', () => {
@@ -110,7 +102,7 @@ describe('Trapdoor closed/open metadata', () => {
 });
 
 describe('Dwarven Mine + Edgeville trapdoor paths', () => {
-    skipped.skipIf(!HAS_COLLISION_PACK)('pack: surface near Dwarven trapdoor reaches underground landing', () => {
+    test.skipIf(!HAS_COLLISION_PACK)('pack: surface near Dwarven trapdoor reaches underground landing', () => {
         const finder = loadPack();
         const edge = findEdge(DWARVEN_TRAP);
         expect(edge).toBeDefined();
@@ -131,7 +123,7 @@ describe('Dwarven Mine + Edgeville trapdoor paths', () => {
         expect(hop!.transport!.openLocId ?? hop!.transport!.locId).toBeDefined();
     });
 
-    skipped.skipIf(!HAS_COLLISION_PACK)('pack: Edgeville dungeon field still exits via ladder after trapdoor metadata', () => {
+    test.skipIf(!HAS_COLLISION_PACK)('pack: Edgeville dungeon field still exits via ladder after trapdoor metadata', () => {
         const finder = loadPack();
         const field = { x: 3111, z: 9937, level: 0 };
         const falador = { x: 2965, z: 3378, level: 0 };
@@ -146,7 +138,7 @@ describe('Dwarven Mine + Edgeville trapdoor paths', () => {
         expect(climb).toBeDefined();
     });
 
-    skipped.skipIf(!HAS_COLLISION_PACK)('pack: Miner can bank the Edgeville Dungeon Mine without a Brass key', () => {
+    test.skipIf(!HAS_COLLISION_PACK)('pack: Miner can bank the Edgeville Dungeon Mine without a Brass key', () => {
         const finder = loadDefaultPack();
         const bank = { x: 3094, z: 3493, level: 0 };
         const mine = { x: 3132, z: 9874, level: 0 };

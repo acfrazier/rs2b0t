@@ -48,11 +48,11 @@ const TRANSPORT_SKILL_GATES: readonly {
     skill: string;
     levelReq: number;
 }[] = [
-    // scripts/areas/area_falador/scripts/mining_guild.rs2:1-8: mining 60 for the surface descent.
-    { x: 3018, z: 3340, level: 0, skill: 'mining', levelReq: 60 },
-    { x: 3018, z: 3338, level: 0, skill: 'mining', levelReq: 60 },
+    // scripts/areas/area_falador/scripts/mining_guild.rs2:1-8: mining 60 for the surface descent; the four stands are the cardinal tiles outside the ring of ladder 2113 placements.
+    { x: 3017, z: 3339, level: 0, skill: 'mining', levelReq: 60 },
+    { x: 3019, z: 3337, level: 0, skill: 'mining', levelReq: 60 },
     { x: 3019, z: 3341, level: 0, skill: 'mining', levelReq: 60 },
-    { x: 3020, z: 3340, level: 0, skill: 'mining', levelReq: 60 },
+    { x: 3021, z: 3339, level: 0, skill: 'mining', levelReq: 60 },
     // scripts/skill_agility/scripts/shortcuts.rs2:112-122 gates `_island_rope_swing` except locId 2323 to avoid an island softlock.
     // 377 transport locIds: 2322 north swing, 2323 softlock swing, 2324 ogre swing; only the outer swings require 10.
     { x: 2709, z: 3209, level: 0, skill: 'agility', levelReq: 10 }, // tree_ropeswing1 north
@@ -84,9 +84,9 @@ const CROSSING_GATES: readonly {
     { x: 3440, z: 9887, level: 0, quest: 'Priest in Peril', minStatus: 'complete', note: 'pip_underground_wall_side_withportal needs %priestperil = 61' },
     // scripts/quests/quest_elena/scripts/sewerpipe.rs2:1-16,32-43: opened pipe + gas mask worn; stage is execution-only.
     {
-        x: 2530, z: 9703, level: 0, quest: 'Plague City', minStatus: 'started',
+        x: 2514, z: 9739, level: 0, quest: 'Plague City', minStatus: 'started',
         worn: [{ name: 'Gas mask', count: 1 }],
-        note: 'plaguesewerpipe needs the mask worn, not carried'
+        note: 'plaguesewerpipe_open needs the mask worn, not carried'
     },
     // scripts/quests/quest_desertrescue/scripts/quest_desertrescue.rs2:1-5,84-149: both gate halves check Metal key without consuming it.
     {

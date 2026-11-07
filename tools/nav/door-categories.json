@@ -70,8 +70,8 @@
       "source": "category.pack:47 (id 46); special quest gate, fail closed until route qualification"
     },
     "shipyard_gate": {
-      "decision": "refuse",
-      "source": "category.pack:52 (id 51); special quest gate, fail closed until route qualification"
+      "decision": "admit",
+      "source": "category.pack:52 (id 51); the shipyard gate answers Open with the Ka-Lu-Min challenge, whose four answers specialCrossings.ts carries for 2945,3041-3042"
     },
     "door_left_closed": {
       "decision": "admit",
@@ -86,12 +86,12 @@
       "source": "category.pack:63 (id 62); quest_ball.rs2:33-36 can damage players without leather gloves"
     },
     "border_gate_toll_left": {
-      "decision": "refuse",
-      "source": "category.pack:64 (id 63); border_gate.rs2:4-6 routes Open through a guard dialogue"
+      "decision": "admit",
+      "source": "category.pack:64 (id 63); border_gate.rs2:4-6 routes Open through a guard dialogue that pays 10 coins (free after Prince Ali Rescue); specialCrossings.ts models the fare and the 'Yes, ok.' answer at 3268,3227-3228"
     },
     "border_gate_toll_right": {
-      "decision": "refuse",
-      "source": "category.pack:65 (id 64); border_gate.rs2:4-6 routes Open through a guard dialogue"
+      "decision": "admit",
+      "source": "category.pack:65 (id 64); border_gate.rs2:4-6 routes Open through a guard dialogue that pays 10 coins (free after Prince Ali Rescue); specialCrossings.ts models the fare and the 'Yes, ok.' answer at 3268,3227-3228"
     },
     "door_closed": {
       "decision": "admit",
@@ -138,6 +138,86 @@
     "74": {
       "decision": "refuse",
       "source": "quest_blackknight.rs2:8-10 explicitly says the right door cannot be opened (pitfall 13)"
+    },
+    "92": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_ikov/scripts/ikov_dungeon.rs2:174-179 opens once %ikov >= ikov_pulled_lever; the planner does not model the stage and the Ikov module (defs/ikov) owns the sequence, as at 289"
+    },
+    "93": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_ikov/scripts/ikov_dungeon.rs2:181-: opens once the fire warrior is defeated; the Ikov module owns the sequence, as at 289"
+    },
+    "99": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_ikov/scripts/ikov_dungeon.rs2:225-230 opens with the Shiny key; specialCrossings.ts keys the crossing at 2657,3496 on that key"
+    },
+    "1804": {
+      "decision": "admit",
+      "source": "scripts/areas/area_edgeville/scripts/edgeville_dungeon.rs2:1-10 answers Open with 'locked' and opens on the Brass key (oplocu); specialCrossings.ts keys 3115,3450 on that key, so a keyless plan avoids it"
+    },
+    "2002": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_waterfall/scripts/quest_waterfall.rs2:365-385 opens with the Baxtorian key (oplocu); specialCrossings.ts keys the crossing at 2568,9893 on that item"
+    },
+    "2025": {
+      "decision": "admit",
+      "source": "scripts/skill_fishing/scripts/fishing_guild.rs2:1-12 opens at Fishing 68; specialRequires.ts DOOR_SKILL_GATES carries the level for 2611,3394 and 2611,3398"
+    },
+    "2112": {
+      "decision": "admit",
+      "source": "scripts/areas/area_falador/scripts/mining_guild.rs2:10-16 opens at Mining 60; specialRequires.ts DOOR_SKILL_GATES carries the level for 3046,9756"
+    },
+    "2647": {
+      "decision": "admit",
+      "source": "scripts/skill_crafting/scripts/crafting_guild/crafting_guild.rs2:1-18 opens at Crafting 40 with a brown apron worn; specialRequires.ts DOOR_SKILL_GATES carries the level for 2933,3289"
+    },
+    "2675": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_desertrescue/scripts/quest_desertrescue.rs2:418 @open_camp_door(^left); desertMiningCampDoors.ts replaces this row with the directed camp transports that carry the key requirement"
+    },
+    "2676": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_desertrescue/scripts/quest_desertrescue.rs2:419 @open_camp_door(^right); replaced by the directed camp transports like 2675"
+    },
+    "2712": {
+      "decision": "admit",
+      "source": "scripts/skill_cooking/scripts/cooking_guild.rs2:1-19 opens at Cooking 32 with a chef's hat worn; specialRequires.ts DOOR_SKILL_GATES carries both for 3143,3444"
+    },
+    "3390": {
+      "decision": "refuse",
+      "source": "scripts/quests/quest_elemental_workshop/scripts/quest_elemental_workshop.rs2:14-15,20-26 the odd wall only opens from the inside; the outward crossing is the directed transport row, so a two-way door edge would let the planner enter"
+    },
+    "3391": {
+      "decision": "refuse",
+      "source": "scripts/quests/quest_elemental_workshop/scripts/quest_elemental_workshop.rs2:14-15,20-26 the left half of the odd wall, same inside-only rule as 3390"
+    },
+    "3745": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_death/scripts/quest_death.rs2:46-61 opens when leaving; entering needs the Tenzing stage, which the Death Plateau module owns, as at 289"
+    },
+    "3746": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_death/scripts/quest_death.rs2:63-71 opens when entering from the back; leaving needs the map stage, owned by the Death Plateau module, as at 289"
+    },
+    "3782": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_troll/scripts/quest_troll.rs2:74,77-88 opens for anyone; Dad's challenge starts on the first pass"
+    },
+    "3783": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_troll/scripts/quest_troll.rs2:75,77-88 opens for anyone, the right half of 3782"
+    },
+    "3785": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_troll/scripts/quest_troll.rs2:90,93-110 the exit refuses until %troll_quest reaches troll_defeated_dad; routes only enter the arena, as at 289"
+    },
+    "3786": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_troll/scripts/quest_troll.rs2:91,93-110 same exit rule, the right half of 3785"
+    },
+    "3810": {
+      "decision": "admit",
+      "source": "scripts/quests/quest_troll/scripts/quest_troll.rs2:248-262 opens from inside, or with the storeroom key at the burnt-meat stage; the Eadgar module owns the key stage, as at 289"
     },
     "4963": {
       "decision": "refuse",

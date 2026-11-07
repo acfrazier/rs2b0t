@@ -6,9 +6,6 @@ import { gunzipSync } from 'fflate';
 import transports from '#/bot/event/webwalk/data/transports.json';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/elementalWorkshopExit.test.ts', 'the offline-qualified 377 graph has no route for this 289 fixture (nav qualification pending, S8 live tier)');
 
 const PACK = 'out/collision.lcnav.gz';
 const EXIT = {
@@ -28,7 +25,7 @@ test('Elemental Workshop has an unconditional exit at the scripted landing', () 
     expect(exit?.requires).toBeUndefined();
 });
 
-skipped('the odd wall only offers the free outward crossing', () => {
+test('the odd wall only offers the free outward crossing', () => {
     const walls = transports.filter(row => [3390, 3391].includes(row.locId ?? -1));
     expect(walls).toHaveLength(1);
     expect(walls[0]).toMatchObject({
@@ -44,7 +41,7 @@ skipped('the odd wall only offers the free outward crossing', () => {
 });
 
 describe.skipIf(!fs.existsSync(PACK))('Elemental Workshop banking route', () => {
-    skipped('a character left inside can climb out and reach Seers bank', () => {
+    test('a character left inside can climb out and reach Seers bank', () => {
         const finder = new PathFinder(gunzipSync(fs.readFileSync(PACK)));
         loadDefaultNavEdges(finder);
         const route = finder.findPath({ x: 2715, z: 9889, level: 0 }, { x: 2725, z: 3491, level: 0 });

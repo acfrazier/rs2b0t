@@ -6,9 +6,6 @@ import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { matchesTransportLanding } from '#/bot/event/webwalk/exec/transportLoc.js';
 import { meetsRequires } from '#/bot/event/webwalk/requires.js';
 import { emptyWorldStateData, worldStateFromData } from '#/bot/event/webwalk/worldStateData.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/iceQueenRoute.test.ts', 'the offline-qualified 377 graph has no route for this 289 fixture (nav qualification pending, S8 live tier)');
 
 const west = { x: 2837, z: 3518, level: 0 };
 const east = { x: 2840, z: 3517, level: 0 };
@@ -36,7 +33,7 @@ test.each([
     expect(edges.some(e => meetsRequires(e.requires, state).ok)).toBe(false);
 });
 
-skipped.skipIf(!existsSync('out/collision.lcnav.gz'))('Catherby reaches the Ice Queen through the rockslide and five ladders', () => {
+test.skipIf(!existsSync('out/collision.lcnav.gz'))('Catherby reaches the Ice Queen through the rockslide and five ladders', () => {
     const finder = new PathFinder(gunzipSync(readFileSync('out/collision.lcnav.gz')));
     loadDefaultNavEdges(finder);
     const state = { ...emptyWorldStateData(), skills: { mining: 50 }, items: { 'Bronze pickaxe': 1 } };

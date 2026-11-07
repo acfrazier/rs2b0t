@@ -14,9 +14,6 @@ import { PathFinder, type Waypoint } from '#/bot/event/webwalk/PathFinder.js';
 import { WalkExecutor } from '#/bot/event/webwalk/WalkExecutor.js';
 import * as liveState from '#/bot/event/webwalk/worldStateLive.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/routeFunding.test.ts', 'the offline-qualified 377 graph has no route for this 289 fixture (nav qualification pending, S8 live tier)');
 
 const draynor = { x: 3093, z: 3243, level: 0 };
 const ardougne = { x: 2655, z: 3283, level: 0 };
@@ -135,7 +132,7 @@ describe.skipIf(!packExists)('route funding with the real navigation pack', () =
         expect(here).toEqual(draynor);
     });
 
-    skipped('funds the bank-origin route after paying the toll to reach the bank', async () => {
+    test('funds the bank-origin route after paying the toll to reach the bank', async () => {
         here = { x: 3267, z: 3227, level: 0 };
         expect(await WalkExecutor.walkTo(ardougne, { useTeleportCatalog: false })).toBe(true);
         expect(withdrawn).toBe(50);

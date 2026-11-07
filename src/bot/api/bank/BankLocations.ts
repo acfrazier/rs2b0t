@@ -87,13 +87,13 @@ export const BANK_LOCATIONS: BankLocation[] = [
         tile: new Tile(3308, 3120, 0),
         access: { name: 'Shantay chest', op: 'Open' }
     },
-    // Why: Gundai's cellar, where magearena_ladder_to_cellar lands: slash the 2 bigweb_slashable webs along z=3957 and climb down at (3091,3958), all 3 baked as edges. Kolodion's arena teleport is unrelated.
+    // Why: Gundai's cellar, reached at 377 by the lever at (3090,3956) (magearena_lever_to_cellar lands at 2539,4712): slash the 2 bigweb_slashable webs along z=3957, then pull the lever, all baked as edges. Kolodion's arena teleport is unrelated.
     // Why: still gated, because that's ~level 55 Wilderness and the webs need a wielded slash weapon, so it must not win on distance for a script working elsewhere.
     {
         name: 'Mage Arena',
         tile: new Tile(2542, 4714, 0),
         requires: { setting: USE_MAGE_BANK },
-        approach: new Tile(3091, 3958, 0),
+        approach: new Tile(3090, 3956, 0),
         npcAccess: { name: 'Gundai', op: 'Talk-to', choose: "I'd like to access my bank account" }
     },
     // Why: the Grand Tree 1F bank booths (SE of the trunk ladder) open without the Grand Tree quest, though the mine still requires it.

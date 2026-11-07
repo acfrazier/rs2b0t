@@ -33,6 +33,7 @@ function clientFixture(fields: Record<string, unknown> = {}): ClientInstance {
         redrawFrame: false,
         mainModalId: -1,
         chatModalId: -1,
+        tutComId: -1,
         reportAbuseComId: -2,
         reportAbuseInput: '',
         socialInputOpen: false,

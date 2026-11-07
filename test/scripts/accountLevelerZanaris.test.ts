@@ -13,7 +13,7 @@ import { enabledSkills } from '#/bot/scripts/AccountLeveler/planner.js';
 import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
 import { skip377 } from '../lib/skip377.js';
 
-const skipped = skip377('test/scripts/accountLevelerZanaris.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
+const skipped = skip377('test/scripts/accountLevelerZanaris.test.ts', '377 data gap: loc 2411 (zanarismarketdoor) and npc 33 (doorman) are declared in the 377 pack but placed in no 377 map file, so the Zanaris market gate this test crosses does not exist in the 377 world (grep of canon-1105 content/maps for ": 2411" and ": 33" finds none; Jakut spawns in m38_69)');
 
 const snapshot = (): LevelerSnapshot => ({
     levels: Object.fromEntries(enabledSkills.map(skill => [skill, 60])), target: 60, now: 1000,

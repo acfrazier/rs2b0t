@@ -1458,10 +1458,9 @@ export class Client extends GameShell {
                 return;
             }
 
-            if (!req.data) {
-                continue;
-            }
-
+            // Java 377 updateOnDemand (2535-2578) processes null completions: a model with null data installs
+            // empty metadata so Model.isReady holds, and a map file with null data is marked -1 so the scene
+            // build stops waiting for it. The arms are separate ifs, as in Java.
             if (req.archive === 0) {
                 Model.unpack(req.file, req.data);
 
@@ -1472,13 +1471,17 @@ export class Client extends GameShell {
                         this.redrawChat = true;
                     }
                 }
-            } else if (req.archive === 1) {
+            }
+
+            if (req.archive === 1 && req.data !== null) {
                 AnimFrame.unpack(req.data);
-            } else if (req.archive === 2) {
-                if (this.midiSong === req.file) {
-                    this.saveMidi(req.data, this.midiFading);
-                }
-            } else if (req.archive === 3) {
+            }
+
+            if (req.archive === 2 && this.midiSong === req.file && req.data !== null) {
+                this.saveMidi(req.data, this.midiFading);
+            }
+
+            if (req.archive === 3) {
                 if (this.mapBuildGroundData && this.mapBuildLocationData && this.sceneState === 1) {
                     for (let i = 0; i < this.mapBuildGroundData.length; i++) {
                         if (this.mapBuildGroundFile[i] == req.file) {
@@ -1502,10 +1505,11 @@ export class Client extends GameShell {
                         }
                     }
                 }
-            } else if (req.archive === 93) {
-                if (this.onDemand.hasMapLocFile(req.file)) {
-                    ClientBuild.prefetchLocations(new Packet(req.data), this.onDemand);
-                }
+            }
+
+            // Java archive 93 builds a Packet over the data unguarded; a null completion has nothing to prefetch.
+            if (req.archive === 93 && req.data !== null && this.onDemand.hasMapLocFile(req.file)) {
+                ClientBuild.prefetchLocations(new Packet(req.data), this.onDemand);
             }
         }
     }
@@ -2944,12 +2948,15 @@ export class Client extends GameShell {
         if (this.mouseX > 17 && this.mouseY > 357 && this.mouseX < 496 && this.mouseY < 453) {
             if (this.chatModalId !== -1) {
                 this.addComponentOptions(IfType.list[this.chatModalId], this.mouseX, this.mouseY, 17, 357, 0);
+            } else if (this.tutComId !== -1) {
+                // Java 377 3938-3939: the sticky chat interface takes the chat-region input.
+                this.addComponentOptions(IfType.list[this.tutComId], this.mouseX, this.mouseY, 17, 357, 0);
             } else if (this.mouseY < 434 && this.mouseX < 426 && getClient377State(this).chatbackInputOpen === 0) {
                 this.addChatOptions(this.mouseX - 17, this.mouseY - 357);
             }
         }
 
-        if (this.chatModalId !== -1 && this.lastOverComId !== this.overChatComId) {
+        if ((this.chatModalId !== -1 || this.tutComId !== -1) && this.lastOverComId !== this.overChatComId) {
             this.redrawChat = true;
             this.overChatComId = this.lastOverComId;
         }
@@ -4677,9 +4684,10 @@ export class Client extends GameShell {
     private addNpcs(alwaysontop: boolean): void {
         for (let i: number = 0; i < this.npcCount; i++) {
             const npc: ClientNpc | null = this.npc[this.npcIds[i]];
-            const typecode: number = ((this.npcIds[i] << 14) + 0x20000000) | 0;
+            let typecode: number = ((this.npcIds[i] << 14) + 0x20000000) | 0;
 
-            if (!npc || !npc.isReady() || npc.type?.alwaysontop !== alwaysontop) {
+            // Java 377 pushPlayers (6065-6071): a multinpc whose form resolves to nothing is not drawn (method473).
+            if (!npc || !npc.isReady() || !npc.type || npc.type.alwaysontop !== alwaysontop || !resolveMultiNpc(npc.type, this.var)) {
                 continue;
             }
 
@@ -4696,6 +4704,11 @@ export class Client extends GameShell {
                 }
 
                 this.tileLastOccupiedCycle[x][z] = this.sceneCycle;
+            }
+
+            // Java 6076-6078: a base type that is not active takes no mouse picking.
+            if (!npc.type.active) {
+                typecode = (typecode + -0x80000000) | 0;
             }
 
             this.world?.addDynamic(this.minusedlevel, npc.x, this.getAvH(npc.x, npc.z, this.minusedlevel), npc.z, npc, typecode, npc.yaw, (npc.size - 1) * 64 + 60, npc.needsForwardDrawPadding);
@@ -8665,13 +8678,15 @@ export class Client extends GameShell {
 
         if (action === MiniMenuAction.OP_NPC6) {
             const npc: ClientNpc | null = this.npc[a];
-            if (npc && npc.type) {
+            // Java 377 doAction 1668 (10318-10323): examine reads the resolved multinpc form.
+            const form: NpcType | null = npc && npc.type ? resolveMultiNpc(npc.type, this.var) : null;
+            if (form) {
                 let examine: string;
 
-                if (!npc.type.desc) {
-                    examine = "It's a " + npc.type.name + '.';
+                if (!form.desc) {
+                    examine = "It's a " + form.name + '.';
                 } else {
-                    examine = npc.type.desc;
+                    examine = form.desc;
                 }
 
                 this.addChat(0, examine, '');
@@ -9330,8 +9345,14 @@ export class Client extends GameShell {
         }
     }
 
-    private addNpcOptions(npc: NpcType, a: number, b: number, c: number): void {
+    private addNpcOptions(base: NpcType, a: number, b: number, c: number): void {
         if (this.menuNumEntries >= 400) {
+            return;
+        }
+
+        // Java 377 addNpcOptions (10521-10530): name, ops and level live on the resolved form of a multinpc; hidden and inactive forms add nothing.
+        const npc: NpcType | null = resolveMultiNpc(base, this.var);
+        if (!npc || !npc.active) {
             return;
         }
 
@@ -12234,7 +12255,9 @@ export class Client extends GameShell {
 
         for (let i: number = 0; i < this.npcCount; i++) {
             const npc: ClientNpc | null = this.npc[this.npcIds[i]];
-            if (npc && npc.isReady() && npc.type && npc.type.minimap) {
+            // Java 377 drawMinimap (12286-12294): the minimap flag and active come from the resolved multinpc form.
+            const form: NpcType | null = npc && npc.isReady() && npc.type ? resolveMultiNpc(npc.type, this.var) : null;
+            if (npc && form && form.minimap && form.active) {
                 anchorX = ((npc.x / 32) | 0) - ((this.localPlayer.x / 32) | 0);
                 anchorY = ((npc.z / 32) | 0) - ((this.localPlayer.z / 32) | 0);
                 this.minimapDrawDot(anchorY, this.mapdots2, anchorX);

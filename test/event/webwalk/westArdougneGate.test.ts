@@ -4,9 +4,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData, type WorldStateData } from '#/bot/event/webwalk/worldStateData.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/westArdougneGate.test.ts', 'the 377 transport rows model the West Ardougne gate as ardougnedoor_l (loc 8738), not the ardougnewalldoor 2048/2049 this fixture asserts (S8 live tier pending)');
 
 function fixture(): PathFinder {
     const pack = new Uint8Array(10 + 3 + 4096 + 512);
@@ -25,13 +22,15 @@ const complete: WorldStateData = {
     quests: { 'Plague City': 'complete', Biohazard: 'complete' }
 };
 
+// 377 map placements of the Ardougne wall door: ardougnedoor_l (8738) at 2557,3300 and 2558,3299, ardougnedoor_r (8739) at 2557,3299 and 2558,3300.
+// A crossing clicks the placement in line with its stand tiles, so each row names the loc beside the row's own z.
 for (const [x, toX, z, locX, locId] of [
-    [2559, 2556, 3300, 2558, 2049],
-    [2556, 2559, 3300, 2557, 2048],
-    [2559, 2556, 3299, 2558, 2048],
-    [2556, 2559, 3299, 2557, 2049]
+    [2559, 2556, 3300, 2558, 8739],
+    [2556, 2559, 3300, 2557, 8738],
+    [2559, 2556, 3299, 2558, 8738],
+    [2556, 2559, 3299, 2557, 8739]
 ]) {
-    skipped(`Biohazard complete opens ${x},${z} to ${toX},${z} without a Gas mask`, () => {
+    test(`Biohazard complete opens ${x},${z} to ${toX},${z} without a Gas mask`, () => {
         const result = fixture().findPath({ x, z, level: 0 }, { x: toX, z, level: 0 }, { state: complete });
         expect(result.ok).toBe(true);
         if (!result.ok) return;
@@ -51,9 +50,9 @@ for (const status of ['not_started', 'started', 'unknown'] as const) {
 }
 
 for (const [Biohazard, allowed] of [['not_started', true], ['started', false], ['complete', false], ['unknown', false]] as const) {
-    (allowed ? skipped : test)(`the garden mud patch is ${allowed ? 'open' : 'closed'} with Biohazard ${Biohazard}`, () => {
+    test(`the garden mud patch is ${allowed ? 'open' : 'closed'} with Biohazard ${Biohazard}`, () => {
         const from = { x: 2566, z: 3330, level: 0 };
-        const to = { x: 2562, z: 9737, level: 0 };
+        const to = { x: 2518, z: 9760, level: 0 };
         const size = 3 + 4096 + 512;
         const pack = new Uint8Array(10 + 2 * size);
         pack.set([0x4c, 0x43, 0x4e, 0x56, 1, 1, 0, 0, 2, 0]);
@@ -72,7 +71,7 @@ for (const [Biohazard, allowed] of [['not_started', true], ['started', false], [
 
 const packPath = 'out/collision.lcnav.gz';
 describe.skipIf(!existsSync(packPath))('West Ardougne gate on the collision pack', () => {
-    skipped('a completed account at the filled garden patch takes the city gate even with the sewer kit', () => {
+    test('a completed account at the filled garden patch takes the city gate even with the sewer kit', () => {
         const finder = new PathFinder(gunzipSync(readFileSync(packPath)));
         loadDefaultNavEdges(finder);
         const state = { ...complete, items: { Spade: 1 }, worn: { 'Gas mask': 1 } };
@@ -80,11 +79,11 @@ describe.skipIf(!existsSync(packPath))('West Ardougne gate on the collision pack
         expect(result.ok).toBe(true);
         if (!result.ok) return;
         const crossings = result.waypoints.flatMap(point => point.transport ? [point.transport] : []);
-        expect(crossings.some(crossing => [2048, 2049].includes(crossing.locId ?? -1))).toBe(true);
+        expect(crossings.some(crossing => [8738, 8739].includes(crossing.locId ?? -1))).toBe(true);
         expect(crossings.some(crossing => /sewer|mud|manhole/i.test(crossing.locName))).toBe(false);
     });
 
-    skipped('routes from Ardougne bank to clue 3522 and returns through the gate without a mask', () => {
+    test('routes from the Ardougne bank to the west-side dig tile and returns through the gate without a mask', () => {
         const finder = new PathFinder(gunzipSync(readFileSync(packPath)));
         loadDefaultNavEdges(finder);
         const bank = { x: 2616, z: 3332, level: 0 };
@@ -94,7 +93,7 @@ describe.skipIf(!existsSync(packPath))('West Ardougne gate on the collision pack
             expect(result.ok).toBe(true);
             if (!result.ok) continue;
             const crossings = result.waypoints.flatMap(point => point.transport ? [point.transport] : []);
-            expect(crossings.some(crossing => [2048, 2049].includes(crossing.locId ?? -1))).toBe(true);
+            expect(crossings.some(crossing => [8738, 8739].includes(crossing.locId ?? -1))).toBe(true);
             expect(crossings.some(crossing => /sewer|mud|manhole/i.test(crossing.locName))).toBe(false);
         }
     });

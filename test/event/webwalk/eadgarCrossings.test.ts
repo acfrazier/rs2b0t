@@ -3,9 +3,6 @@ import { describe, expect, test } from 'bun:test';
 import type { TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
 import doors from '#/bot/event/webwalk/data/doors.json';
 import transports from '#/bot/event/webwalk/data/transports.json';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/eadgarCrossings.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
 
 const edges = transports as TransportEdgeData[];
 const doorEdges = doors as { x: number; z: number; level: number; locId: number }[];
@@ -27,7 +24,7 @@ describe('troll storeroom staircase', () => {
 
     // Why: the storeroom door and the interior door were already derived; only the stair was missing,
     // and without it the goutweed crate is unreachable from anywhere in the stronghold.
-    skipped('the two doors past it are still in the door data', () => {
+    test('the two doors past it are still in the door data', () => {
         expect(doorEdges.some(door => door.locId === 3810 && door.x === 2869 && door.z === 10085)).toBe(true);
         expect(doorEdges.some(door => door.locId === 3776 && door.x === 2861 && door.z === 10092)).toBe(true);
     });

@@ -24,9 +24,6 @@ import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { richTransportQuestMap } from '#/bot/event/webwalk/transportQuestReqs.js';
 import { emptyWorldStateData, type WorldStateData } from '#/bot/event/webwalk/worldStateData.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/api/bank/bank-locations.test.ts', 'the offline-qualified 377 graph has no route for this 289 fixture (nav qualification pending, S8 live tier)');
 
 const MAGE_KEY = `rs2b0t:set:Global:${USE_MAGE_BANK}`;
 
@@ -373,7 +370,7 @@ describe('nearestWalkableBank picks the walkable-nearest bank, not the air-neare
     }
 
     const costWalk = bankCostForFinder(finder, { state, maxExpansions: 500_000 });
-    const blockedCost = bankCostForFinder(finder, { state, maxExpansions: 500_000, avoidDoors: new Set(['3091|3957']) });
+    const blockedCost = bankCostForFinder(finder, { state, maxExpansions: 500_000, avoidDoors: new Set(['3090|3956']) });
     const walkTo = (from: { x: number; z: number; level: number }, name: string, cost: BankPathCost = costWalk): number | null => {
         const bank = BANK_LOCATIONS.find(b => b.name === name)!;
         return cost(from, bank.tile);
@@ -397,10 +394,10 @@ describe('nearestWalkableBank picks the walkable-nearest bank, not the air-neare
         expect(picked?.name).toBe('Falador East');
     }, 120_000);
 
-    skipped('at the Mage Arena webs, the walk to Edgeville beats the air-close Gundai cellar', () => {
+    test('at the Mage Arena webs, the walk to Edgeville beats the air-close Gundai cellar', () => {
         setSetting(true);
         const from = { x: 3094, z: 3785, level: 0 };
-        // Why: off the ladder mouth the air line to Gundai's cellar is a few tiles, but the full route is a run to the webs plus the ladder, and Edgeville's plain road is cheaper.
+        // Why: off the lever the air line to Gundai's cellar is a few tiles, but the full route is a run to the webs plus the lever, and Edgeville's plain road is cheaper.
         expect(nearestBank(from)?.name).toBe('Mage Arena');
         expect(walkTo(from, 'Edgeville')!).toBeLessThan(walkTo(from, 'Mage Arena')!);
         expect(nearestWalkableBank(from, costWalk)?.name).toBe('Edgeville');
@@ -409,7 +406,7 @@ describe('nearestWalkableBank picks the walkable-nearest bank, not the air-neare
     test('ladder edge blocked, the Mage Arena is rejected outright', () => {
         setSetting(true);
         const from = { x: 3091, z: 3958, level: 0 };
-        // Why: the ladder loc at 3091|3957 is the only route to the cellar; blocking it makes the bank unreachable so the selector skips it and returns the nearest surface bank instead.
+        // Why: the lever loc at 3090|3956 is the only route to the cellar; blocking it makes the bank unreachable so the selector skips it and returns the nearest surface bank instead.
         expect(walkTo(from, 'Mage Arena', blockedCost)).toBeNull();
         expect(nearestWalkableBank(from, blockedCost)?.name).not.toBe('Mage Arena');
     }, 120_000);

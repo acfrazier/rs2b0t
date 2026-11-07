@@ -8,15 +8,12 @@ import { specialCrossingForTransport } from '#/bot/event/webwalk/data/specialCro
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/blackKnightFortress.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
 
 const PACK = 'out/collision.lcnav.gz';
 const OUTSIDE = { x: 3016, z: 3513, level: 0 };
 const HOLE = { x: 3031, z: 3508, level: 1 };
 
-skipped('the banquet-hall ladder preserves the required southern approach on both floors', () => {
+test('the banquet-hall ladder preserves the required southern approach on both floors', () => {
     const edges = stairs.filter(edge => edge.locX === 3022 && edge.locZ === 3518);
     expect(edges).toHaveLength(2);
     for (const edge of edges) {
@@ -35,7 +32,7 @@ test('the banquet door answers the guard warning', () => {
 });
 
 describe.skipIf(!fs.existsSync(PACK))('Black Knight fortress route', () => {
-    skipped('Amik can reach the grill tile through the eastern ladder landing and leave again', () => {
+    test('Amik can reach the grill tile through the eastern ladder landing and leave again', () => {
         const finder = new PathFinder(gunzipSync(fs.readFileSync(PACK)));
         loadDefaultNavEdges(finder);
         const amik = { x: 2962, z: 3338, level: 2 };
@@ -54,7 +51,7 @@ describe.skipIf(!fs.existsSync(PACK))('Black Knight fortress route', () => {
         }
     });
 
-    skipped('the hole and return route use the banquet ladder and secret wall', () => {
+    test('the hole and return route use the banquet ladder and secret wall', () => {
         const finder = new PathFinder(gunzipSync(fs.readFileSync(PACK)));
         loadDefaultNavEdges(finder);
         for (const [from, to] of [[OUTSIDE, HOLE], [HOLE, OUTSIDE]]) {

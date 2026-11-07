@@ -85,3 +85,13 @@ cross-checked against the `<rune>temple_ruined` loc the maps place (`pack/loc.pa
 The macro_ent_* ids are `pack/npc.pack:1720-1751,1792-1793`: tree1-6 1719/1720/1721/1744/1747/1748, dead_tree1-11 1722-1732 plus dead_tree12 1745, dramen 1733, magic 1734, maple 1735,
 willow1-3 1736-1738, oak 1739, yew 1740, evergreen1-3 1741-1743, achey 1746, hollow1-2 1749-1750, jungle_tree1-2 1791-1792. The 289 pack numbered them 444-452; pack ids depend on build history (pitfall 11).
 The neighbours are not ents: crow 1751, favour_jimmy 1718, mm_waymottin_final_battle 1790, favour_tassie_slipcast 1793.
+
+## Nav rows and camps changed in SC-i round 2
+
+- Mage Arena: the cellar levers `magearena_lever_to_cellar` and `magearena_lever_from_cellar` teleport to 0_39_73_43_40 and 0_48_61_18_52 (`scripts/areas/area_mage_arena/scripts/mage_arena.rs2:1-22`). The 289 mystic-portal rows are gone: loc 2880 `magearena_scan` has no placement near 3105,3953 (`maps/m28_68.jm2:21871` holds its only placements).
+- West Ardougne sewer: the pipe is entered from 2514,9739, the mud patch drops to 2518,9760, the manhole lands at 2529,3304 (`quest_elena.constant:23-26`).
+- Dwarven trapdoor: loc 11867 `fai_dwarf_trapdoor_down` at 3019,3450, stood on from 3018,3450 (3019,3450 is blocked in the pack).
+- Zanaris market gate: loc 2411 and npc 33 are declared (`pack/loc.pack:2412`, `pack/npc.pack:34`) but placed in no map file, so no gate exists to cross.
+- Ardougne men camp: the Man at 2614,3318 is behind the locked door_2556 (`skill_thieving/scripts/doors/locked_door.rs2:83-106`); the camp stands at the Man at 2621,3293.
+- Lumbridge start tile 3208,3220 is a sealed castle room in the 377 map; its only door is the Recipe for Disaster door (`rfd_feast_door.rs2:6-9`).
+- Iron dragon loot: `npc_default_death` adds the `death_drop` param (`skill_combat/scripts/npc/npc_combat.rs2:3,90-95`); `iron_dragon` carries `param=death_drop,dragon_bones` (`dragons.npc`).

@@ -43,7 +43,8 @@ export const COMBAT_CAMPS: readonly CombatCamp[] = [
     { id: 'seers-men', region: 'seers', target: 'Man', x: 2695, z: 3493, hp: 25, offence: 20, defence: 20, herbs: true },
     { id: 'seers-women', region: 'seers', target: 'Woman', x: 2696, z: 3496, hp: 25, offence: 20, defence: 20, herbs: true },
     { id: 'catherby-men', region: 'catherby', target: 'Man', x: 2804, z: 3430, hp: 25, offence: 20, defence: 20, herbs: true },
-    { id: 'ardougne-men', region: 'ardougne', target: 'Man', x: 2614, z: 3318, hp: 25, offence: 20, defence: 20 },
+    // 377: the Man (npc 24) spawn at 2614,3318 is inside a house whose door_2556 is locked from outside (skill_thieving/scripts/doors/locked_door.rs2:83-106), so the camp stands at the other spawn, 2621,3293.
+    { id: 'ardougne-men', region: 'ardougne', target: 'Man', x: 2621, z: 3293, hp: 25, offence: 20, defence: 20 },
     { id: 'ardougne-cows', region: 'ardougne', target: 'Cow', x: 2664, z: 3347, hp: 25, offence: 20, defence: 20 },
     { id: 'ardougne-monks', region: 'ardougne', target: 'Monk', x: 2608, z: 3213, hp: 25, offence: 20, defence: 20 },
     { id: 'ardougne-guards', region: 'ardougne', target: 'Guard', x: 2659, z: 3308, hp: 30, offence: 25, defence: 25 },

@@ -33,11 +33,12 @@ describe('specialRequiresAt — guild skill gates (content-backed)', () => {
 
     test('Mining Guild ladder descent requires mining 60 on all four surface stands', () => {
         const mining60 = [{ name: 'mining', level: 60 }];
+        // The 377 ladder_2113 rows stand one tile off the 289 stands, at 3017,3339, 3019,3337, 3019,3341 and 3021,3339.
         for (const [x, z] of [
-            [3018, 3340],
-            [3018, 3338],
+            [3017, 3339],
+            [3019, 3337],
             [3019, 3341],
-            [3020, 3340]
+            [3021, 3339]
         ] as const) {
             expect(specialRequiresAt(x, z, 0)?.skills).toEqual(mining60);
         }

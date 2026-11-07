@@ -19,7 +19,7 @@
   "generators": {
     "tools/clues/cluesParse.ts": "41eed0e98a17b0da13f0993e7d0a2c8f3a9cc0d6f8fa5a3f9a0d1394b1064606",
     "tools/clues/gen-cluedb.ts": "88ea7586ee86d7d0a2f8dc1f0e50d386e4eacf81847c0d4ce9fb0869692fd6fc",
-    "tools/combat/gen-dropdb.ts": "c168de0e955f30b3468fb9d7218e66dadf4df549cebd29d8cf4625f70cb9023c",
+    "tools/combat/gen-dropdb.ts": "e4f41ca3151aac1ed5376c92470dc093a46b9f1b7c0965529dc916819d27550e",
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
     "tools/gen-377-data.sh": "214a987daa89f5dcaaef149b5d0a6421b93532af917d981f9ed30ab2f363569b",
@@ -36,10 +36,10 @@
     "tools/map/encodePng.ts": "ebf62672a4035f6b0a7cfe451cb3d856dfe82201cc3b830c4eec9f4b6159f961",
     "tools/nav/build-collision.ts": "84af9f74ac800e16cf29f9665576069346cedac043056e04d00a9cca09210bcb",
     "tools/nav/derive-doors.ts": "36e6bb5114e227d797a7f7e81fac281157d8ff1cfccd4824295d74d4f66bdfa2",
-    "tools/nav/derive-ladders.py": "96263e7d865e923be22030e0da3dbe6f580d9f5122a9499649a30df164588526",
-    "tools/nav/derive-stairs.ts": "72db7026ab46c7722676f793afeca78c90fcbda7382da2d9c6779aed3df67136",
+    "tools/nav/derive-ladders.py": "eac03e5054bf4e4cf184e3b2f096481c4e6ae147b7c0ac3ad38d691896bebe01",
+    "tools/nav/derive-stairs.ts": "08d86d03f075b1b68c0f8ac128d827e10e4c040300f73c4b8229c72ba7a24b1f",
     "tools/nav/derive-transports.sh": "57e8df7c2818ff8184edd48a1b8733012204dd2211acd21d6341a5853bc40ac1",
-    "tools/nav/enrich-transports.py": "7d0b68e611b0c693904f9c28879abf4660bed83b090862ea6771dbb6374489ae",
+    "tools/nav/enrich-transports.py": "b387488ce93dc331f241649910083814491003328bddaac5460ea99f99660e48",
     "tools/nav/lib.ts": "93f5d22f03c65f8be03e95319085a16b0da62acdaa9753af81c777cb9c476a22",
     "tools/nav/stairsParse.ts": "9369171ffbee7ec995d8da4444a0f11da8ed145ad4154a694dd47668b9eeec06",
     "tools/patches/worldmap-377.patch": "0ac9dbe029993299bf4a2579944b24ff57f68611d4b54906990f329229ccf223",
@@ -49,7 +49,7 @@
   "artifacts": [
     {
       "path": "docs/SCRIPTS.md",
-      "sha256": "ad7d5d1a52be599b46ad63d05aeca71b29697246516faded2e5a8fd554e30334",
+      "sha256": "b35466f002115047371deb2ea1062c80ced3067a2b390f3477b9d0e779881ff6",
       "kind": "generated",
       "qualification": "offline"
     },
@@ -109,7 +109,7 @@
     },
     {
       "path": "src/bot/data/dropdb.ts",
-      "sha256": "7faebd08323d155677a781d4f2217c3999b5d4326abef0fc981896c5482e9a3b",
+      "sha256": "2e71ba5caa2683f9fef61063ccb17393c2450221451df10863aac481534393c3",
       "kind": "generated",
       "qualification": "pending"
     },
@@ -187,25 +187,25 @@
     },
     {
       "path": "src/bot/event/webwalk/data/doors.json",
-      "sha256": "4ece60a5e81d25b39e0eaad4b67beb47ea69bfae17a5e8465fd1b70dee2c9d7d",
+      "sha256": "e570581e44d9353553474af01cf47e695792818fcdefe2f343373195668af7b3",
       "kind": "generated",
       "qualification": "offline"
     },
     {
       "path": "src/bot/event/webwalk/data/stairEdges.json",
-      "sha256": "4c1ff89e8c13be38db1ebcd2787039d9b1107bcbdda4dad60edba36088656745",
+      "sha256": "a093eea39c414af500d02d0d3f6c8ff0a852e5e93d18a9a1c36fade2d4d69cf3",
       "kind": "generated",
       "qualification": "offline"
     },
     {
       "path": "src/bot/event/webwalk/data/transports.json",
-      "sha256": "b403b9c90f47ba2a0a6e43a532dd74644b7e357c3a56d65abe73a9d642de0fd0",
+      "sha256": "5f24e2487f5c7a2daae4cf670980c82d3290a18a254f54f841978489eb849ffb",
       "kind": "generated",
       "qualification": "offline"
     },
     {
       "path": "src/bot/event/webwalk/specialRequires.ts",
-      "sha256": "d028956edc3214b5eb11703dc120b2cd2ce329f48e893c9649e773593a1e14d7",
+      "sha256": "94b083773e81b07e85d6ae1f978cda2f1c98a937c5f0dceea342b644539ad26d",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -217,7 +217,7 @@
     },
     {
       "path": "src/bot/event/webwalk/travelCatalog.ts",
-      "sha256": "23fc5d9e298e8b80c9ea1aadd605b72ef308a3ac782b7caf0b1a96e2e3e30490",
+      "sha256": "dd49401ded52720342b00dcc5bb44a56b38d483d9f59b8e00224338981985b7b",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -235,7 +235,7 @@
     },
     {
       "path": "test/event/webwalk/routeCorpus377.test.ts",
-      "sha256": "984143ebd03ce2bc9b8b084285447ab5ad6c3fcd989e27ec9934529ad8dac8a2",
+      "sha256": "dcc2c264f15838a1d825bfe5b8b8d568cf384a6e2287add2f803f6991dea9c1e",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -361,7 +361,7 @@
     },
     {
       "path": "tools/nav/door-categories.json",
-      "sha256": "d29199f42958ab83af2bba05ae0d461852992d7323ee2f7ad1cdbbcc6d86a3be",
+      "sha256": "5a7cfc4c126d5885c3b2f78d0576d8b1562926bda25390bf73b5161fa21c49fc",
       "kind": "nav-input",
       "qualification": "offline"
     },
@@ -373,7 +373,7 @@
     },
     {
       "path": "tools/nav/stair-prices.json",
-      "sha256": "6b70fdc7a5e548beefc5bf34a7d3d73748895ecc52d82c251bf4c83ba98a75bc",
+      "sha256": "b0d773da25665ef3c3cb1c479a8c6ddd10594dca91a60af73d41c0239ec4da31",
       "kind": "nav-input",
       "qualification": "offline"
     },

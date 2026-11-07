@@ -73,7 +73,8 @@ describe('Priest in Peril crossings', () => {
  * only past `^quest_elena_opened_pipe`. The pack asked for one carried.
  */
 describe('West Ardougne sewer pipe', () => {
-    const pipe = { x: 2530, z: 9703, level: 0 };
+    // 377 quest_elena.constant:23-26 stands the player at 2514,9739 to enter the open pipe loc at 2514,9737.
+    const pipe = { x: 2514, z: 9739, level: 0 };
 
     test('needs Plague City started and the mask worn', () => {
         const req = specialRequiresAt(pipe.x, pipe.z, pipe.level)!;

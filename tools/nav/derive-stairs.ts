@@ -232,9 +232,8 @@ function snapWalkable(finder: PathFinder, x: number, z: number, level: number): 
     return fallback;
 }
 
-// Climb works from a cardinal neighbour with no intervening wall.
-// Why: collision reveals the rotated staircase footprint; the config only provides its size.
-const FOOTPRINT_RADIUS = 1;
+// Climb works from a cardinal neighbour with no intervening wall; the radius matches the walker's PathFinder.cardinalGoals and covers a 1x3 staircase (loc 11724).
+const FOOTPRINT_RADIUS = 2;
 const SIDES: readonly [number, number, number][] = [
     [0, 1, 1 << 2],
     [1, 0, 1 << 3],

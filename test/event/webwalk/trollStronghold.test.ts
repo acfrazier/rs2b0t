@@ -7,9 +7,6 @@ import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import type { WorldStateData } from '#/bot/event/webwalk/worldStateData.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/trollStronghold.test.ts', 'the offline-qualified 377 graph has no route for this 289 fixture (nav qualification pending, S8 live tier)');
 
 const PACK_PATH = path.join(process.cwd(), 'out/collision.lcnav.gz');
 /** Pack is gitignored, pack-dependent tests must skip, never silent-pass (#341). */
@@ -36,7 +33,7 @@ const GODRIC_CELL_DOOR = { x: 2833, z: 10078, level: 0 };
 const DUNSTAN = { x: 2919, z: 3574, level: 0 };
 
 describe.skipIf(!HAS_COLLISION_PACK)('Troll Stronghold route', () => {
-    skipped('bank reaches Dad through the stile and the secret-way rock climbs', () => {
+    test('bank reaches Dad through the stile and the secret-way rock climbs', () => {
         const outcome = loadPack().findPath(FALADOR_BANK, DAD_ARENA, {
             state: questReady()
         });
@@ -47,7 +44,7 @@ describe.skipIf(!HAS_COLLISION_PACK)('Troll Stronghold route', () => {
         expect(hops).toContain('Open Arena Entrance');
     });
 
-    skipped('bank reaches a Troll General on the stronghold top floor', () => {
+    test('bank reaches a Troll General on the stronghold top floor', () => {
         const outcome = loadPack().findPath(FALADOR_BANK, TROLL_GENERAL, {
             state: questReady()
         });
@@ -58,7 +55,7 @@ describe.skipIf(!HAS_COLLISION_PACK)('Troll Stronghold route', () => {
         expect(hops).toContain('Enter Stronghold');
     });
 
-    skipped('bank reaches the prison cells through the prison door and both staircases', () => {
+    test('bank reaches the prison cells through the prison door and both staircases', () => {
         const outcome = loadPack().findPath(FALADOR_BANK, GODRIC_CELL_DOOR, {
             state: questReady()
         });
@@ -68,7 +65,7 @@ describe.skipIf(!HAS_COLLISION_PACK)('Troll Stronghold route', () => {
         expect(hops.filter(h => h === 'Climb-down Stone Staircase').length).toBe(2);
     });
 
-    skipped('the prison leaves by the back exit rather than retracing the stronghold', () => {
+    test('the prison leaves by the back exit rather than retracing the stronghold', () => {
         const finder = loadPack();
         const outcome = finder.findPath(GODRIC_CELL_DOOR, DUNSTAN, {
             state: questReady()

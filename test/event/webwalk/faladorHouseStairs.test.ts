@@ -8,10 +8,6 @@ import doors from '#/bot/event/webwalk/data/doors.json';
 import stairs from '#/bot/event/webwalk/data/stairEdges.json';
 import transports from '#/bot/event/webwalk/data/transports.json';
 import { PathFinder, type DoorEdgeData, type NavPoint, type TransportEdgeData } from '#/bot/event/webwalk/PathFinder.js';
-import { CLUE_DB } from '#/bot/api/ai/clues/data/cluedb.js';
-import { skip377 } from '../../lib/skip377.js';
-
-const skipped = skip377('test/event/webwalk/faladorHouseStairs.test.ts', 'the 377 door and transport rows for this crossing differ from this 289 fixture (S8 live tier pending)');
 
 const PACK_PATH = path.join(process.cwd(), 'out/collision.lcnav.gz');
 const HAS_COLLISION_PACK = fs.existsSync(PACK_PATH);
@@ -29,8 +25,11 @@ function loadFinder(): PathFinder {
 const finder = HAS_COLLISION_PACK ? loadFinder() : (null as unknown as PathFinder);
 const rows = stairs as unknown as TransportEdgeData[];
 
-/** trail_clue_easy_vague013, the chest upstairs in the eastern Falador houses. */
-const CHEST_CLUE = 3497;
+/**
+ * The chest room upstairs in the eastern Falador houses: `param=trail_coord,1_47_52_33_36` of trail_clue_easy_vague013 (377 scripts/_unpack/377/all.obj:41708).
+ * 377 trail_easy.enum:38-42 lists only vague001-005, so the clue is never dispensed; the room and its stairs are still on the 377 map, which is what this test routes to.
+ */
+const CHEST: NavPoint = { x: 3041, z: 3364, level: 1 };
 const FALADOR_EAST_BANK: NavPoint = { x: 3013, z: 3355, level: 0 };
 /** The spiral staircase that reaches the chest, and the tile the house door opens onto. */
 const STAIRS: NavPoint = { x: 3034, z: 3363, level: 0 };
@@ -56,7 +55,8 @@ function footprint(p: NavPoint): NavPoint[] {
         for (const [dx, dz] of SIDES) {
             const nx = cur.x + dx;
             const nz = cur.z + dz;
-            if (Math.max(Math.abs(nx - p.x), Math.abs(nz - p.z)) > 1) {
+            // A straight staircase spans up to three tiles from its placement tile (loc 11724 is 1x3), so the solid footprint is searched two tiles out.
+            if (Math.max(Math.abs(nx - p.x), Math.abs(nz - p.z)) > 2) {
                 continue;
             }
             if (seen.has(`${nx},${nz}`) || finder.walkable(nx, nz, p.level)) {
@@ -96,11 +96,8 @@ describe('eastern Falador house staircase', () => {
 });
 
 describe.skipIf(!HAS_COLLISION_PACK)('eastern Falador house routing', () => {
-    skipped('the chest clue routes through the door and climbs from inside', () => {
-        const chest = CLUE_DB[CHEST_CLUE]!.coord!;
-        expect(chest).toEqual({ x: 3041, z: 3364, level: 1 });
-
-        const route = finder.findPath(FALADOR_EAST_BANK, chest, undefined, 4_000_000);
+    test('the upstairs chest room routes through the door and climbs from inside', () => {
+        const route = finder.findPath(FALADOR_EAST_BANK, CHEST, undefined, 4_000_000);
         expect(route.ok).toBe(true);
         if (!route.ok) {
             return;
@@ -115,7 +112,7 @@ describe.skipIf(!HAS_COLLISION_PACK)('eastern Falador house routing', () => {
         expect(operableTiles(STAIRS).has(`${climb!.from.x},${climb!.from.z}`)).toBe(true);
     });
 
-    skipped('no staircase is anchored on the far side of its own wall', () => {
+    test('no staircase is anchored on the far side of its own wall', () => {
         const walledOff = rows
             .filter(e => e.kind === 'stair' && !e.disabledReason && !isLadder(e) && e.locX !== undefined && e.locZ !== undefined)
             .filter(e => Math.max(Math.abs(e.locX! - e.from.x), Math.abs(e.locZ! - e.from.z)) <= 2)

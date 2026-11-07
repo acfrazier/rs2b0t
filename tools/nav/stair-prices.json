@@ -665,12 +665,33 @@
       ],
       "source": "scripts/areas/area_mausoleum/scripts/holy_barrier.rs2:16"
     },
+    "plaguemanholeopen": {
+      "extraTicks": 0,
+      "locIds": [
+        2544
+      ],
+      "source": "scripts/areas/area_ardougne_west/scripts/manhole.rs2:14-19 climbs down with a zero-length delay then p_telejump"
+    },
+    "plaguemudpatch1": {
+      "extraTicks": 0,
+      "locIds": [
+        2531
+      ],
+      "source": "scripts/quests/quest_elena/scripts/mud_patch.rs2:1-4,13-29 digs with a spade (oplocu), then p_telejump into the sewer"
+    },
     "plaguemudpile": {
       "extraTicks": 0,
       "locIds": [
         2533
       ],
       "source": "scripts/quests/quest_elena/scripts/mud_pile.rs2:1"
+    },
+    "plaguesewerpipe_open": {
+      "extraTicks": 4,
+      "locIds": [
+        2542
+      ],
+      "source": "scripts/quests/quest_elena/scripts/sewerpipe.rs2:1-15,33-49 forcewalks one tile, then agility_exactmove runs 126 client cycles (about 4 ticks) before the p_telejump"
     },
     "puzzle_ladder": {
       "extraTicks": 0,

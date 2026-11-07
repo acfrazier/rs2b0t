@@ -9,9 +9,6 @@ import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import { resolveDangerZones } from '#/bot/event/webwalk/data/dangerZones.js';
 import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
-import { skip377 } from '../lib/skip377.js';
-
-const skipped = skip377('test/scripts/accountLevelerMembersCombat.test.ts', 'the 377 collision pack blocks the Lumbridge start tile 3208,3220 and the offline-qualified graph has no route for the Ardougne camps (nav qualification pending, S8 live tier)');
 
 const members = [
     ['seers-men', [1, 2, 3]], ['seers-women', [4, 5, 6]], ['catherby-men', [1, 2, 3]],
@@ -191,12 +188,13 @@ test('starter selection excludes prison cells and quest-gated guild and house ta
     expect(COMBAT_CAMPS.map(camp => camp.id)).not.toContain('varrock-rats');
 });
 
-skipped.skipIf(!existsSync('out/collision.lcnav.gz')).each(starters.map(([id]) => id))('starter %s is reachable from banks without restricted doors', id => {
+test.skipIf(!existsSync('out/collision.lcnav.gz')).each(starters.map(([id]) => id))('starter %s is reachable from banks without restricted doors', id => {
     const finder = new PathFinder(gunzipSync(readFileSync('out/collision.lcnav.gz')));
     loadDefaultNavEdges(finder);
     const camp = COMBAT_CAMPS.find(camp => camp.id === id)!;
     const destination = { x: camp.x, z: camp.z, level: 0 };
-    for (const start of [{ x: 3092, z: 3243, level: 0 }, { x: 3013, z: 3355, level: 0 }, { x: 3208, z: 3220, level: 0 }]) {
+    // The third start is the Lumbridge courtyard: in the 377 pack the 289 start tile 3208,3220 is a sealed castle room whose only door is the Recipe for Disaster door (hundred_lumbridge_door, rfd_feast_door.rs2:6-9).
+    for (const start of [{ x: 3092, z: 3243, level: 0 }, { x: 3013, z: 3355, level: 0 }, { x: 3222, z: 3218, level: 0 }]) {
         const route = finder.findPath(start, destination, {
             state: { ...emptyWorldStateData(), members: true, skills: { agility: 1 }, items: { Coins: 200 }, entranaRestrictedGear: true, canSlashWeb: false },
             avoidZones: resolveDangerZones(['white-wolf-mountain'], { includeAutomatic: true, combatLevel: 3, start, destination }), useTeleportCatalog: false
@@ -247,7 +245,7 @@ test.skipIf(!existsSync(`${content}/maps`) || !existsSync('out/collision.lcnav.g
     }
 }, 20000);
 
-skipped.skipIf(!existsSync('out/collision.lcnav.gz'))('members camps route around danger zones without restricted doors or unlocks', () => {
+test.skipIf(!existsSync('out/collision.lcnav.gz'))('members camps route around danger zones without restricted doors or unlocks', () => {
     const finder = new PathFinder(gunzipSync(readFileSync('out/collision.lcnav.gz')));
     loadDefaultNavEdges(finder);
     for (const [id] of members) {
