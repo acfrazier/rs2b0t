@@ -138,6 +138,14 @@
     "74": {
       "decision": "refuse",
       "source": "quest_blackknight.rs2:8-10 explicitly says the right door cannot be opened (pitfall 13)"
+    },
+    "4963": {
+      "decision": "refuse",
+      "source": "scripts/quests/quest_hauntedmine/scripts/hm_reward_door.rs2:25-35 requires the reward key or key ring on entry"
+    },
+    "4964": {
+      "decision": "refuse",
+      "source": "scripts/quests/quest_hauntedmine/scripts/hm_reward_door.rs2:25-35 requires the reward key or key ring on entry"
     }
   }
 }

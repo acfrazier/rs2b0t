@@ -1,3 +1,10 @@
+/**
+ * 377 sources (content a15d0faa8): the surfaces pair with the staged generated `cookSurfaceLocs.ts` (the 377
+ * pack placements of `cooking_sources.loc`, 121 surfaces). Every curated loc the derivation pins exists in the
+ * 377 pack: Catherby range (2817,3444), Seers village range (2715,3476), Sinclair pier range (2733,3582),
+ * Fishing Guild range (2616,3396), Draynor fireplace (3100,3256) and the Barbarian Village fires (loc 2732
+ * `fire` placed at 3078-3079,3445, `pack/loc.pack:2733:2732=fire`). No tile changed from 289.
+ */
 import type { WorldTile } from '../adapter/ClientAdapter.js';
 import type { BankLocation } from '../api/bank/BankLocations.js';
 import Tile from '../geometry/Tile.js';

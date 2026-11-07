@@ -14,12 +14,11 @@ export interface ClueGate {
 }
 
 /** Clues whose destination a quest seals off. */
-export const CLUE_GATES: Record<number, ClueGate> = {
-    // Isafdar and the elf camp open at Regicide; the seams themselves are REGICIDE_SEAMS, which the baked nav pack still doesn't carry.
-    3564: { quest: 'Regicide', reason: 'Lord Iorwerth is in the elf camp' },
-    3560: { quest: 'Regicide', reason: 'dig site is in Isafdar' },
-    3562: { quest: 'Regicide', reason: 'dig site is in Isafdar' }
-};
+// 377: the table is empty. The only 289 rows (3560/3562/3564, the Isafdar dig and elf-camp clues) have no
+// 377 clue items at all: the 377 trail content (`_unpack/377/all.obj`, 367 `trail_clue*` objs) carries no
+// isafdar clue, and the staged cluedb (2677-2858) has no such ids. A row for a clue the content does not
+// sell would be a stale gate (the audit reports it), so the gate moves with the content (pitfall 16).
+export const CLUE_GATES: Record<number, ClueGate> = {};
 
 // Why: `unknown` is the quest tab not loaded yet, so only `complete` opens the gate.
 export function clueGate(id: number, status: (quest: string) => QuestStatus): string | null {

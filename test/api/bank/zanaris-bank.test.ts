@@ -5,7 +5,11 @@ import { Quests } from '#/bot/api/ui/questlog/Quests.js';
 
 const key = 'rs2b0t:set:Global:useZanarisBank';
 
-afterEach(() => { mock.restore(); localStorage.removeItem(key); sessionStorage.removeItem(key); });
+afterEach(() => {
+    mock.restore();
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+});
 
 test('Zanaris requires both Lost City and the explicit bank opt-in', () => {
     const bank = BANK_LOCATIONS.find(bank => bank.name === 'Zanaris');
@@ -20,10 +24,11 @@ test('Zanaris requires both Lost City and the explicit bank opt-in', () => {
     expect(bankUnlocked(bank)).toBe(false);
 });
 
-test('Zanaris cooking derives the nearby range and direct NPC banking', () => {
+test('Zanaris cooking pairs direct NPC banking with no surface', () => {
     const location = cookLocation('Zanaris');
     expect(location).not.toBeNull();
     expect(location?.bank.npcAccess).toEqual({ name: 'Banker', op: 'Bank' });
-    expect(location?.surface?.loc.x).toBe(3151);
-    expect(location?.surface?.loc.z).toBe(9558);
+    // 377: the staged generated cookSurfaceLocs.ts (the pack placements of cooking_sources.loc, 121 surfaces)
+    // has no Zanaris row, and the 289 range at (3151,9558) is not placed, so the row earns no surface.
+    expect(location?.surface).toBeNull();
 });

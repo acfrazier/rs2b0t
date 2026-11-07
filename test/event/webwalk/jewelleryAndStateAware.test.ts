@@ -18,10 +18,17 @@ describe('jewellery catalog execution metadata', () => {
         }
     });
 
-    test('spell ids resolve including watchtower and trollheim', () => {
+    test('spell ids match the 377 rows without a Trollheim teleport', () => {
         expect(teleportById('watchtower')?.family).toBe('spell');
-        expect(teleportById('trollheim')?.family).toBe('spell');
+        expect(teleportById('trollheim')).toBeUndefined();
         expect(teleportById('varrock')?.to).toEqual({ x: 3213, z: 3424, level: 0 });
+    });
+
+    test('both ring destinations require the members world and expose Rub choices', () => {
+        const dueling = JEWELLERY_TELEPORTS.filter(d => d.teleportId.startsWith('dueling_'));
+        expect(dueling.map(d => d.teleportId).sort()).toEqual(['dueling_arena', 'dueling_castle_wars']);
+        expect(dueling.every(d => d.requires?.members === true)).toBe(true);
+        expect(dueling.every(d => d.dialogueChoose?.length)).toBe(true);
     });
 });
 

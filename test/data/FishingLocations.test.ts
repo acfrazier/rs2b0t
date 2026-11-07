@@ -28,9 +28,9 @@ describe('Shilo Village camp', () => {
         expect(shilo?.baitVendor).toEqual({ keeper: 'Fernahei', stand: new Tile(2870, 2971, 0), price: 2, item: 'Feather' });
         expect(FISHING_LOCATIONS.filter(location => location.baitVendor).map(location => location.name)).toEqual(['Fishing Guild', 'Shilo Village']);
     });
-    test('includes both river banks in its sweep inside the unchanged camp', () => {
+    test('includes both river banks in its sweep inside the 377 camp', () => {
         const shilo = FISHING_LOCATIONS.find(location => location.name === 'Shilo Village');
-        expect(shilo?.campRadius).toBe(48);
+        expect(shilo?.campRadius).toBe(56);
         expect(shilo?.sweep).toEqual(expect.arrayContaining([
             new Tile(2822, 2968, 0), new Tile(2832, 2973, 0),
             new Tile(2834, 2975, 0), new Tile(2850, 2977, 0),
@@ -40,6 +40,14 @@ describe('Shilo Village camp', () => {
             expect(shilo?.spot.distanceTo(stop)).toBeLessThanOrEqual(shilo?.campRadius ?? 0);
             expect(shilo?.avoidSpots?.some(tile => tile.equals(stop)) ?? false).toBe(false);
         }
+    });
+    test('the 377 map spot at (2807,3021) is covered by the Shilo leash', () => {
+        // maps/m43_47.jm2:7423 places the 377 Fishing spot (obj 1174) at this tile; it is 51 Chebyshev tiles from the camp.
+        const shilo = FISHING_LOCATIONS.find(location => location.name === 'Shilo Village')!;
+        const farthestMapSpot = new Tile(2807, 3021, 0);
+        expect(shilo.spot.distanceTo(farthestMapSpot)).toBe(51);
+        expect(shilo.campRadius).toBe(56);
+        expect(shilo.spot.distanceTo(farthestMapSpot)).toBeLessThanOrEqual(shilo.campRadius!);
     });
 });
 
@@ -160,14 +168,14 @@ describe('the Shilo Village camp', () => {
         expect(shilo.baitVendor).toEqual({ keeper: 'Fernahei', stand: new Tile(2870, 2971, 0), price: 2, item: 'Feather' });
     });
 
-    test('accepts every stationary spawn within the 48-tile camp', () => {
-        const spawns = [[2822, 2969], [2834, 2974], [2835, 2974], [2836, 2971],
+    test('keeps every listed scouting stop inside the 56-tile camp', () => {
+        const stops = [[2822, 2969], [2834, 2974], [2835, 2974], [2836, 2971],
             [2841, 2971], [2850, 2976], [2855, 2973], [2855, 2977], [2856, 2973],
             [2857, 2973], [2860, 2976], [2862, 2972], [2869, 2977]] as const;
-        for (const [x, z] of spawns) {
+        for (const [x, z] of stops) {
             const tile = new Tile(x, z, 0);
             expect(shilo.avoidSpots?.some(avoided => avoided.equals(tile)) ?? false).toBe(false);
-            expect(shilo.spot.distanceTo(tile)).toBeLessThanOrEqual(48);
+            expect(shilo.spot.distanceTo(tile)).toBeLessThanOrEqual(shilo.campRadius!);
             expect(shilo.sweep?.some(stop => stop.distanceTo(tile) <= 2)).toBe(true);
         }
     });

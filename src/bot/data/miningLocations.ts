@@ -1,10 +1,14 @@
+/**
+ * 377 sources (content a15d0faa8): the minable rocks per camp are the 377 map placements of the ids in the
+ * staged `miningRocks.ts` edition: the classic 2090-2111 rocks plus the 377 rocks_97xx/111xxx/119xxx series
+ * (`pack/loc.pack`, `scripts/skill_mining/configs/mine.dbrow:12-183`), full decode in
+ * RS2B0T-377-S9-1106/placements-rocks.txt. The camp anchors, banks and resource claims were re-derived from
+ * those placements; Rimmington also carries the new-series field (clay 9713 @ (2986,3239), copper
+ * 9708-9710 @ (2976-2979,3245-3248), tin 9714/9716, iron 9717-9719, gold 9720/9722) that Doric's 377 Path mined.
+ */
 import type { WorldTile } from '../adapter/ClientAdapter.js';
 import Tile from '../geometry/Tile.js';
-import {
-    locationOptions,
-    resolveGatheringLocation,
-    type GatheringLocation
-} from './gatheringLocations.js';
+import { locationOptions, resolveGatheringLocation, type GatheringLocation } from './gatheringLocations.js';
 
 /** Mining camps from rs2b2tgathering.csv and live checks. `recommendedCombat` is twice the highest local aggressive NPC level plus one. */
 export type MiningLocation = GatheringLocation & {
@@ -29,15 +33,7 @@ const BANK = {
     grandTree: new Tile(2449, 3482, 1)
 } as const;
 
-function mine(
-    name: string,
-    spot: Tile,
-    bankStand: Tile,
-    resources: readonly string[],
-    notes?: string,
-    verified = true,
-    recommendedCombat?: number
-): MiningLocation {
+function mine(name: string, spot: Tile, bankStand: Tile, resources: readonly string[], notes?: string, verified = true, recommendedCombat?: number, overrides?: Partial<MiningLocation>): MiningLocation {
     return {
         name,
         spot,
@@ -47,15 +43,14 @@ function mine(
         verified,
         resources,
         notes,
-        recommendedCombat
+        recommendedCombat,
+        ...overrides
     };
 }
 
 /** UI label: "Dwarven Mine (65 Combat recommended)" when a rec is set. */
 export function miningLocationLabel(loc: Pick<MiningLocation, 'name' | 'recommendedCombat'>): string {
-    return loc.recommendedCombat != null
-        ? `${loc.name} (${loc.recommendedCombat} Combat recommended)`
-        : loc.name;
+    return loc.recommendedCombat != null ? `${loc.name} (${loc.recommendedCombat} Combat recommended)` : loc.name;
 }
 
 export const MINING_LOCATIONS: MiningLocation[] = [
@@ -68,18 +63,14 @@ export const MINING_LOCATIONS: MiningLocation[] = [
     ),
     mine(
         'Southeast Varrock Mine',
+        // 377 places no clay here (query-tiles loc 3283,3368 r=25 shows only copper/iron/tin); the 289 row's
+        // clay is gone with the content.
         new Tile(3285, 3366, 0),
         BANK.varrockEast,
-        ['clay', 'copper', 'tin', 'iron']
+        ['copper', 'tin', 'iron']
     ),
     // Doric quest copper/clay/iron anchors cluster around Rimmington mine.
-    mine(
-        'Rimmington Mine',
-        new Tile(2978, 3247, 0),
-        BANK.faladorEast,
-        ['clay', 'copper', 'tin', 'iron'],
-        'Seed from Doric ore anchors'
-    ),
+    mine('Rimmington Mine', new Tile(2978, 3247, 0), BANK.faladorEast, ['clay', 'copper', 'tin', 'iron'], 'Seed from Doric ore anchors'),
     mine(
         'Dwarven Mine',
         // Surface trapdoor hop is 3019,3449; seed underground rock cluster near Nurmof.
@@ -129,13 +120,7 @@ export const MINING_LOCATIONS: MiningLocation[] = [
         'Requires Mining 60; underground guild seed'
         // Inside guild door, no resident aggro; no combat rec.
     ),
-    mine(
-        'Crafting Guild',
-        new Tile(2939, 3282, 0),
-        BANK.faladorWest,
-        ['silver', 'gold'],
-        'Requires Crafting 40 + brown apron'
-    ),
+    mine('Crafting Guild', new Tile(2939, 3282, 0), BANK.faladorWest, ['silver', 'gold'], 'Requires Crafting 40 + brown apron'),
     mine(
         'Coal Trucks',
         new Tile(2582, 3481, 0),
@@ -148,28 +133,20 @@ export const MINING_LOCATIONS: MiningLocation[] = [
     ),
     // Rocks cluster around 3086, 3416 to 3425; 3080,3420 was an unpathable object centre.
     // bank-locations.test still uses 3080,3420 as a village-area nearest-bank probe.
-    mine(
-        'Barbarian Village',
-        new Tile(3084, 3417, 0),
-        BANK.edgeville,
-        ['tin', 'coal'],
-        'Tin/coal rocks east of village center'
-    ),
+    mine('Barbarian Village', new Tile(3084, 3417, 0), BANK.edgeville, ['tin', 'coal'], 'Tin/coal rocks east of village center'),
     mine(
         'North Brimhaven Mine',
         // Adjacent stand: 2732,3223 is inside a rock loc.
         new Tile(2733, 3224, 0),
         BANK.ardougneEast,
         ['gold'],
-        'No local bank — ship/path to Ardougne East'
+        'No local bank — ship/path to Ardougne East',
+        true,
+        undefined,
+        // The gold vein reaches (2743,3152) (query-tiles loc 2733,3224 r=160), so the leash covers it.
+        { campRadius: 76 }
     ),
-    mine(
-        'Shilo Village',
-        new Tile(2825, 2997, 0),
-        BANK.shilo,
-        ['gem rocks'],
-        'Requires Shilo Village quest; bank gated'
-    ),
+    mine('Shilo Village', new Tile(2825, 2997, 0), BANK.shilo, ['gem rocks'], 'Requires Shilo Village quest; bank gated'),
     mine(
         'West Lumbridge Swamp Mine',
         // Why: the classic west-coast seed is blue void on this engine, so the live cluster is the east-swamp rocks near Urhney (about 3233 to 3243, 3157 to 3167); stand 2 tiles south of the rock tile to stay outside the loc.
@@ -231,7 +208,8 @@ export const MINING_LOCATIONS: MiningLocation[] = [
     ),
     mine(
         'Wilderness Skeleton Mine',
-        // Walkable centre stand in the level-10 Wilderness coal field; the 34 coal-rock placements span 3009 to 3023, 3586 to 3598 around it.
+        // 377 note: the coal here sits in hidden numbered rocks (rocks_14850/14851/14852, query-tiles loc
+        // 3016,3592 r=14) and the content's mine.dbrow has no ore table for them, so no ROCK_TYPES id matches.
         new Tile(3018, 3590, 0),
         BANK.edgeville,
         ['coal'],
@@ -281,9 +259,7 @@ export const MINING_LOCATIONS: MiningLocation[] = [
 export const MINING_LOCATION_OPTIONS = locationOptions(MINING_LOCATIONS);
 
 /** Persisted option value to UI label, with the combat rec where set. */
-export const MINING_LOCATION_OPTION_LABELS: Record<string, string> = Object.fromEntries(
-    MINING_LOCATIONS.filter(l => l.recommendedCombat != null).map(l => [l.name, miningLocationLabel(l)])
-);
+export const MINING_LOCATION_OPTION_LABELS: Record<string, string> = Object.fromEntries(MINING_LOCATIONS.filter(l => l.recommendedCombat != null).map(l => [l.name, miningLocationLabel(l)]));
 
 export function resolveMiningLocation(setting: string, startTile: WorldTile): MiningLocation | null {
     return resolveGatheringLocation(setting, startTile, MINING_LOCATIONS);

@@ -1,9 +1,9 @@
-/** Plan-time TransportRequires for specialCrossings skill/item gates and door-only skill gates like the Fishing Guild. */
+/** Revision-377 plan-time requirements for catalogued navigation crossings and skill-gated doors. */
 
 import { SPECIAL_CROSSINGS } from './data/specialCrossings.js';
 import type { TransportRequires } from './types.js';
 
-/** Door tiles with skill / worn gates from doors.json; levels from Server content (skill_*_guild / magic_guild / fishing_guild / ranging). */
+/** 377 placement coordinates come from doors.json / transports.json; handler requirements are from the cited 377 scripts. */
 const DOOR_SKILL_GATES: readonly {
     x: number;
     z: number;
@@ -14,18 +14,19 @@ const DOOR_SKILL_GATES: readonly {
     worn?: { name: string; count: number }[];
     note?: string;
 }[] = [
+    // scripts/areas/area_falador/scripts/mining_guild.rs2:10-16: door entry requires mining 60.
     { x: 3046, z: 9756, level: 0, skill: 'mining', levelReq: 60 },
-    // fishing_guild.rs2 loc_2025, fishing 68
+    // scripts/skill_fishing/scripts/fishing_guild.rs2:1-12: entry requires fishing 68.
     { x: 2611, z: 3394, level: 0, skill: 'fishing', levelReq: 68 },
     { x: 2611, z: 3398, level: 0, skill: 'fishing', levelReq: 68 },
-    // magic_guild.rs2, magic 66 (Yanille double doors, both sides)
+    // scripts/areas/area_yanille/scripts/magic_guild.rs2:6-17: entry requires magic 66.
     { x: 2584, z: 3087, level: 0, skill: 'magic', levelReq: 66 },
     { x: 2584, z: 3088, level: 0, skill: 'magic', levelReq: 66 },
     { x: 2597, z: 3087, level: 0, skill: 'magic', levelReq: 66 },
     { x: 2597, z: 3088, level: 0, skill: 'magic', levelReq: 66 },
-    // crafting_guild.rs2 crafting_guild_door, crafting 40
+    // scripts/skill_crafting/scripts/crafting_guild/crafting_guild.rs2:1-18: crafting 40 and brown apron worn.
     { x: 2933, z: 3289, level: 0, skill: 'crafting', levelReq: 40 },
-    // cooking_guild.rs2 chefdoor, cooking 32 + Chef's hat worn
+    // scripts/skill_cooking/scripts/cooking_guild.rs2:1-19: cooking 32 and chef's hat worn.
     {
         x: 3143,
         z: 3444,
@@ -35,11 +36,11 @@ const DOOR_SKILL_GATES: readonly {
         worn: [{ name: "Chef's hat", count: 1 }],
         note: "chef's hat worn"
     },
-    // ranging_guild_door.rs2, ranged 40 (map loc 2658,3438); doors.json keys the loc tile and transports.json the diagonal stands, so both are gated.
+    // scripts/minigames/game_ranging/scripts/ranging_guild_door.rs2:17-34: ranged 40; the pack rows include loc and stands.
     { x: 2658, z: 3438, level: 0, skill: 'ranged', levelReq: 40 }
 ];
 
-/** Transport from-tiles (transports.json) with skill gates, attached via specialRequiresAt(edge.from); exit ladders stay open. */
+/** 377 transports.json from-tiles with handler skill gates; exit ladders remain open per server scripts. */
 const TRANSPORT_SKILL_GATES: readonly {
     x: number;
     z: number;
@@ -47,16 +48,16 @@ const TRANSPORT_SKILL_GATES: readonly {
     skill: string;
     levelReq: number;
 }[] = [
-    // mining_guild.rs2 miningguildladder, mining 60 to descend; all 4 surface from-tiles in transports.json (locId 2113)
+    // scripts/areas/area_falador/scripts/mining_guild.rs2:1-8: mining 60 for the surface descent.
     { x: 3018, z: 3340, level: 0, skill: 'mining', levelReq: 60 },
     { x: 3018, z: 3338, level: 0, skill: 'mining', levelReq: 60 },
     { x: 3019, z: 3341, level: 0, skill: 'mining', levelReq: 60 },
     { x: 3020, z: 3340, level: 0, skill: 'mining', levelReq: 60 },
-    // Why: skill_agility/shortcuts.rs2 _island_rope_swing needs agility 10 on the outer swings.
-    // Why: tree_ropeswing2 (brim south, from 2705,3205) carries no level check on purpose so players cannot softlock on the island, content reads `loc_type ! tree_ropeswing2`.
+    // scripts/skill_agility/scripts/shortcuts.rs2:112-122 gates `_island_rope_swing` except locId 2323 to avoid an island softlock.
+    // 377 transport locIds: 2322 north swing, 2323 softlock swing, 2324 ogre swing; only the outer swings require 10.
     { x: 2709, z: 3209, level: 0, skill: 'agility', levelReq: 10 }, // tree_ropeswing1 north
     { x: 2511, z: 3091, level: 0, skill: 'agility', levelReq: 10 }, // tree_ropeswing3 ogre
-    // ranging_guild_door diagonal stands (transports.json from-tiles; loc at 2658,3438)
+    // scripts/minigames/game_ranging/scripts/ranging_guild_door.rs2:17-34: diagonal stands for the ranged-40 door.
     { x: 2657, z: 3439, level: 0, skill: 'ranged', levelReq: 40 },
     { x: 2659, z: 3437, level: 0, skill: 'ranged', levelReq: 40 }
 ];
@@ -75,21 +76,19 @@ const CROSSING_GATES: readonly {
     /** Content script and the stage it tests. */
     note: string;
 }[] = [
-    // area_mausoleum/gates.rs2, check_priest_peril_gate(^priestperil_find_drezel_key = 5)
+    // scripts/areas/area_mausoleum/scripts/gates.rs2:1-9; scripts/quests/quest_priestperil/configs/priestperil.constant:6.
     { x: 3405, z: 9895, level: 0, quest: 'Priest in Peril', minStatus: 'started', note: 'pip_underground_door1 needs %priestperil >= 5' },
-    // check_priest_peril_gate(^priestperil_meet_in_mausoleum = 8)
+    // Second door stage 8: scripts/areas/area_mausoleum/scripts/gates.rs2:4-5; scripts/quests/quest_priestperil/configs/priestperil.constant:9.
     { x: 3431, z: 9897, level: 0, quest: 'Priest in Peril', minStatus: 'started', note: 'pip_underground_door2 needs %priestperil >= 8' },
-    // area_mausoleum/holy_barrier.rs2, %priestperil = ^priestperil_access_holy_barrier (61),
-    // which is one Drezel conversation past ^priestperil_complete (60).
+    // scripts/areas/area_mausoleum/scripts/holy_barrier.rs2:1-9: private stage 61 is one post-completion Drezel talk.
     { x: 3440, z: 9887, level: 0, quest: 'Priest in Peril', minStatus: 'complete', note: 'pip_underground_wall_side_withportal needs %priestperil = 61' },
-    // quest_elena/sewerpipe.rs2, %elenaquest >= ^quest_elena_opened_pipe and the gas mask worn; the pack only asked for one carried.
+    // scripts/quests/quest_elena/scripts/sewerpipe.rs2:1-16,32-43: opened pipe + gas mask worn; stage is execution-only.
     {
         x: 2530, z: 9703, level: 0, quest: 'Plague City', minStatus: 'started',
         worn: [{ name: 'Gas mask', count: 1 }],
         note: 'plaguesewerpipe needs the mask worn, not carried'
     },
-    // quest_desertrescue.rs2 open_desertcamp_gate, both directions retain the key.
-    // The gate itself has no quest-stage check; this remains usable while the quest runs.
+    // scripts/quests/quest_desertrescue/scripts/quest_desertrescue.rs2:1-5,84-149: both gate halves check Metal key without consuming it.
     {
         x: 3273,
         z: 3028,

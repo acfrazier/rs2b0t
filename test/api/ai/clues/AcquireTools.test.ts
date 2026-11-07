@@ -139,17 +139,19 @@ describe('ensureSpade', () => {
     });
     test('walks to the NEARER spawn and takes the spade', async () => {
         playerTile = new Tile(2600, 3320, 0);
-        groundSpades = [new Tile(2574, 3331, 0)];
+        // 377 spawn: maps/m40_52:7877 places the spade at (2566,3330); the mock sits on it.
+        groundSpades = [new Tile(2566, 3330, 0)];
         expect(await ensureSpade(() => {})).toBe(true);
-        expect(walks[0]).toBe('2574,3331');
+        expect(walks[0]).toBe('2566,3330');
         expect(takes).toBe(1);
         expect(held).toContain('Spade');
     });
     test('picks Falador when closer', async () => {
         playerTile = new Tile(2950, 3360, 0);
-        groundSpades = [new Tile(2981, 3369, 0)];
+        // 377 spawn: maps/m46_52:14358 places the spade at (2981,3370).
+        groundSpades = [new Tile(2981, 3370, 0)];
         expect(await ensureSpade(() => {})).toBe(true);
-        expect(walks[0]).toBe('2981,3369');
+        expect(walks[0]).toBe('2981,3370');
     });
     test('no spade at either spawn -> false', async () => {
         playerTile = new Tile(2600, 3320, 0);
