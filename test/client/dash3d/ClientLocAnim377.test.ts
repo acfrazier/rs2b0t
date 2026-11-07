@@ -27,8 +27,8 @@ const origCycle = Client.loopCycle;
 function seq(delays: number[], frames: number[], loops: number): Seq {
     const s = Object.create(SeqType.prototype) as Seq;
     s.numFrames = delays.length;
-    s.delay = Int16Array.from(delays);
-    s.frames = Int16Array.from(frames);
+    s.delay = Int32Array.from(delays);
+    s.frames = Int32Array.from(frames);
     s.loops = loops;
     return s;
 }

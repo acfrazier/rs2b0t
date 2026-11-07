@@ -6220,499 +6220,128 @@ export class Client extends GameShell {
             this.ptype0 = this.ptype;
 
             if (this.ptype === ServerProt.IF_OPENCHAT) {
-                const comId: number = this.in.g2();
-                this.ifAnimReset(comId);
-
-                if (this.sideModalId !== -1) {
-                    this.sideModalId = -1;
-                    this.redrawSide = true;
-                    this.redrawIcons = true;
-                }
-
-                this.chatModalId = comId;
-                this.redrawChat = true;
-                this.mainModalId = -1;
-                this.resumedPauseButton = false;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfOpenChat();
             }
 
             if (this.ptype === ServerProt.IF_OPENMAIN_SIDE) {
-                const mainComId: number = this.in.g2();
-                const sideComId: number = this.in.g2();
-
-                if (this.chatModalId !== -1) {
-                    this.chatModalId = -1;
-                    this.redrawChat = true;
-                }
-
-                if (this.dialogInputOpen) {
-                    this.dialogInputOpen = false;
-                    this.redrawChat = true;
-                }
-
-                this.mainModalId = mainComId;
-                this.sideModalId = sideComId;
-                this.redrawSide = true;
-                this.redrawIcons = true;
-                this.resumedPauseButton = false;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfOpenMainSide();
             }
 
             if (this.ptype === ServerProt.IF_CLOSE) {
-                this.modalCloseGeneration++;
-                if (this.sideModalId !== -1) {
-                    this.sideModalId = -1;
-                    this.redrawSide = true;
-                    this.redrawIcons = true;
-                }
-
-                if (this.chatModalId !== -1) {
-                    this.chatModalId = -1;
-                    this.redrawChat = true;
-                }
-
-                if (this.dialogInputOpen) {
-                    this.dialogInputOpen = false;
-                    this.redrawChat = true;
-                }
-
-                this.mainModalId = -1;
-                this.resumedPauseButton = false;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfClose();
             }
 
             if (this.ptype === ServerProt.IF_SETICON) {
-                let comId: number = this.in.g2();
-                const icon: number = this.in.g1();
-                if (comId === 65535) {
-                    comId = -1;
-                }
-                this.sideIcon[icon] = comId;
-
-                this.redrawSide = true;
-                this.redrawIcons = true;
-
-                this.ptype = -1;
-                return true;
-            }
-
-            if (this.ptype === ServerProt.IF_OPENMAIN) {
-                const comId: number = this.in.g2();
-                this.ifAnimReset(comId);
-
-                if (this.sideModalId !== -1) {
-                    this.sideModalId = -1;
-                    this.redrawSide = true;
-                    this.redrawIcons = true;
-                }
-
-                if (this.chatModalId !== -1) {
-                    this.chatModalId = -1;
-                    this.redrawChat = true;
-                }
-
-                if (this.dialogInputOpen) {
-                    this.dialogInputOpen = false;
-                    this.redrawChat = true;
-                }
-
-                this.mainModalId = comId;
-                this.resumedPauseButton = false;
-
-                this.ptype = -1;
-                return true;
-            }
-
-            if (this.ptype === ServerProt.IF_OPENSIDE) {
-                const comId: number = this.in.g2();
-                this.ifAnimReset(comId);
-
-                if (this.chatModalId !== -1) {
-                    this.chatModalId = -1;
-                    this.redrawChat = true;
-                }
-
-                if (this.dialogInputOpen) {
-                    this.dialogInputOpen = false;
-                    this.redrawChat = true;
-                }
-
-                this.sideModalId = comId;
-                this.redrawSide = true;
-                this.redrawIcons = true;
-                this.mainModalId = -1;
-                this.resumedPauseButton = false;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetIcon();
             }
 
             if (this.ptype === ServerProt.IF_SHOWICON) {
-                this.activeIcon = this.in.g1();
+                return this.handleIfShowIcon();
+            }
 
-                this.redrawSide = true;
-                this.redrawIcons = true;
+            if (this.ptype === ServerProt.IF_OPENMAIN) {
+                return this.handleIfOpenMain();
+            }
 
-                this.ptype = -1;
-                return true;
+            if (this.ptype === ServerProt.IF_OPENSIDE) {
+                return this.handleIfOpenSide();
             }
 
             if (this.ptype === ServerProt.IF_OPENOVERLAY) {
-                const comId: number = this.in.g2b();
-                if (comId >= 0) {
-                    this.ifAnimReset(comId);
-                }
-                this.mainOverlayId = comId;
+                return this.handleIfOpenOverlay();
+            }
 
-                this.ptype = -1;
-                return true;
+            if (this.ptype === ServerProt.IF_OPENFULL) {
+                return this.handleIfOpenFull();
+            }
+
+            if (this.ptype === ServerProt.IF_SETANGLE) {
+                return this.handleIfSetAngle();
             }
 
             if (this.ptype === ServerProt.IF_SETCOLOUR) {
-                const comId: number = this.in.g2();
-                const colour: number = this.in.g2();
-
-                const r: number = (colour >> 10) & 0x1f;
-                const g: number = (colour >> 5) & 0x1f;
-                const b: number = colour & 0x1f;
-                IfType.list[comId].colour = (r << 19) + (g << 11) + (b << 3);
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetColour();
             }
 
             if (this.ptype === ServerProt.IF_SETHIDE) {
-                const comId: number = this.in.g2();
-                const hide = this.in.g1() === 1;
-
-                IfType.list[comId].hide = hide;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetHide();
             }
 
             if (this.ptype === ServerProt.IF_SETOBJECT) {
-                const comId: number = this.in.g2();
-                const objId: number = this.in.g2();
-                const zoom: number = this.in.g2();
-
-                const type: ObjType = ObjType.list(objId);
-                IfType.list[comId].model1Type = 4;
-                IfType.list[comId].model1Id = objId;
-                IfType.list[comId].modelXAn = type.xan2d;
-                IfType.list[comId].modelYAn = type.yan2d;
-                IfType.list[comId].modelZoom = ((type.zoom2d * 100) / zoom) | 0;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetObject();
             }
 
             if (this.ptype === ServerProt.IF_SETMODEL) {
-                const comId: number = this.in.g2();
-                const modelId: number = this.in.g2();
+                return this.handleIfSetModel();
+            }
 
-                IfType.list[comId].model1Type = 1;
-                IfType.list[comId].model1Id = modelId;
-
-                this.ptype = -1;
-                return true;
+            if (this.ptype === ServerProt.IF_SETROTATION) {
+                return this.handleIfSetRotation();
             }
 
             if (this.ptype === ServerProt.IF_SETANIM) {
-                const comId: number = this.in.g2();
-                const seqId: number = this.in.g2b();
-
-                const com: IfType = IfType.list[comId];
-                com.modelAnim = seqId;
-                if (seqId === -1) {
-                    com.animFrame = 0;
-                    com.animCycle = 0;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetAnim();
             }
 
             if (this.ptype === ServerProt.IF_SETPLAYERHEAD) {
-                const comId = this.in.g2();
-
-                if (this.localPlayer) {
-                    IfType.list[comId].model1Type = 3;
-                    IfType.list[comId].model1Id = this.localPlayer.transmog
-                        ? this.localPlayer.transmog.id + 0x12345678
-                        : (this.localPlayer.appearance[8] << 6) + (this.localPlayer.appearance[0] << 12) + (this.localPlayer.colour[0] << 24) + (this.localPlayer.colour[4] << 18) + this.localPlayer.appearance[11];
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetPlayerHead();
             }
 
             if (this.ptype === ServerProt.IF_SETTEXT) {
-                const comId: number = this.in.g2();
-                const text = this.in.gjstr();
-
-                IfType.list[comId].text = text;
-
-                if (IfType.list[comId].layerId === this.sideIcon[this.activeIcon]) {
-                    this.redrawSide = true;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetText();
             }
 
             if (this.ptype === ServerProt.IF_SETNPCHEAD) {
-                const comId: number = this.in.g2();
-                const npcId: number = this.in.g2();
-
-                IfType.list[comId].model1Type = 2;
-                IfType.list[comId].model1Id = npcId;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetNpcHead();
             }
 
             if (this.ptype === ServerProt.IF_SETPOSITION) {
-                const comId: number = this.in.g2();
-                const x: number = this.in.g2b();
-                const y: number = this.in.g2b();
-
-                const com: IfType = IfType.list[comId];
-                com.x = x;
-                com.y = y;
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetPosition();
             }
 
             if (this.ptype === ServerProt.IF_SETSCROLLPOS) {
-                const comId: number = this.in.g2();
-                let pos: number = this.in.g2();
-
-                const com = IfType.list[comId];
-                if (typeof com !== 'undefined' && com.type === ComponentType.TYPE_LAYER) {
-                    if (pos < 0) {
-                        pos = 0;
-                    }
-
-                    if (pos > com.scrollHeight - com.height) {
-                        pos = com.scrollHeight - com.height;
-                    }
-
-                    com.scrollPos = pos;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleIfSetScrollPos();
             }
 
             if (this.ptype === ServerProt.TUT_FLASH) {
-                this.tutFlashIcon = this.in.g1();
-
-                if (this.tutFlashIcon === this.activeIcon) {
-                    if (this.tutFlashIcon === 3) {
-                        this.activeIcon = 1;
-                    } else {
-                        this.activeIcon = 3;
-                    }
-
-                    this.redrawSide = true;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleTutFlash();
             }
 
             if (this.ptype === ServerProt.TUT_OPEN) {
-                this.tutComId = this.in.g2b();
-                this.redrawChat = true;
-
-                this.ptype = -1;
-                return true;
+                return this.handleTutOpen();
             }
 
             if (this.ptype === ServerProt.UPDATE_INV_STOP_TRANSMIT) {
-                const comId = this.in.g2();
-                const inv: IfType = IfType.list[comId];
-
-                if (!inv.linkObjType || !inv.linkObjNumber) {
-                    throw new Error();
-                }
-
-                for (let i: number = 0; i < inv.linkObjType.length; i++) {
-                    inv.linkObjType[i] = -1;
-                    inv.linkObjType[i] = 0;
-                }
-                const previous = this.invUpdateState.get(comId);
-                this.invUpdateState.set(comId, {
-                    generation: (previous?.generation ?? 0) + 1,
-                    fullGeneration: 0,
-                    transmitting: false
-                });
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateInvStopTransmit();
             }
 
             if (this.ptype === ServerProt.UPDATE_INV_FULL) {
-                this.redrawSide = true;
-
-                const comId: number = this.in.g2();
-                const inv: IfType = IfType.list[comId];
-
-                if (!inv.linkObjType || !inv.linkObjNumber) {
-                    throw new Error();
-                }
-
-                const size: number = this.in.g2();
-                for (let i: number = 0; i < size; i++) {
-                    inv.linkObjType[i] = this.in.g2();
-
-                    let count: number = this.in.g1();
-                    if (count === 255) {
-                        count = this.in.g4();
-                    }
-
-                    inv.linkObjNumber[i] = count;
-                }
-
-                for (let i: number = size; i < inv.linkObjType.length; i++) {
-                    inv.linkObjType[i] = 0;
-                    inv.linkObjNumber[i] = 0;
-                }
-
-                const generation = (this.invUpdateState.get(comId)?.generation ?? 0) + 1;
-                this.invUpdateState.set(comId, { generation, fullGeneration: generation, transmitting: true });
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateInvFull();
             }
 
             if (this.ptype === ServerProt.UPDATE_INV_PARTIAL) {
-                this.redrawSide = true;
-
-                const comId: number = this.in.g2();
-                const inv: IfType = IfType.list[comId];
-
-                if (!inv.linkObjType || !inv.linkObjNumber) {
-                    throw new Error();
-                }
-
-                while (this.in.pos < this.psize) {
-                    const slot: number = this.in.gsmart();
-                    const id: number = this.in.g2();
-
-                    let count: number = this.in.g1();
-                    if (count === 255) {
-                        count = this.in.g4();
-                    }
-
-                    if (slot >= 0 && slot < inv.linkObjType.length) {
-                        inv.linkObjType[slot] = id;
-                        inv.linkObjNumber[slot] = count;
-                    }
-                }
-
-                const previous = this.invUpdateState.get(comId);
-                this.invUpdateState.set(comId, {
-                    generation: (previous?.generation ?? 0) + 1,
-                    fullGeneration: previous?.fullGeneration ?? 0,
-                    transmitting: true
-                });
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateInvPartial();
             }
 
             if (this.ptype === ServerProt.CAM_LOOKAT) {
-                this.cinemaCam = true;
-
-                this.camLookAtLx = this.in.g1();
-                this.camLookAtLz = this.in.g1();
-                this.camLookAtHei = this.in.g2();
-                this.camLookAtRate = this.in.g1();
-                this.camLookAtRate2 = this.in.g1();
-
-                if (this.camLookAtRate2 >= 100) {
-                    const sceneX: number = this.camLookAtLx * 128 + 64;
-                    const sceneZ: number = this.camLookAtLz * 128 + 64;
-                    const sceneY: number = this.getAvH(sceneX, sceneZ, this.minusedlevel) - this.camLookAtHei;
-
-                    const deltaX: number = sceneX - this.camX;
-                    const deltaY: number = sceneY - this.camY;
-                    const deltaZ: number = sceneZ - this.camZ;
-
-                    const distance: number = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ) | 0;
-
-                    this.camPitch = ((Math.atan2(deltaY, distance) * 325.949) | 0) & 0x7ff;
-                    this.camYaw = ((Math.atan2(deltaX, deltaZ) * -325.949) | 0) & 0x7ff;
-
-                    if (this.camPitch < 128) {
-                        this.camPitch = 128;
-                    } else if (this.camPitch > 383) {
-                        this.camPitch = 383;
-                    }
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleCamLookAt();
             }
 
             if (this.ptype === ServerProt.CAM_SHAKE) {
-                const axis: number = this.in.g1();
-                const ran: number = this.in.g1();
-                const amp: number = this.in.g1();
-                const rate: number = this.in.g1();
-
-                this.camShake[axis] = true;
-                this.camShakeAxis[axis] = ran;
-                this.camShakeRan[axis] = amp;
-                this.camShakeAmp[axis] = rate;
-                this.camShakeCycle[axis] = 0;
-
-                this.ptype = -1;
-                return true;
+                return this.handleCamShake();
             }
 
             if (this.ptype === ServerProt.CAM_MOVETO) {
-                this.cinemaCam = true;
-
-                this.camMoveToLx = this.in.g1();
-                this.camMoveToLz = this.in.g1();
-                this.camMoveToHei = this.in.g2();
-                this.camMoveToRate = this.in.g1();
-                this.camMoveToRate2 = this.in.g1();
-
-                if (this.camMoveToRate2 >= 100) {
-                    this.camX = this.camMoveToLx * 128 + 64;
-                    this.camZ = this.camMoveToLz * 128 + 64;
-                    this.camY = this.getAvH(this.camX, this.camZ, this.minusedlevel) - this.camMoveToHei;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleCamMoveTo();
             }
 
             if (this.ptype === ServerProt.CAM_RESET) {
-                this.cinemaCam = false;
-
-                for (let i: number = 0; i < 5; i++) {
-                    this.camShake[i] = false;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleCamReset();
             }
 
             if (this.ptype === ServerProt.NPC_INFO) {
                 this.getNpcPos(this.in, this.psize);
-
+                
                 this.ptype = -1;
                 return true;
             }
@@ -6720,558 +6349,170 @@ export class Client extends GameShell {
             if (this.ptype === ServerProt.PLAYER_INFO) {
                 this.getPlayerPos(this.in, this.psize);
                 this.awaitingPlayerInfo = false;
-
-                this.ptype = -1;
-                return true;
-            }
-
-            if (this.ptype === ServerProt.MESSAGE_GAME) {
-                const message: string = this.in.gjstr();
-
-                if (message.endsWith(':tradereq:')) {
-                    const player: string = message.substring(0, message.indexOf(':'));
-                    const username = JString.toUserhash(player);
-
-                    let ignored: boolean = false;
-                    for (let i: number = 0; i < this.ignoreCount; i++) {
-                        if (this.ignoreUserhash[i] === username) {
-                            ignored = true;
-                            break;
-                        }
-                    }
-
-                    if (!ignored && this.chatDisabled === 0) {
-                        this.addChat(4, 'wishes to trade with you.', player);
-                    }
-                } else if (message.endsWith(':duelreq:')) {
-                    const player: string = message.substring(0, message.indexOf(':'));
-                    const username = JString.toUserhash(player);
-
-                    let ignored: boolean = false;
-                    for (let i: number = 0; i < this.ignoreCount; i++) {
-                        if (this.ignoreUserhash[i] === username) {
-                            ignored = true;
-                            break;
-                        }
-                    }
-
-                    if (!ignored && this.chatDisabled === 0) {
-                        this.addChat(8, 'wishes to duel with you.', player);
-                    }
-                } else {
-                    this.addChat(0, message, '');
-                }
-
-                this.ptype = -1;
-                return true;
-            }
-
-            if (this.ptype === ServerProt.UPDATE_IGNORELIST) {
-                this.ignoreCount = (this.psize / 8) | 0;
-                for (let i: number = 0; i < this.ignoreCount; i++) {
-                    this.ignoreUserhash[i] = this.in.g8();
-                }
-
-                this.ptype = -1;
-                return true;
-            }
-
-            if (this.ptype === ServerProt.CHAT_FILTER_SETTINGS) {
-                this.chatPublicMode = this.in.g1();
-                this.chatPrivateMode = this.in.g1();
-                this.chatTradeMode = this.in.g1();
-
-                this.redrawChatMode = true;
-                this.redrawChat = true;
-
-                this.ptype = -1;
-                return true;
-            }
-
-            if (this.ptype === ServerProt.MESSAGE_PRIVATE) {
-                const from: bigint = this.in.g8();
-                const messageId: number = this.in.g4();
-                const staffModLevel: number = this.in.g1();
-
-                let ignored: boolean = false;
-                for (let i: number = 0; i < 100; i++) {
-                    if (this.privateMessageIds[i] === messageId) {
-                        ignored = true;
-                        break;
-                    }
-                }
-
-                if (staffModLevel <= 1) {
-                    for (let i: number = 0; i < this.ignoreCount; i++) {
-                        if (this.ignoreUserhash[i] === from) {
-                            ignored = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!ignored && this.chatDisabled === 0) {
-                    try {
-                        this.privateMessageIds[this.privateMessageCount] = messageId;
-                        this.privateMessageCount = (this.privateMessageCount + 1) % 100;
-
-                        const uncompressed: string = WordPack.unpack(this.in, this.psize - 13);
-                        const filtered: string = WordFilter.filter(uncompressed);
-
-                        if (staffModLevel === 2 || staffModLevel === 3) {
-                            this.addChat(7, filtered, '@cr2@' + JString.toScreenName(JString.toRawUsername(from)));
-                        } else if (staffModLevel === 1) {
-                            this.addChat(7, filtered, '@cr1@' + JString.toScreenName(JString.toRawUsername(from)));
-                        } else {
-                            this.addChat(3, filtered, JString.toScreenName(JString.toRawUsername(from)));
-                        }
-                    } catch (_e) {
-                    }
-                }
-
+                
                 this.ptype = -1;
                 return true;
             }
 
             if (this.ptype === ServerProt.FRIENDLIST_LOADED) {
-                this.friendServerStatus = this.in.g1();
-                this.redrawSide = true;
+                return this.handleFriendListLoaded();
+            }
 
-                this.ptype = -1;
-                return true;
+            if (this.ptype === ServerProt.MESSAGE_GAME) {
+                return this.handleMessageGame();
+            }
+
+            if (this.ptype === ServerProt.UPDATE_IGNORELIST) {
+                return this.handleUpdateIgnoreList();
+            }
+
+            if (this.ptype === ServerProt.CHAT_FILTER_SETTINGS) {
+                return this.handleChatFilterSettings();
+            }
+
+            if (this.ptype === ServerProt.MESSAGE_PRIVATE) {
+                return this.handleMessagePrivate();
             }
 
             if (this.ptype === ServerProt.UPDATE_FRIENDLIST) {
-                const username: bigint = this.in.g8();
-                const world: number = this.in.g1();
-
-                let displayName: string | null = JString.toScreenName(JString.toRawUsername(username));
-                for (let i: number = 0; i < this.friendCount; i++) {
-                    if (username === this.friendUserhash[i]) {
-                        if (this.friendNodeId[i] !== world) {
-                            this.friendNodeId[i] = world;
-                            this.redrawSide = true;
-                            if (world > 0) {
-                                this.addChat(5, displayName + ' has logged in.', '');
-                            }
-                            if (world === 0) {
-                                this.addChat(5, displayName + ' has logged out.', '');
-                            }
-                        }
-
-                        displayName = null;
-                        break;
-                    }
-                }
-
-                if (displayName && this.friendCount < 200) {
-                    this.friendUserhash[this.friendCount] = username;
-                    this.friendUsername[this.friendCount] = displayName;
-                    this.friendNodeId[this.friendCount] = world;
-                    this.friendCount++;
-                    this.redrawSide = true;
-                }
-
-                let sorted: boolean = false;
-                while (!sorted) {
-                    sorted = true;
-
-                    for (let i: number = 0; i < this.friendCount - 1; i++) {
-                        if ((this.friendNodeId[i] !== Client.nodeId && this.friendNodeId[i + 1] === Client.nodeId) || (this.friendNodeId[i] === 0 && this.friendNodeId[i + 1] !== 0)) {
-                            const oldWorld: number = this.friendNodeId[i];
-                            this.friendNodeId[i] = this.friendNodeId[i + 1];
-                            this.friendNodeId[i + 1] = oldWorld;
-
-                            const oldName: string | null = this.friendUsername[i];
-                            this.friendUsername[i] = this.friendUsername[i + 1];
-                            this.friendUsername[i + 1] = oldName;
-
-                            const oldUserhash: bigint = this.friendUserhash[i];
-                            this.friendUserhash[i] = this.friendUserhash[i + 1];
-                            this.friendUserhash[i + 1] = oldUserhash;
-                            this.redrawSide = true;
-                            sorted = false;
-                        }
-                    }
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateFriendList();
             }
 
             if (this.ptype === ServerProt.UNSET_MAP_FLAG) {
-                this.minimapFlagX = 0;
-
-                this.ptype = -1;
-                return true;
+                return this.handleUnsetMapFlag();
             }
 
             if (this.ptype === ServerProt.UPDATE_RUNWEIGHT) {
-                if (this.activeIcon === 12) {
-                    this.redrawSide = true;
-                }
-
-                this.runweight = this.in.g2b();
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateRunWeight();
             }
 
             if (this.ptype === ServerProt.HINT_ARROW) {
-                this.hintType = this.in.g1();
-
-                if (this.hintType === 1) {
-                    this.hintNpc = this.in.g2();
-                    // HINT_ARROW is always six bytes; entity targets include three padding bytes.
-                    this.in.g2();
-                    this.in.g1();
-                }
-
-                if (this.hintType >= 2 && this.hintType <= 6) {
-                    if (this.hintType === 2) {
-                        this.hintOffsetX = 64;
-                        this.hintOffsetZ = 64;
-                    } else if (this.hintType === 3) {
-                        this.hintOffsetX = 0;
-                        this.hintOffsetZ = 64;
-                    } else if (this.hintType === 4) {
-                        this.hintOffsetX = 128;
-                        this.hintOffsetZ = 64;
-                    } else if (this.hintType === 5) {
-                        this.hintOffsetX = 64;
-                        this.hintOffsetZ = 0;
-                    } else if (this.hintType === 6) {
-                        this.hintOffsetX = 64;
-                        this.hintOffsetZ = 128;
-                    }
-
-                    this.hintType = 2;
-                    this.hintTileX = this.in.g2();
-                    this.hintTileZ = this.in.g2();
-                    this.hintHeight = this.in.g1();
-                }
-
-                if (this.hintType === 10) {
-                    this.hintPlayer = this.in.g2();
-                    this.in.g2();
-                    this.in.g1();
-                } else if (this.hintType === 255) {
-                    // HintArrowEncoder encodes the clear variant as -1 followed by five zero bytes.
-                    this.in.g2();
-                    this.in.g2();
-                    this.in.g1();
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleHintArrow();
             }
 
             if (this.ptype === ServerProt.UPDATE_REBOOT_TIMER) {
-                this.rebootTimer = this.in.g2() * 30;
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateRebootTimer();
             }
 
             if (this.ptype === ServerProt.UPDATE_STAT) {
-                this.redrawSide = true;
-
-                const stat: number = this.in.g1();
-                const xp: number = this.in.g4();
-                const level: number = this.in.g1();
-
-                this.statXP[stat] = xp;
-                this.statEffectiveLevel[stat] = level;
-                this.statBaseLevel[stat] = 1;
-                this.statSeenGeneration[stat] = this.statSessionGeneration;
-
-                for (let i: number = 0; i < 98; i++) {
-                    if (xp >= Client.levelExperience[i]) {
-                        this.statBaseLevel[stat] = i + 2;
-                    }
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateStat();
             }
 
             if (this.ptype === ServerProt.UPDATE_RUNENERGY) {
-                if (this.activeIcon === 12) {
-                    this.redrawSide = true;
-                }
-
-                this.runenergy = this.in.g1();
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdateRunEnergy();
             }
 
             if (this.ptype === ServerProt.RESET_ANIMS) {
-                for (let i: number = 0; i < this.players.length; i++) {
-                    const player: ClientPlayer | null = this.players[i];
-                    if (!player) {
-                        continue;
-                    }
-
-                    player.primaryAnim = -1;
-                }
-
-                for (let i: number = 0; i < this.npc.length; i++) {
-                    const npc: ClientNpc | null = this.npc[i];
-                    if (!npc) {
-                        continue;
-                    }
-
-                    npc.primaryAnim = -1;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleResetAnims();
             }
 
             if (this.ptype === ServerProt.UPDATE_PID) {
-                this.selfSlot = this.in.g2();
-                this.membersAccount = this.in.g1();
-
-                this.ptype = -1;
-                return true;
+                return this.handleUpdatePid();
             }
 
             if (this.ptype === ServerProt.LAST_LOGIN_INFO) {
-                this.lastAddress = this.in.g4();
-                this.daysSinceLastLogin = this.in.g2();
-                this.daysSinceRecoveriesChanged = this.in.g1();
-                this.unreadMessages = this.in.g2();
-                this.warnMembersInNonMembers = this.in.g1();
-
-                if (this.lastAddress !== 0 && this.mainModalId === -1) {
-                    this.dnsReq = null;
-                    const ipStr = JString.formatIPv4(this.lastAddress);
-                    if (!ipStr.startsWith('127.')) {
-                        reverseDnsLookup(ipStr).then(results => {
-                            this.dnsReq = results[0];
-                        });
-                    }
-
-                    this.closeModal();
-
-                    let contentType: number = 650;
-                    if (this.daysSinceRecoveriesChanged !== 201 || this.warnMembersInNonMembers == 1) {
-                        contentType = 655;
-                    }
-
-                    this.reportAbuseInput = '';
-                    this.reportAbuseMuteOption = false;
-
-                    for (let i: number = 0; i < IfType.list.length; i++) {
-                        if (IfType.list[i] && IfType.list[i].clientCode === contentType) {
-                            this.mainModalId = IfType.list[i].layerId;
-                            break;
-                        }
-                    }
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleLastLoginInfo();
             }
 
             if (this.ptype === ServerProt.LOGOUT) {
                 await this.logout();
-
+                
                 this.ptype = -1;
                 return false;
             }
 
             if (this.ptype === ServerProt.P_COUNTDIALOG) {
-                this.socialInputOpen = false;
-                this.dialogInputOpen = true;
-                this.dialogInput = '';
-                this.redrawChat = true;
-
-                if (this.isMobile) {
-                    MobileKeyboard.show();
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handlePCountDialog();
             }
 
             if (this.ptype === ServerProt.SET_MULTIWAY) {
-                this.inMultizone = this.in.g1();
-
-                this.ptype = -1;
-                return true;
+                return this.handleSetMultiway();
             }
 
             if (this.ptype === ServerProt.SET_PLAYER_OP) {
-                const index = this.in.g1();
-                const priority = this.in.g1();
-                let op: string | null = this.in.gjstr();
+                return this.handleSetPlayerOp();
+            }
 
-                if (index >= 1 && index <= 5) {
-                    if (op.toLowerCase() === 'null') {
-                        op = null;
-                    }
-
-                    this.playerOp[index - 1] = op;
-                    this.playerOpPriority[index - 1] = priority === 0;
-                }
-
-                this.ptype = -1;
-                return true;
+            if (this.ptype === ServerProt.P_NAMEDIALOG) {
+                return this.handlePNamedialog();
             }
 
             if (this.ptype === ServerProt.MINIMAP_TOGGLE) {
-                this.minimapState = this.in.g1();
-
-                this.ptype = -1;
-                return true;
+                return this.handleMinimapToggle();
             }
 
             if (this.ptype === ServerProt.REBUILD_NORMAL) {
                 this.rebuildNormal();
+                
+                this.ptype = -1;
+                return true;
+            }
 
+            if (this.ptype === ServerProt.REBUILD_REGION) {
+                this.rebuildRegion();
+                
                 this.ptype = -1;
                 return true;
             }
 
             if (this.ptype === ServerProt.VARP_SMALL) {
-                const varpId: number = this.in.g2();
-                const value: number = this.in.g1b();
-
-                this.varServ[varpId] = value;
-
-                if (this.var[varpId] !== value) {
-                    this.var[varpId] = value;
-                    this.clientVar(varpId);
-
-                    this.redrawSide = true;
-
-                    if (this.tutComId !== -1) {
-                        this.redrawChat = true;
-                    }
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleVarpSmall();
             }
 
             if (this.ptype === ServerProt.VARP_LARGE) {
-                const varpId: number = this.in.g2();
-                const value: number = this.in.g4();
-
-                this.varServ[varpId] = value;
-
-                if (this.var[varpId] !== value) {
-                    this.var[varpId] = value;
-                    this.clientVar(varpId);
-
-                    this.redrawSide = true;
-
-                    if (this.tutComId !== -1) {
-                        this.redrawChat = true;
-                    }
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleVarpLarge();
             }
 
             if (this.ptype === ServerProt.VARP_SYNC) {
-                for (let i: number = 0; i < this.var.length; i++) {
-                    if (this.var[i] !== this.varServ[i]) {
-                        this.var[i] = this.varServ[i];
-                        this.clientVar(i);
-
-                        this.redrawSide = true;
-                    }
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleVarpSync();
             }
 
             if (this.ptype === ServerProt.SYNTH_SOUND) {
-                const soundId: number = this.in.g2();
-                const loops: number = this.in.g1();
-                const delay: number = this.in.g2();
-
-                if (this.waveEnabled && !Client.lowMem && this.waveCount < 50) {
-                    this.waveIds[this.waveCount] = soundId;
-                    this.waveLoops[this.waveCount] = loops;
-                    this.waveDelay[this.waveCount] = delay + JagFX.delays[soundId];
-                    this.waveCount++;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleSynthSound();
             }
 
             if (this.ptype === ServerProt.MIDI_SONG) {
-                let songId: number = this.in.g2();
-                if (songId == 65535) {
-                    songId = -1;
-                }
-
-                if (this.nextMidiSong != songId && this.midiActive && !Client.lowMem && this.nextMusicDelay === 0) {
-                    this.midiSong = songId;
-                    this.midiFading = true;
-                    this.onDemand?.request(2, this.midiSong);
-                }
-
-                this.nextMidiSong = songId;
-
-                this.ptype = -1;
-                return true;
+                return this.handleMidiSong();
             }
 
             if (this.ptype === ServerProt.MIDI_JINGLE) {
-                const jingleId: number = this.in.g2();
-                const delay: number = this.in.g2();
-
-                if (this.midiActive && !Client.lowMem) {
-                    this.midiSong = jingleId;
-                    this.midiFading = false;
-                    this.onDemand?.request(2, this.midiSong);
-                    this.nextMusicDelay = delay;
-                }
-
-                this.ptype = -1;
-                return true;
+                return this.handleMidiJingle();
             }
 
             if (this.ptype === ServerProt.UPDATE_ZONE_PARTIAL_FOLLOWS) {
                 this.zoneUpdatePartialFollows();
-
+                
                 this.ptype = -1;
                 return true;
             }
 
             if (this.ptype === ServerProt.UPDATE_ZONE_FULL_FOLLOWS) {
                 this.zoneUpdateFullFollows();
-
+                
                 this.ptype = -1;
                 return true;
             }
 
             if (this.ptype === ServerProt.UPDATE_ZONE_PARTIAL_ENCLOSED) {
                 this.zoneUpdatePartialEnclosed();
-
+                
                 this.ptype = -1;
                 return true;
             }
 
+            // Standalone zone children: the opcode is the packet, and the zone origin is the one the last UPDATE_ZONE_PARTIAL_FOLLOWS or FULL_FOLLOWS set.
             if (
-                this.ptype === ServerProt.OBJ_COUNT ||
                 this.ptype === ServerProt.P_LOCMERGE ||
-                this.ptype === ServerProt.OBJ_REVEAL ||
-                this.ptype === ServerProt.MAP_ANIM ||
-                this.ptype === ServerProt.MAP_PROJANIM ||
-                this.ptype === ServerProt.OBJ_DEL ||
-                this.ptype === ServerProt.OBJ_ADD ||
                 this.ptype === ServerProt.LOC_ANIM ||
+                this.ptype === ServerProt.OBJ_DEL ||
+                this.ptype === ServerProt.OBJ_REVEAL ||
+                this.ptype === ServerProt.LOC_ADD_CHANGE ||
+                this.ptype === ServerProt.MAP_PROJANIM ||
                 this.ptype === ServerProt.LOC_DEL ||
-                this.ptype === ServerProt.LOC_ADD_CHANGE
+                this.ptype === ServerProt.OBJ_COUNT ||
+                this.ptype === ServerProt.MAP_ANIM ||
+                this.ptype === ServerProt.OBJ_ADD ||
+                this.ptype === ServerProt.SOUND_AREA
             ) {
                 this.zonePacket(this.in, this.ptype);
 

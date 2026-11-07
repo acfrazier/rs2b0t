@@ -47,7 +47,7 @@ const finder = HAS_COLLISION_PACK ? loadFinder() : null;
 describe('revision-377 offline route corpus', () => {
     test('keeps the six historical mainland legs and Lumbridge-to-Mizgog first in the corpus', () => {
         const routes = buildScriptRoutes({ maxBankPairs: 0 });
-        expect(routes.slice(0, REQUIRED_ROUTES.length).map(route => route.id)).toEqual(REQUIRED_ROUTES);
+        expect(routes.slice(0, REQUIRED_ROUTES.length).map(route => route.id)).toEqual([...REQUIRED_ROUTES]);
 
         const mizgog = routes.find(route => route.id === 'MIZGOG-01');
         expect(mizgog).toMatchObject({

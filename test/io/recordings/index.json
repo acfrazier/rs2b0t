@@ -2,12 +2,6 @@
   "format": 1,
   "recordings": [
     {
-      "file": "289/reference.jsonl",
-      "sha256": "bae74026982c028e95949c4f0117162c3cd4e340d13b501be63afb04da79fcd8",
-      "cacheSha256": "8aa106076a1b37d2442727c1a1ca9033e40aa1c4406291d1dfdbb62bd1043efe",
-      "revision": 289
-    },
-    {
       "file": "377/tutorial.jsonl",
       "sha256": "7f4905c1685b39868efade385904892da153dd9e1801d516cbb1a85e567e2555",
       "cacheSha256": "6ff2ab747dd45cdc9ac254a8dd33545ab1686b3f0f1cf0ab5ac8f74815da17a1",

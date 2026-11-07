@@ -216,10 +216,9 @@ test('a failing replay restores preloaded canvas, login-key exports, and the ori
 const recordingIndex = resolve('test/io/recordings/index.json');
 const missingIndex = !existsSync(recordingIndex);
 if (missingIndex) console.info('SKIP: test/io/replay.test.ts: recording index is not present');
-const missingEngine = CLIENT_VERSION === 289 ? skipUnless('engine') : false;
 const missingCacheBundle = skipUnless('cache-bundle');
 
-describe.skipIf(missingIndex || missingEngine || missingCacheBundle)('production replay runtime', () => {
+describe.skipIf(missingIndex || missingCacheBundle)('production replay runtime', () => {
     test('boots and replays every current-client recording through production mainloop', async () => {
         const fixtures = loadReplayFixtures();
         expect(fixtures.length).toBeGreaterThan(0);
@@ -432,11 +431,12 @@ describe('production tcpIn fail-closed replay path', () => {
     });
 
     test('a real handler exception takes T2 logout and is still rethrown', async () => {
-        await dispatch(ServerProt.IF_SETTEXT, [255, 255, 10], async (_client, run, logout, stream) => {
+        // Java dereferences the unloaded component list entry here; with no local player the handler returns before that read.
+        await dispatch(ServerProt.IF_SETPLAYERHEAD, [255, 255], async (_client, run, logout, stream) => {
             await expect(run()).rejects.toBeInstanceOf(TypeError);
             expect(logout).toHaveBeenCalledTimes(1);
             expect(stream.closed).toBe(true);
-        });
+        }, client => Object.assign(client, { localPlayer: { routeX: [0], routeZ: [0] } }));
     });
 
     test('same-length wrong transform reaches the handler but fails the independent value oracle', async () => {
