@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { engineLoginKey } from '../lib/engineLoginKey.js';
-import { installObserver, observe, quiescent, type CaptureSnapshot } from './capture-page.js';
+import { cycles, installObserver, observe, quiescent, type CaptureSnapshot } from './capture-page.js';
 import { assertCaptureFrames, captureScenario, type Scenario, type ScenarioContext } from './capture-scenarios.js';
 import { startTap, type TapSession } from '../../tools/tap-377/tap.js';
 import { loadEngineProtocol } from '../../tools/tap-377/protocol.js';
@@ -131,6 +131,17 @@ export async function capture(options: Options): Promise<void> {
             }
         });
         if (pageErrors) throw new Error('capture browser reported an uncaught error');
+        stage = 'cache-drain';
+        const pendingBefore = tap.diagnostics.pendingCounts;
+        const drainDeadline = Date.now() + 30_000;
+        while (true) {
+            const diagnostics = tap.diagnostics;
+            if (diagnostics.failures.length) throw new Error('capture tap failed before finalization');
+            if (Object.values(diagnostics.pendingCounts).every(count => count === 0)) break;
+            if (Date.now() >= drainDeadline) throw new Error('capture cache stream did not drain');
+            await cycles(page, 1);
+        }
+        steps.push({ label: 'cache-drained', details: { pendingBefore, pendingAfter: tap.diagnostics.pendingCounts } });
         stage = 'finalization';
         await tap.finalize();
         assertCaptureFrames(options.scenario, tap.records, protocol);

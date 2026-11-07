@@ -6,6 +6,8 @@ This directory contains the development-only game/OnDemand tap. Its Playwright c
 
 The tap binds to loopback and requires an explicit engine directory and origin. It reads the engine login key in place. Login requests, RSA blocks, credentials, seeds, and the machine identifier are never recording fields. Independent ISAAC instances decrypt the two game directions after an accepted login. The OnDemand connection is classified separately and is never ISAAC-decoded.
 
+The key reader accepts unencrypted two-prime RSA in PKCS#1 or version-0 PKCS#8. PKCS#8 must declare the RSA encryption algorithm; other algorithms and encrypted keys are rejected. The same integer decoder handles the large public exponent used by older engines.
+
 A JSONL file starts with a versioned header: revision, engine/content/client commits, disposable account prefix, and hashes of the nine HTTP archive responses. Each segment contains the accepted login replies, plaintext game frames, checkpoints, and a clean segment end. Frames include the opcode and any variable-length prefix. `tick` counts inbound `PLAYER_INFO` packets; each direction also has its own ordinal. A checkpoint names the exact number of inbound packets the browser has consumed, not the number the network has received.
 
 The cache bundle is separate from the public recording. It contains the nine archive responses and the compressed OnDemand files requested during capture. `test/io/recordings/index.json` pins both the recording and the cache bundle by SHA-256. Keep cache bundles and receipts in the approved evidence directory; never add the engine key or raw content source to Git.
@@ -27,9 +29,11 @@ bun e2e/tap-377/capture-session.ts \
 
 The output directory must not exist. The driver creates a fresh disposable account under the supplied prefix and keeps its secret in memory. The reference browser is built inside the output directory and served by the tap; no engine public files are changed. Headed Chrome is the default. `--headless` is explicit.
 
-For revision 377, select `tutorial`, `mainland`, or `instance`. The latter two require `--harness-lib` naming the operator-approved account helper module. Its `mainlandAccount` prepares only the fixture account. The receipt labels every seed operation; no seed is credited as the interaction being proved. No scenario starts, stops, repacks, or edits an engine.
+For revision 377, select `tutorial`, `mainland`, or `instance`. The latter two require `--harness-lib` naming the operator-approved account helper module. Its `mainlandAccount` prepares only the fixture account. The receipt labels every seed operation; no seed is credited as the interaction being proved. Teleport seeds use the shared engine-coordinate encoder and must reach their exact target tile. No scenario starts, stops, repacks, or edits an engine.
 
-The driver asserts a built scene and a stable route head for five server ticks before each checkpoint. It rejects packet-handler failures and players outside the disposable prefix. It asserts movement, interface results, count-dialog withdrawal, both non-adjacent bank rearrangement modes, instanced scene construction, clean logout, and a same-client relogin. Successful checkpoints have screenshots. Failure receipts retain allowlisted state and packet byte counts, not arbitrary packet dumps or exception text. A failed attempt is retained, not silently promoted to a recording.
+The driver asserts a built scene and a stable route head for five server ticks before each checkpoint. It rejects packet-handler failures and players outside the disposable prefix. It asserts movement, interface results, count-dialog withdrawal, both non-adjacent bank rearrangement modes, instanced scene construction, clean logout, and a same-client relogin. Before finalization it also waits for the tap's outstanding cache requests and partial wire buffers to drain; the client's urgent-request count alone does not include background prefetch. Successful checkpoints have screenshots. Failure receipts retain allowlisted state and packet byte counts, not arbitrary packet dumps or exception text. A failed attempt is retained, not silently promoted to a recording.
+
+Bank drags wait for the client to observe the hovered source slot before pressing the mouse. Both modes use occupied, non-adjacent slots. Each drag is checked again after closing and reopening the bank, so the client's optimistic reorder alone cannot pass the capture.
 
 ## Validation boundary
 
@@ -55,4 +59,10 @@ ENGINE_DIR="$ENGINE_DIR" RS2B0T_CACHE_BUNDLE="$CACHE_BUNDLE" \
 
 Before the client cutover this selects the 289 recording. The 377 captures are checked for wire validity now and replay through the 377 production client after cutover.
 
-Replay uses the production client frame and cache loaders. It does not exercise real network sockets, the OnDemand wire parser, or rendering. The live capture covers the socket and OnDemand paths; renderer qualification remains a live-client check. Hosted CI can run the synthetic failures without a cache bundle and must state when a real cache-backed recording is skipped.
+The runtime checks the adapter's packet-listener sequence for every notifying packet. `LOGOUT` is a terminal handler: it returns false to stop the frame, so the adapter does not notify it. Replay instead requires that this recorded packet has already run production logout before segment cleanup; the next login must reset the same client's session state.
+
+The replay receipt names `Jpeg.decodeJpeg: jpeg-js` as a substituted boot step. Happy-dom does not load the title image, so the test harness decodes its captured JPEG bytes with the development-only decoder. Production `Pix32.fromJpeg`, archive loading, configuration initialization, and the rest of `maininit` still run. The bundle guard rejects this decoder in browser or worker output.
+
+The synthetic login uses fixed public parameters and reply bytes; `RecordedStream` discards login writes. The receipt names this configuration substitution too. All login-key exports are preserved and restored, so replay does not depend on which test first imported the key module or change later tests' key state. Production RSA encoding and the successful-login reset still run.
+
+Replay uses the production client frame and cache loaders. Its loopback archive server uses Bun's native HTTP types rather than happy-dom's replacements. Native fetch is scoped to the replay and its original property descriptor is restored even when replay fails. Replay does not exercise game sockets, the OnDemand wire parser, or rendering. The live capture covers the socket and OnDemand paths; renderer qualification remains a live-client check. Hosted CI can run the synthetic failures without a cache bundle and must state when a real cache-backed recording is skipped.

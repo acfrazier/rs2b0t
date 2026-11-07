@@ -1,4 +1,5 @@
 import type { Page } from 'playwright-core';
+import { teleCheat } from '../tutorial/harness.js';
 import { action, cleanLogout, cycles, login, observe, quiescent, readValue, walk, type CaptureSnapshot, type Npc, type Loc, type InvItem } from './capture-page.js';
 import type { Protocol, RecordingRecord } from '../../tools/tap-377/format.js';
 
@@ -28,6 +29,12 @@ async function seed(context: ScenarioContext, command: string): Promise<void> {
     await action(context.page, 'cheat', command);
     await cycles(context.page, 30);
     await quiescent(context.page);
+}
+
+async function seedPosition(context: ScenarioContext, x: number, z: number, level = 0): Promise<void> {
+    await seed(context, teleCheat({ x, z, level }));
+    await until(context.page, 'fixture teleport reached its target', state =>
+        state.state.serverTile.x === x && state.state.serverTile.z === z && state.state.serverTile.level === level);
 }
 
 interface Dialogue { body: string; options: { comId: number; text: string }[]; next: number | null; open: boolean }
@@ -102,7 +109,6 @@ async function tutorial(context: ScenarioContext): Promise<void> {
     await until(context.page, 'tutorial dialogue appeared', async () => (await dialogue(context.page)).open);
     context.note('tutorial-talk', { body: (await dialogue(context.page)).body });
     await context.checkpoint('tutorial-talk-built-scene');
-    await action(context.page, 'closeModal');
     await relog(context);
 }
 
@@ -136,23 +142,54 @@ async function drag(context: ScenarioContext, from: number, to: number, insert: 
         return { x: box.x + p.x * box.width / size.width, y: box.y + p.y * box.height / size.height };
     };
     const source = point(from), target = point(to);
-    const count = (await observe(context.page)).inboundCount;
     await context.page.mouse.move(source.x, source.y);
+    // The menu is rebuilt during redraw, not on pointermove. Arm the click only after its source slot is observed.
+    await until(context.page, 'bank source hovered', async () => context.page.evaluate(slot => {
+        const harness: unknown = Reflect.get(globalThis, '__lc377');
+        if (!harness || typeof harness !== 'object' || !('client' in harness)) return false;
+        const client = harness.client;
+        return !!client && typeof client === 'object' &&
+            'hoveredSlotComId' in client && client.hoveredSlotComId === 5382 && 'hoveredSlot' in client && client.hoveredSlot === slot;
+    }, from), 5000);
     await context.page.mouse.down();
     try {
         await cycles(context.page, 6);
+        const armed = await context.page.evaluate(slot => {
+            const harness: unknown = Reflect.get(globalThis, '__lc377');
+            if (!harness || typeof harness !== 'object' || !('client' in harness)) return false;
+            const client = harness.client;
+            return !!client && typeof client === 'object' &&
+                'objDragArea' in client && typeof client.objDragArea === 'number' && client.objDragArea !== 0 &&
+                'objDragComId' in client && client.objDragComId === 5382 && 'objDragSlot' in client && client.objDragSlot === slot;
+        }, from);
+        if (!armed) throw new Error('capture bank drag did not arm');
         await context.page.mouse.move(target.x, target.y, { steps: 5 });
         await cycles(context.page, 2);
     } finally { await context.page.mouse.up(); }
     const ids = before.filter(item => item.slot < 5).sort((a, b) => a.slot - b.slot).map(item => item.id);
     const expected = rearranged(ids, from, to, insert);
-    await until(context.page, 'server bank reorder', async state => {
-        if (state.inboundCount <= count) return false;
+    await until(context.page, 'client bank reorder', async () => {
         const current = await readValue<InvItem[]>(context.page, 'ifInv', 5382);
         return expected.every((id, slot) => current.find(item => item.slot === slot)?.id === id);
     });
+    // The client swaps optimistically. A fresh server-opened inventory must confirm the result.
+    await action(context.page, 'closeModal');
+    await until(context.page, 'bank closed after drag', state => state.main === -1);
+    await openBank(context);
+    const confirmed = await readValue<InvItem[]>(context.page, 'ifInv', 5382);
+    if (!expected.every((id, slot) => confirmed.find(item => item.slot === slot)?.id === id)) {
+        throw new Error('capture bank reorder was not retained by the server');
+    }
     context.note(insert ? 'bank-insert' : 'bank-swap', { from, to, before: ids, after: expected });
     await context.checkpoint(insert ? 'bank-insert-built-scene' : 'bank-swap-built-scene');
+}
+
+async function openBank(context: ScenarioContext): Promise<void> {
+    const banker = (await readValue<Npc[]>(context.page, 'npcs')).find(npc => npc.name === 'Banker' && npc.ops.includes('Bank'));
+    if (!banker) throw new Error('mainland banker is absent');
+    await action(context.page, 'npcOp', banker.index, banker.ops.indexOf('Bank') + 1);
+    await until(context.page, 'bank opened', state => state.main === 5292 && state.side === 2005);
+    await quiescent(context.page);
 }
 
 async function mainland(context: ScenarioContext): Promise<void> {
@@ -160,7 +197,7 @@ async function mainland(context: ScenarioContext): Promise<void> {
     context.note('seed', { command: 'mainlandAccount: own tutorial completion and mainland teleport, then relogin', scope: 'fixture preparation only' });
     await context.mainlandAccount(context.page, context.username, context.secret);
     await context.checkpoint('mainland-login-built-scene');
-    await seed(context, 'tele 3212 3246 0');
+    await seedPosition(context, 3217, 3219);
     const doors = await readValue<Loc[]>(context.page, 'locs', { name: 'Door', maxDist: 10 });
     const door = doors.find(loc => loc.ops.includes('Open'));
     if (!door) throw new Error('mainland fixture has no nearby closed door');
@@ -171,11 +208,11 @@ async function mainland(context: ScenarioContext): Promise<void> {
     });
     context.note('door-open', { id: door.id, x: door.x, z: door.z });
     await context.checkpoint('door-built-scene');
-    await seed(context, 'tele 3205 3209 0');
+    await seedPosition(context, 3205, 3209);
     await action(context.page, 'opLocAt', 3204, 3207, 'Climb-up');
     await until(context.page, 'stairs changed level', state => state.state.serverTile.level === 1);
     await context.checkpoint('stairs-built-scene');
-    await seed(context, 'tele 3212 3246 0');
+    await seedPosition(context, 3212, 3246);
     const shopkeeper = (await readValue<Npc[]>(context.page, 'npcs')).find(npc => npc.name === 'Shop keeper');
     if (!shopkeeper) throw new Error('mainland shopkeeper is absent');
     await action(context.page, 'npcOp', shopkeeper.index, 1);
@@ -185,12 +222,21 @@ async function mainland(context: ScenarioContext): Promise<void> {
     context.note('shop-open', { root: 3824, stockSlots: stock.length });
     await context.checkpoint('shop-built-scene');
     await action(context.page, 'closeModal');
-    for (const [name, count] of [['coins', 100], ['pot', 1], ['bucket', 1], ['jug', 1], ['tinderbox', 1]] as const) await seed(context, `~bankitem ${name} ${count}`);
-    await seed(context, 'tele 3093 3243 0');
-    const banker = (await readValue<Npc[]>(context.page, 'npcs')).find(npc => npc.name === 'Banker' && npc.ops.includes('Bank'));
-    if (!banker) throw new Error('mainland banker is absent');
-    await action(context.page, 'npcOp', banker.index, banker.ops.indexOf('Bank') + 1);
-    await until(context.page, 'bank opened', state => state.main === 5292 && state.side === 2005);
+    const bankSeeds = [
+        { name: 'coins', id: 995, count: 100 },
+        { name: 'pot_empty', id: 1931, count: 1 },
+        { name: 'bucket_empty', id: 1925, count: 1 },
+        { name: 'jug_empty', id: 1935, count: 1 },
+        { name: 'tinderbox', id: 590, count: 1 }
+    ];
+    for (const item of bankSeeds) await seed(context, `givebank ${item.name} ${item.count}`);
+    await seedPosition(context, 3093, 3243);
+    await openBank(context);
+    const seededItems = await readValue<InvItem[]>(context.page, 'ifInv', 5382);
+    if (!bankSeeds.every((item, slot) => seededItems.some(actual => actual.slot === slot && actual.id === item.id && actual.count === item.count))) {
+        throw new Error('capture bank seeds did not reach their expected slots');
+    }
+    context.note('bank-seed-readback', { items: seededItems.map(({ id, slot, count }) => ({ id, slot, count })) });
     await context.checkpoint('bank-built-scene');
     await drag(context, 0, 4, false);
     await drag(context, 4, 1, true);
@@ -219,7 +265,8 @@ async function instance(context: ScenarioContext): Promise<void> {
     if (!context.mainlandAccount) throw new Error('instance capture requires the approved account helper');
     context.note('seed', { command: 'mainlandAccount: own tutorial completion and mainland teleport, then relogin', scope: 'fixture preparation only' });
     await context.mainlandAccount(context.page, context.username, context.secret);
-    for (const command of ['setvar spy 4', 'setvar druidquest 4', 'setvar recruitmentdrive 0', 'setvar rd_rooms_tempvar 0', 'setvar rd_rooms_tempvar2 0', 'tele 2996 3373 0']) await seed(context, command);
+    for (const command of ['setvar spy 4', 'setvar druidquest 4', 'setvar recruitmentdrive 1', 'setvar rd_rooms_tempvar 0', 'setvar rd_rooms_tempvar2 0']) await seed(context, command);
+    await seedPosition(context, 2996, 3373);
     await context.checkpoint('before-instance-built-scene');
     const tiffy = (await readValue<Npc[]>(context.page, 'npcs')).find(npc => npc.name === 'Sir Tiffy Cashien');
     if (!tiffy) throw new Error('instance entry NPC is absent');

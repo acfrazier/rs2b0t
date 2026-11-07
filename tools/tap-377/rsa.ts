@@ -1,5 +1,7 @@
 import { bigIntModPow, bigIntToBytes, bytesToBigInt } from '../../src/client/util/JsUtil.js';
 
+const RSA_ENCRYPTION_OID = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01];
+
 export interface RsaPrivateKey { modulus: bigint; privateExponent: bigint }
 
 class Der {
@@ -31,19 +33,33 @@ class Der {
     }
 }
 
-/** Engine-TS serializes a PKCS#1 RSA key. Its arbitrary public exponent is not admitted by Node/Bun's key importer. */
+/** Accept unencrypted PKCS#1 and PKCS#8 RSA keys without Node's public-exponent size restriction. */
 export function readRsaPrivateKey(pem: Uint8Array): RsaPrivateKey {
     const fence = '-'.repeat(5);
     const lines = new TextDecoder('utf-8', { fatal: true }).decode(pem).trim().split(/\r?\n/);
-    if (lines.shift() !== `${fence}BEGIN RSA PRIVATE KEY${fence}` || lines.pop() !== `${fence}END RSA PRIVATE KEY${fence}`) throw new Error('invalid engine key');
+    const header = lines.shift();
+    const pkcs8 = header === `${fence}BEGIN PRIVATE KEY${fence}`;
+    const keyType = pkcs8 ? 'PRIVATE KEY' : 'RSA PRIVATE KEY';
+    if (header !== `${fence}BEGIN ${keyType}${fence}` || lines.pop() !== `${fence}END ${keyType}${fence}`) throw new Error('invalid engine key');
     const base64 = lines.join('');
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) throw new Error('invalid engine key');
     const bytes = Buffer.from(base64, 'base64');
     try {
         if (bytes.toString('base64') !== base64) throw new Error('invalid engine key');
-        const root = new Der(bytes);
-        const fields = new Der(root.element(0x30));
+        let root = new Der(bytes);
+        let fields = new Der(root.element(0x30));
         if (!root.done || fields.integer() !== 0n) throw new Error('invalid engine key');
+        if (pkcs8) {
+            const algorithm = new Der(fields.element(0x30));
+            const oid = algorithm.element(0x06);
+            if (oid.length !== RSA_ENCRYPTION_OID.length || RSA_ENCRYPTION_OID.some((byte, index) => oid[index] !== byte)) throw new Error('invalid engine key');
+            if (!algorithm.done && algorithm.element(0x05).length !== 0) throw new Error('invalid engine key');
+            if (!algorithm.done) throw new Error('invalid engine key');
+            root = new Der(fields.element(0x04));
+            if (!fields.done) throw new Error('invalid engine key');
+            fields = new Der(root.element(0x30));
+            if (!root.done || fields.integer() !== 0n) throw new Error('invalid engine key');
+        }
         const modulus = fields.integer(), publicExponent = fields.integer(), privateExponent = fields.integer();
         const p = fields.integer(), q = fields.integer();
         const exponentP = fields.integer(), exponentQ = fields.integer(), coefficient = fields.integer();

@@ -1,7 +1,11 @@
 import { Buffer } from 'node:buffer';
 import { isDeepStrictEqual } from 'node:util';
+import { mock } from 'bun:test';
+import { decode as decodeJpegBytes } from 'jpeg-js';
 
+import * as loginKey from '#/client/config/loginKey.js';
 import { TARGET } from '#/client/config/target.js';
+import { decodeJpeg } from '#/client/graphics/Jpeg.js';
 
 import type { ClientStreamLike } from '#/client/io/ClientStream.js';
 import type JagFile from '#/client/io/JagFile.js';
@@ -20,6 +24,7 @@ import type {
     RecordingRecord
 } from '../../../tools/tap-377/format.js';
 import { startReplayArchiveServer, type ReplayArchiveServer } from './server.js';
+import { nativeFetch } from '../../setup-dom.js';
 
 const SYNTHETIC_LOGIN_SEED = new Uint8Array([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]);
 const MAX_FRAMES_PER_CHECKPOINT = 5000;
@@ -306,6 +311,7 @@ export interface ReplayReport {
     runtimeOutbound: { frameCount: number; opcodes: string[] };
     boot: {
         mode: 'production-maininit';
+        substitutedSteps: string[];
         mainredrawCalls: 0;
         onDemandWireParser: false;
         gameSockets: false;
@@ -424,14 +430,13 @@ export async function replayRecording(
     if (typeof document === 'undefined') {
         throw new Error('replay requires the happy-dom test document');
     }
-    const restoreCanvas = installCanvasMock();
+    const restoreCanvas = await installCanvasMock();
+    const previousFetch = Object.getOwnPropertyDescriptor(globalThis, 'fetch');
     const previousTarget = {
         wsHost: TARGET.wsHost,
         tls: TARGET.tls,
         httpPrefix: TARGET.httpPrefix
     };
-    const previousLoginRsan = process.env.LOGIN_RSAN;
-    const previousLoginRsae = process.env.LOGIN_RSAE;
     const previousSecureOrigin = process.env.SECURE_ORIGIN;
     const previousStrictPackets = process.env.STRICT_PACKETS;
     const previousStrictConfig = process.env.STRICT_CONFIG;
@@ -448,11 +453,15 @@ export async function replayRecording(
     let detachAdapter: (() => void) | null = null;
     let setPacketListener: ((listener: ((ptype: number) => void) | null) => void) | null = null;
     let restoreClientSettings: (() => void) | null = null;
+    let restoreJpegDecoder: (() => void) | null = null;
+    let restoreLoginKey: (() => void) | null = null;
     const packetListenerOpcodes: number[] = [];
     const checkpointReports: CheckpointReport[] = [];
     let runtimeOutboundChunks: Uint8Array[] = [];
 
     try {
+        Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: nativeFetch });
+        restoreLoginKey = installSyntheticLoginKey();
         const startedServer = startReplayArchiveServer(cacheBundle);
         archiveServer = startedServer;
         TARGET.wsHost = startedServer.host;
@@ -461,8 +470,7 @@ export async function replayRecording(
         process.env.SECURE_ORIGIN = 'false';
         process.env.STRICT_PACKETS = '1';
         process.env.STRICT_CONFIG = '1';
-        if (!process.env.LOGIN_RSAN) process.env.LOGIN_RSAN = '65537';
-        if (!process.env.LOGIN_RSAE) process.env.LOGIN_RSAE = '65537';
+        restoreJpegDecoder = installJpegDecoder();
         // Test loading boundary: strict flags, loopback target, and the canvas must exist before client modules capture globals.
         const [{ Client }, { default: OnDemand }, { attach, detach, reader, setPacketListener: setListener }] = await Promise.all([
             import('#/client/shell/Client.js'),
@@ -585,9 +593,12 @@ export async function replayRecording(
 
             const inboundCount = stream.inboundFrameCount;
             const packetListenerStart = packetListenerOpcodes.length;
-            const expectedInboundOpcodes = segment.frames
+            // tcpIn returns false for LOGOUT to stop the frame; the adapter notifies only true returns.
+            const logoutOpcode = protocol.server.find(descriptor => descriptor.name === 'LOGOUT')?.id;
+            const expectedListenerOpcodes = segment.frames
                 .filter(frame => frame.direction === 'in')
-                .map(frame => decodeRecordedFrame(frame, protocol.server)[0]!);
+                .map(frame => decodeRecordedFrame(frame, protocol.server)[0]!)
+                .filter(opcode => opcode !== logoutOpcode);
             for (const checkpoint of segment.checkpoints) {
                 stream.exposeInboundThrough(checkpoint.inboundCount);
                 let frames = 0;
@@ -653,11 +664,14 @@ export async function replayRecording(
             if (stream.consumedInboundCount !== segment.end.inboundCount) {
                 throw new Error('replay segment did not consume its exact end inbound count');
             }
+            if (segment.end.reason === 'logout' && reader.ingame()) {
+                throw new Error('recorded LOGOUT did not run the production logout path');
+            }
 
             const processedOpcodes = packetListenerOpcodes.slice(packetListenerStart);
             if (
-                processedOpcodes.length !== expectedInboundOpcodes.length ||
-                expectedInboundOpcodes.some((opcode, index) => processedOpcodes[index] !== opcode)
+                processedOpcodes.length !== expectedListenerOpcodes.length ||
+                expectedListenerOpcodes.some((opcode, index) => processedOpcodes[index] !== opcode)
             ) {
                 throw new Error('production packet listener did not process the recorded inbound opcode sequence');
             }
@@ -689,6 +703,7 @@ export async function replayRecording(
             runtimeOutbound: emitted,
             boot: {
                 mode: 'production-maininit',
+                substitutedSteps: ['Jpeg.decodeJpeg: jpeg-js', 'loginKey: synthetic public parameters'],
                 mainredrawCalls: 0,
                 onDemandWireParser: false,
                 gameSockets: false
@@ -706,16 +721,16 @@ export async function replayRecording(
                 }
             }
         } finally {
+            if (previousFetch) Object.defineProperty(globalThis, 'fetch', previousFetch);
+            else Reflect.deleteProperty(globalThis, 'fetch');
+            restoreJpegDecoder?.();
+            restoreLoginKey?.();
             restoreClientSettings?.();
             archiveServer?.close();
             TARGET.wsHost = previousTarget.wsHost;
             TARGET.tls = previousTarget.tls;
             if (previousTarget.httpPrefix === undefined) delete TARGET.httpPrefix;
             else TARGET.httpPrefix = previousTarget.httpPrefix;
-            if (previousLoginRsan === undefined) delete process.env.LOGIN_RSAN;
-            else process.env.LOGIN_RSAN = previousLoginRsan;
-            if (previousLoginRsae === undefined) delete process.env.LOGIN_RSAE;
-            else process.env.LOGIN_RSAE = previousLoginRsae;
             if (previousSecureOrigin === undefined) delete process.env.SECURE_ORIGIN;
             else process.env.SECURE_ORIGIN = previousSecureOrigin;
             if (previousStrictPackets === undefined) delete process.env.STRICT_PACKETS;
@@ -728,7 +743,18 @@ export async function replayRecording(
 }
 
 
-function installCanvasMock(): () => void {
+function installSyntheticLoginKey(): () => void {
+    const previous = { ...loginKey };
+    // Login writes are discarded. Scope these parameters even when another test already cached the key module.
+    mock.module('#/client/config/loginKey.js', () => ({
+        ...previous,
+        loginModulus: () => 65537n,
+        loginExponent: () => 65537n
+    }));
+    return () => { mock.module('#/client/config/loginKey.js', () => previous); };
+}
+
+async function installCanvasMock(): Promise<() => void> {
     if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') {
         throw new Error('replay requires happy-dom canvas globals');
     }
@@ -781,8 +807,12 @@ function installCanvasMock(): () => void {
     }
     canvas.width = 800;
     canvas.height = 600;
+    // Test loading boundary: another test may have imported Canvas before a DOM canvas existed.
+    const { canvas: priorCanvas, canvas2d: priorCanvas2d } = await import('#/client/graphics/Canvas.js');
+    mock.module('#/client/graphics/Canvas.js', () => ({ canvas, canvas2d: fake2d(canvas) }));
 
     return () => {
+        mock.module('#/client/graphics/Canvas.js', () => ({ canvas: priorCanvas, canvas2d: priorCanvas2d }));
         if (existingCanvas) {
             canvas.width = previousWidth;
             canvas.height = previousHeight;
@@ -794,5 +824,27 @@ function installCanvasMock(): () => void {
         } else {
             Reflect.deleteProperty(HTMLCanvasElement.prototype, 'getContext');
         }
+    };
+}
+
+function installJpegDecoder(): () => void {
+    const previous = decodeJpeg;
+    // happy-dom cannot load an HTMLImageElement. Decode the captured JPEG bytes, not synthetic pixels.
+    mock.module('#/client/graphics/Jpeg.js', () => ({
+        async decodeJpeg(data: Uint8Array): Promise<ImageData> {
+            // Match the production decoder's repair of the cache's JPEG marker.
+            if (data[0] !== 0xff) data[0] = 0xff;
+            const image = decodeJpegBytes(data, { useTArray: true });
+            return {
+                width: image.width,
+                height: image.height,
+                // jpeg-js allocates a new Uint8Array, never a shared buffer; reuse its storage.
+                data: new Uint8ClampedArray(image.data.buffer as ArrayBuffer, image.data.byteOffset, image.data.byteLength),
+                colorSpace: 'srgb'
+            };
+        }
+    }));
+    return () => {
+        mock.module('#/client/graphics/Jpeg.js', () => ({ decodeJpeg: previous }));
     };
 }

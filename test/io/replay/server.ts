@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer';
 import Packet from '#/client/io/Packet.js';
 
 import { ARCHIVES, type CacheBundle } from '../../../tools/tap-377/format.js';
+import { nativeResponse as NativeResponse } from '../../setup-dom.js';
 
 function decodeBase64(value: string, label: string): Uint8Array<ArrayBuffer> {
     if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
@@ -56,15 +57,15 @@ export function startReplayArchiveServer(cache: CacheBundle): ReplayArchiveServe
         port: 0,
         fetch(request): Response {
             if (request.method !== 'GET') {
-                return new Response(null, { status: 405 });
+                return new NativeResponse(null, { status: 405 });
             }
 
             const bytes = routeBytes.get(new URL(request.url).pathname);
             if (!bytes) {
-                return new Response('not found', { status: 404 });
+                return new NativeResponse('not found', { status: 404 });
             }
 
-            return new Response(bytes, {
+            return new NativeResponse(bytes, {
                 headers: { 'content-type': 'application/octet-stream' }
             });
         }

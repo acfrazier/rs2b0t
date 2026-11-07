@@ -1,7 +1,9 @@
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, mock, spyOn, test } from 'bun:test';
 
+import * as loginKey from '#/client/config/loginKey.js';
 import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import { assertPacketConsumed } from '#/client/io/packetGuard.js';
 import Packet from '#/client/io/Packet.js';
@@ -9,9 +11,10 @@ import OnDemand, { type OnDemandWorker } from '#/client/io/OnDemand.js';
 import { ServerProt } from '#/client/io/ServerProt.js';
 
 import { skipUnless } from '../lib/skipUnless.js';
-import type { FrameRecord, LoginRecord, Protocol } from '../../tools/tap-377/format.js';
+import { ARCHIVES, type CacheBundle, type FrameRecord, type LoginRecord, type Protocol, type RecordingHeader, type RecordingRecord } from '../../tools/tap-377/format.js';
 import { loadReplayFixture } from './replay/recording.js';
 import { decodeRecordedFrame, RecordedStream, replayRecording } from './replay/runtime.js';
+import { nativeFetch } from '../setup-dom.js';
 
 mock.module('#/client/3rdparty/audio.js', () => ({
     playWave: async (): Promise<void> => {},
@@ -140,6 +143,63 @@ test('OnDemand retains its injected worker, forwards requests, and terminates it
     expect(loader.worker).toBeNull();
 });
 
+test('a failing replay restores preloaded canvas, login-key exports, and the original fetch descriptor', async () => {
+    const archives = {} as CacheBundle['archives'];
+    const archiveHashes = {} as RecordingHeader['archiveHashes'];
+    for (const name of ARCHIVES) {
+        const bytes = Uint8Array.of(1, 2);
+        archives[name] = Buffer.from(bytes).toString('base64');
+        archiveHashes[name] = createHash('sha256').update(bytes).digest('hex');
+    }
+    const cleanupProtocol: Protocol = {
+        revision: 289,
+        client: [{ name: 'NO_TIMEOUT', id: 1, length: 0 }],
+        server: [{ name: 'LOGOUT', id: 9, length: 0 }]
+    };
+    const records: RecordingRecord[] = [
+        {
+            type: 'header', tapVersion: 1, revision: 289,
+            engineCommit: 'a'.repeat(40), contentCommit: 'b'.repeat(40), clientCommit: 'c'.repeat(40),
+            accountPrefix: 'qa', archiveHashes, tickBasis: 'player-info'
+        },
+        login, frame(1, '09'),
+        { type: 'end', segment: 1, reason: 'logout', inboundCount: 1, outboundCount: 0 }
+    ];
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'fetch');
+    const fetchBefore = globalThis.fetch;
+    // Load this boundary first: the full suite may cache Canvas while no canvas exists.
+    const canvasModule = await import('#/client/graphics/Canvas.js');
+    const canvasBefore = canvasModule.canvas;
+    const canvas2dBefore = canvasModule.canvas2d;
+    const loginKeyBefore = { ...loginKey };
+    const modulusBefore = loginKey.loginModulus();
+    const exponentBefore = loginKey.loginExponent();
+    const server = spyOn(Bun, 'serve').mockImplementation(() => {
+        expect(globalThis.fetch).toBe(nativeFetch);
+        expect(document.querySelector('#canvas')).toBe(canvasModule.canvas);
+        expect(canvasModule.canvas).not.toBeNull();
+        expect(loginKey.loginModulus()).toBe(65537n);
+        expect(loginKey.loginExponent()).toBe(65537n);
+        expect(loginKey.parseLoginModulus).toBe(loginKeyBefore.parseLoginModulus);
+        throw new Error('synthetic replay archive failure');
+    });
+    try {
+        await expect(replayRecording(records, { format: 1, archives, ondemand: {} }, cleanupProtocol))
+            .rejects.toThrow('synthetic replay archive failure');
+        expect(server).toHaveBeenCalledTimes(1);
+        expect(Object.getOwnPropertyDescriptor(globalThis, 'fetch')).toEqual(descriptor);
+        expect(globalThis.fetch).toBe(fetchBefore);
+        expect(canvasModule.canvas).toBe(canvasBefore);
+        expect(canvasModule.canvas2d).toBe(canvas2dBefore);
+        expect({ ...loginKey }).toEqual(loginKeyBefore);
+        expect(loginKey.loginModulus()).toBe(modulusBefore);
+        expect(loginKey.loginExponent()).toBe(exponentBefore);
+    } finally {
+        server.mockRestore();
+        if (descriptor) Object.defineProperty(globalThis, 'fetch', descriptor);
+    }
+});
+
 const recordingIndex = resolve('test/io/recordings/index.json');
 const missingIndex = !existsSync(recordingIndex);
 if (missingIndex) console.info('SKIP: test/io/replay.test.ts: recording index is not present');
@@ -151,7 +211,7 @@ describe.skipIf(missingIndex || missingEngine || missingCacheBundle)('production
         const fixture = loadReplayFixture();
         const report = await replayRecording(fixture.records, fixture.cacheBundle, fixture.protocol);
         const recordedCheckpoints = fixture.records.filter(record => record.type === 'checkpoint');
-        const inboundFrames = fixture.records.filter(record => record.type === 'frame' && record.direction === 'in');
+        const inboundFrames = fixture.records.filter((record): record is FrameRecord => record.type === 'frame' && record.direction === 'in');
 
         expect(report.revision).toBe(fixture.indexEntry.revision);
         expect(report.segmentCount).toBeGreaterThan(0);
@@ -162,7 +222,8 @@ describe.skipIf(missingIndex || missingEngine || missingCacheBundle)('production
         expect(report.recordedOpcodeCoverage.outbound.descriptors).toEqual(
             fixture.protocol.client.map(descriptor => descriptor.name).sort()
         );
-        expect(report.packetListenerCount).toBe(inboundFrames.length);
+        const logoutOpcode = fixture.protocol.server.find(descriptor => descriptor.name === 'LOGOUT')?.id;
+        expect(report.packetListenerCount).toBe(inboundFrames.filter(frame => parseInt(frame.bytes.slice(0, 2), 16) !== logoutOpcode).length);
         expect(report.checkpoints.map(checkpoint => ({ label: checkpoint.label, inboundCount: checkpoint.inboundCount }))).toEqual(
             recordedCheckpoints.map(checkpoint => ({ label: checkpoint.label, inboundCount: checkpoint.inboundCount }))
         );
@@ -171,6 +232,7 @@ describe.skipIf(missingIndex || missingEngine || missingCacheBundle)('production
         ).toBe(true);
         expect(report.boot).toEqual({
             mode: 'production-maininit',
+            substitutedSteps: ['Jpeg.decodeJpeg: jpeg-js', 'loginKey: synthetic public parameters'],
             mainredrawCalls: 0,
             onDemandWireParser: false,
             gameSockets: false

@@ -128,6 +128,19 @@ describe('tap RSA login guard', () => {
         expect(acceptsLoginRequest(signed, privateKey, 'qa', 377, challenge)).toBe(true);
         packet.fill(0); signed.fill(0); challenge.fill(0);
     });
+    test('decrypts a synthetic login from a PKCS#8 RSA key and rejects another key algorithm', () => {
+        const { privateKey, packet, challenge } = syntheticLogin('qaGuest', 'pkcs8');
+        const otherKey = generateKeyPairSync('ed25519').privateKey;
+        const otherPem = Buffer.from(otherKey.export({ format: 'pem', type: 'pkcs8' }));
+        try {
+            expect(acceptsLoginRequest(packet, privateKey, 'qa', 377, challenge)).toBe(true);
+            expect(() => readRsaPrivateKey(otherPem)).toThrow('invalid engine key');
+        } finally {
+            packet.fill(0);
+            challenge.fill(0);
+            otherPem.fill(0);
+        }
+    });
     test('decodes a PKCS#1 key with a public exponent larger than a machine integer', () => {
         // Textbook RSA numbers are a synthetic arithmetic fixture, not engine key material.
         const fields = [0n, 3233n, 17n + 3120n * (1n << 64n), 2753n, 61n, 53n, 53n, 49n, 38n];
@@ -274,7 +287,7 @@ function concat(...parts: readonly Uint8Array[]): Uint8Array {
     return output;
 }
 
-function syntheticLogin(username: string): { privateKey: RsaPrivateKey; packet: Uint8Array; challenge: Uint8Array } {
+function syntheticLogin(username: string, keyFormat: 'pkcs1' | 'pkcs8' = 'pkcs1'): { privateKey: RsaPrivateKey; packet: Uint8Array; challenge: Uint8Array } {
     const pair = generateKeyPairSync('rsa', { modulusLength: 1024 });
     const modulusLength = pair.privateKey.asymmetricKeyDetails?.modulusLength;
     if (!modulusLength || modulusLength % 8 !== 0) throw new Error('synthetic key invalid');
@@ -311,7 +324,7 @@ function syntheticLogin(username: string): { privateKey: RsaPrivateKey; packet: 
     packet[42] = encrypted.length;
     encrypted.copy(packet, 43);
     encrypted.fill(0);
-    const pem = Buffer.from(pair.privateKey.export({ format: 'pem', type: 'pkcs1' }));
+    const pem = Buffer.from(pair.privateKey.export({ format: 'pem', type: keyFormat }));
     try { return { privateKey: readRsaPrivateKey(pem), packet, challenge }; }
     finally { pem.fill(0); }
 }

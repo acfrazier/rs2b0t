@@ -3,7 +3,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ENTRIES = ['client', 'mapview', 'ondemandworker', 'botclient', 'multibox', 'navworker'];
-const TAP_MARKERS = ['tap-377', 'TAP_VERSION', 'RecordingHeader', 'startTap', 'capture-session'];
+const TAP_MARKERS = ['tap-377', 'TAP_VERSION', 'RecordingHeader', 'startTap', 'capture-session', 'jpeg-js'];
 
 function files(root: string): string[] {
     return readdirSync(root, { withFileTypes: true }).flatMap(entry => {
@@ -20,6 +20,8 @@ describe('development-only session tap', () => {
     test('the guard rejects both code and source-map references', () => {
         expect(containsTap('import { startTap } from "./tools/tap-377/proxy.js"')).toBe(true);
         expect(containsTap(JSON.stringify({ sources: ['../../tools/tap-377/format.ts'] }))).toBe(true);
+        expect(containsTap('import { decode } from "jpeg-js"')).toBe(true);
+        expect(containsTap(JSON.stringify({ sources: ['../../node_modules/jpeg-js/lib/decoder.js'] }))).toBe(true);
         expect(containsTap('function mainloop() {}')).toBe(false);
     });
 
@@ -29,7 +31,7 @@ describe('development-only session tap', () => {
         }
     });
 
-    test('every browser and worker bundle excludes the tap, including source maps', () => {
+    test('every browser and worker bundle excludes the tap and replay JPEG decoder, including source maps', () => {
         for (const entry of ENTRIES) {
             for (const suffix of ['.js', '.js.map']) {
                 const path = `out/${entry}${suffix}`;
