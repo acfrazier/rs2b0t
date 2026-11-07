@@ -25,9 +25,6 @@ export default class PixMap {
     setPixels(): void {
         Pix2D.setPixels(this.data, this.width, this.height);
     }
-    bind(): void {
-        this.setPixels();
-    }
 
     draw(x: number, y: number): void {
         this.prepareCanvas();

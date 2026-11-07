@@ -31,13 +31,16 @@ function transformedPlayer(npcId = 1487) {
 function setPlayerHead(player: InstanceType<typeof ClientPlayer>, comId: number): void {
     const input = new Packet(new Uint8Array(2));
     input.p2_alt3(comId);
+    const size = input.pos;
     input.pos = 0;
     const client = Object.assign(Object.create(Client.prototype), {
         localPlayer: player,
         in: input,
+        psize: size,
         ptype: -1
     }) as InstanceType<typeof Client>;
     expect(client['handleIfSetPlayerHead']()).toBe(true);
+    expect(client['in'].pos).toBe(client['psize']);
 }
 
 describe('player dialogue heads', () => {

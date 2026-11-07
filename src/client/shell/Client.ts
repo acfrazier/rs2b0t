@@ -22,6 +22,7 @@ import VarpType from '#/client/config/VarpType.js';
 import VarBitType from '#/client/config/VarBitType.js';
 import IfType from '#/client/config/IfType.js';
 import { ComponentType, ButtonType } from '#/client/config/IfType.js';
+import { getClient377State } from '#/client/shell/Client377State.js';
 import { gameHttpUrl, TARGET } from '#/client/config/target.js';
 import { loginExponent, loginModulus, refreshLoginKey } from '#/client/config/loginKey.js';
 
@@ -125,16 +126,6 @@ interface LoginStart {
     done: Promise<void>;
 }
 
-interface Client377State {
-    fullscreenInterfaceId0: number;
-    fullscreenInterfaceId1: number;
-    chatbackInputOpen: number;
-    currentDay: number;
-    previousLoginDay: number;
-    daysSincePasswordChanged: number;
-    recoveriesLastChangedDay: number;
-    daysOfMembersRemaining: number;
-}
 
 export class Client extends GameShell {
     static nodeId: number = 10;
@@ -4989,11 +4980,29 @@ export class Client extends GameShell {
                     this.b12?.centreStringWave(message, this.projectX, this.projectY + 1, Colour.BLACK, this.sceneCycle);
                     this.b12?.centreStringWave(message, this.projectX, this.projectY, colour, this.sceneCycle);
                 } else if (this.chatEffect[i] === 2) {
+                    this.b12?.centreStringWave2(message, this.projectX, this.projectY + 1, Colour.BLACK, this.sceneCycle);
+                    this.b12?.centreStringWave2(message, this.projectX, this.projectY, colour, this.sceneCycle);
+                } else if (this.chatEffect[i] === 3) {
+                    this.b12?.centreStringShake(message, this.projectX, this.projectY + 1, Colour.BLACK, 150 - this.chatTimer[i], this.sceneCycle);
+                    this.b12?.centreStringShake(message, this.projectX, this.projectY, colour, 150 - this.chatTimer[i], this.sceneCycle);
+                } else if (this.chatEffect[i] === 4) {
                     const w: number = this.b12?.stringWid(message) ?? 0;
                     const offsetX: number = ((150 - this.chatTimer[i]) * (w + 100)) / 150;
                     Pix2D.setClipping(this.projectX - 50, 0, this.projectX + 50, 334);
                     this.b12?.drawString(message, this.projectX + 50 - offsetX, this.projectY + 1, Colour.BLACK);
                     this.b12?.drawString(message, this.projectX + 50 - offsetX, this.projectY, colour);
+                    Pix2D.resetClipping();
+                } else if (this.chatEffect[i] === 5 && this.b12) {
+                    const delta: number = 150 - this.chatTimer[i];
+                    let offsetY: number = 0;
+                    if (delta < 25) {
+                        offsetY = delta - 25;
+                    } else if (delta > 125) {
+                        offsetY = delta - 125;
+                    }
+                    Pix2D.setClipping(0, this.projectY - this.b12.height - 1, 512, this.projectY + 5);
+                    this.b12.centreString(message, this.projectX, this.projectY + 1 + offsetY, Colour.BLACK);
+                    this.b12.centreString(message, this.projectX, this.projectY + offsetY, colour);
                     Pix2D.resetClipping();
                 }
             }
@@ -10734,9 +10743,10 @@ export class Client extends GameShell {
                     register = this.statXP[script[pc++]];
                 } else if (opcode === 4) {
                     const com: IfType = IfType.list[script[pc++]];
-                    const obj: number = script[pc++] + 1;
+                    const objId: number = script[pc++];
+                    const obj: number = objId + 1;
 
-                    if (com.linkObjType && com.linkObjNumber && obj >= 0 && obj < ObjType.numDefinitions && (!ObjType.list(obj).members || Client.memServer)) {
+                    if (com.linkObjType && com.linkObjNumber && obj >= 0 && obj < ObjType.numDefinitions && (!ObjType.list(objId).members || Client.memServer)) {
                         for (let i: number = 0; i < com.linkObjType.length; i++) {
                             if (com.linkObjType[i] === obj) {
                                 register += com.linkObjNumber[i];
@@ -10827,7 +10837,7 @@ export class Client extends GameShell {
         const comId: number = this.in.g2();
         this.ifAnimReset(comId);
 
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         if (this.sideModalId !== -1) {
             this.sideModalId = -1;
             this.redrawSide = true;
@@ -10855,7 +10865,7 @@ export class Client extends GameShell {
     private handleIfOpenMainSide(): boolean {
         const mainComId: number = this.in.g2_alt2();
         const sideComId: number = this.in.g2_alt3();
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
 
         if (this.chatModalId !== -1) {
             this.chatModalId = -1;
@@ -10889,7 +10899,7 @@ export class Client extends GameShell {
     }
 
     private handleIfClose(): boolean {
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         this.modalCloseGeneration++;
         if (this.sideModalId !== -1) {
             this.sideModalId = -1;
@@ -10937,7 +10947,7 @@ export class Client extends GameShell {
 
     private handleIfOpenMain(): boolean {
         const comId: number = this.in.g2_alt3();
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         this.ifAnimReset(comId);
 
         if (this.sideModalId !== -1) {
@@ -10971,7 +10981,7 @@ export class Client extends GameShell {
 
     private handleIfOpenSide(): boolean {
         const comId: number = this.in.g2_alt3();
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         this.ifAnimReset(comId);
 
         if (this.chatModalId !== -1) {
@@ -11116,7 +11126,7 @@ export class Client extends GameShell {
             if (com.layerId === this.sideIcon[this.activeIcon]) {
                 this.redrawSide = true;
             }
-            if (com.layerId === this.chatModalId || this.chatModalId === comId) {
+            if (com.layerId === this.chatModalId || this.chatModalId === comId || com.layerId === this.tutComId || this.tutComId === comId) {
                 this.redrawChat = true;
             }
         }
@@ -11187,20 +11197,18 @@ export class Client extends GameShell {
     private handleUpdateInvStopTransmit(): boolean {
         const comId: number = this.in.g2_alt1();
         const inv = IfType.list[comId];
-        if (inv?.linkObjType) {
-            for (let i: number = 0; i < inv.linkObjType.length; i++) {
-                inv.linkObjType[i] = 0;
-                if (inv.linkObjNumber) {
-                    inv.linkObjNumber[i] = 0;
-                }
-            }
-            const previous = this.invUpdateState.get(comId);
-            this.invUpdateState.set(comId, {
-                generation: (previous?.generation ?? 0) + 1,
-                fullGeneration: 0,
-                transmitting: false
-            });
+        if (!inv || !inv.linkObjType || !inv.linkObjNumber) {
+            throw new Error();
         }
+        for (let i: number = 0; i < inv.linkObjType.length; i++) {
+            inv.linkObjType[i] = 0;
+        }
+        const previous = this.invUpdateState.get(comId);
+        this.invUpdateState.set(comId, {
+            generation: (previous?.generation ?? 0) + 1,
+            fullGeneration: 0,
+            transmitting: false
+        });
         this.ptype = -1;
         return true;
     }
@@ -11210,9 +11218,7 @@ export class Client extends GameShell {
         const comId: number = this.in.g2();
         const inv = IfType.list[comId];
         if (!inv || !inv.linkObjType || !inv.linkObjNumber) {
-            this.in.pos = this.psize;
-            this.ptype = -1;
-            return true;
+            throw new Error();
         }
 
         const size: number = this.in.g2();
@@ -11240,9 +11246,7 @@ export class Client extends GameShell {
         const comId: number = this.in.g2();
         const inv = IfType.list[comId];
         if (!inv || !inv.linkObjType || !inv.linkObjNumber) {
-            this.in.pos = this.psize;
-            this.ptype = -1;
-            return true;
+            throw new Error();
         }
 
         while (this.in.pos < this.psize) {
@@ -11315,8 +11319,16 @@ export class Client extends GameShell {
     private handleUpdateStat(): boolean {
         this.redrawSide = true;
         const stat: number = this.in.g1_alt2();
-        this.statBaseLevel[stat] = this.in.g1();
-        this.statXP[stat] = this.in.g4();
+        const level: number = this.in.g1();
+        const xp: number = this.in.g4();
+        this.statEffectiveLevel[stat] = level;
+        this.statXP[stat] = xp;
+        this.statBaseLevel[stat] = 1;
+        for (let i: number = 0; i < 98; i++) {
+            if (xp >= Client.levelExperience[i]) {
+                this.statBaseLevel[stat] = i + 2;
+            }
+        }
         this.statSeenGeneration[stat] = this.statSessionGeneration;
         this.ptype = -1;
         return true;
@@ -11505,24 +11517,27 @@ export class Client extends GameShell {
     }
 
     private handleHintArrow(): boolean {
-        this.hintType = this.in.g1();
-        if (this.hintType === 1) {
+        const hintType: number = this.in.g1();
+        this.hintType = hintType;
+        if (hintType === 1) {
             this.hintNpc = this.in.g2();
+            this.in.g2();
+            this.in.g1();
         }
-        if (this.hintType >= 2 && this.hintType <= 6) {
-            if (this.hintType === 2) {
+        if (hintType >= 2 && hintType <= 6) {
+            if (hintType === 2) {
                 this.hintOffsetX = 64;
                 this.hintOffsetZ = 64;
-            } else if (this.hintType === 3) {
+            } else if (hintType === 3) {
                 this.hintOffsetX = 0;
                 this.hintOffsetZ = 64;
-            } else if (this.hintType === 4) {
+            } else if (hintType === 4) {
                 this.hintOffsetX = 128;
                 this.hintOffsetZ = 64;
-            } else if (this.hintType === 5) {
+            } else if (hintType === 5) {
                 this.hintOffsetX = 64;
                 this.hintOffsetZ = 0;
-            } else if (this.hintType === 6) {
+            } else if (hintType === 6) {
                 this.hintOffsetX = 64;
                 this.hintOffsetZ = 128;
             }
@@ -11531,11 +11546,15 @@ export class Client extends GameShell {
             this.hintTileZ = this.in.g2();
             this.hintHeight = this.in.g1();
         }
-        if (this.hintType === 10) {
+        if (hintType === 10) {
             this.hintPlayer = this.in.g2();
+            this.in.g2();
+            this.in.g1();
+        } else if (hintType === 255) {
+            this.in.g2();
+            this.in.g2();
+            this.in.g1();
         }
-        // The engine pads entity/clear arrows to the six-byte descriptor size.
-        this.in.pos = this.psize;
         this.ptype = -1;
         return true;
     }
@@ -11580,7 +11599,7 @@ export class Client extends GameShell {
     }
 
     private handleLastLoginInfo(): boolean {
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         state.daysSincePasswordChanged = this.in.g2_alt1();
         this.in.g2_alt3();
         this.in.g2();
@@ -11594,8 +11613,6 @@ export class Client extends GameShell {
         this.in.g1_alt1();
 
         this.daysSinceLastLogin = state.currentDay - state.previousLoginDay;
-        this.daysSinceRecoveriesChanged = state.recoveriesLastChangedDay;
-        this.warnMembersInNonMembers = 0;
         const ipStr = JString.formatIPv4(this.lastAddress >>> 0);
         this.dnsReq = ipStr;
         reverseDnsLookup(ipStr).then(
@@ -11638,7 +11655,7 @@ export class Client extends GameShell {
     }
 
     private handlePCountDialog(): boolean {
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         this.socialInputOpen = false;
         state.chatbackInputOpen = 1;
         this.dialogInputOpen = true;
@@ -11652,7 +11669,7 @@ export class Client extends GameShell {
     }
 
     private handlePNamedialog(): boolean {
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         this.socialInputOpen = false;
         state.chatbackInputOpen = 2;
         this.dialogInputOpen = false;
@@ -11737,7 +11754,7 @@ export class Client extends GameShell {
         const delay: number = this.in.g2();
         if (delay === 65535) {
             if (this.waveCount < 50) {
-                this.waveIds[this.waveCount] = soundId;
+                this.waveIds[this.waveCount] = (soundId << 16) >> 16;
                 this.waveLoops[this.waveCount] = loops;
                 this.waveDelay[this.waveCount] = 0;
                 this.waveCount++;
@@ -11783,9 +11800,11 @@ export class Client extends GameShell {
     private handleIfOpenFull(): boolean {
         const overlayCom: number = this.in.g2_alt1();
         const mainCom: number = this.in.g2_alt2();
-        const state = this as unknown as Client377State;
+        const state = getClient377State(this);
         this.ifAnimReset(mainCom);
-        this.ifAnimReset(overlayCom);
+        if (overlayCom !== 65535) {
+            this.ifAnimReset(overlayCom);
+        }
         if (this.mainModalId !== -1) {
             this.mainModalId = -1;
         }
@@ -11831,17 +11850,17 @@ export class Client extends GameShell {
         const a: number = this.in.g2();
         const comId: number = this.in.g2_alt2();
         const b: number = this.in.g2_alt1();
-        const com = IfType.list[comId] as (IfType & { modelRotate: number }) | undefined;
+        const com = IfType.list[comId];
         if (com) {
-            com.modelRotate = (a << 16) + b;
+            getClient377State(this).modelRotateByComponentId.set(comId, (a << 16) + b);
         }
         this.ptype = -1;
         return true;
     }
 
     private ifAnimReset(id: number): void {
-        const parent: IfType = IfType.list[id];
-        if (!parent.children) {
+        const parent: IfType | undefined = IfType.list[id];
+        if (!parent || !parent.children) {
             return;
         }
 
@@ -11858,8 +11877,9 @@ export class Client extends GameShell {
     }
 
     private animateInterface(id: number, delta: number): boolean {
-        const parent: IfType = IfType.list[id];
-        if (!parent.children) {
+        const state = getClient377State(this);
+        const parent: IfType | undefined = IfType.list[id];
+        if (!parent || !parent.children) {
             return false;
         }
 
@@ -11867,8 +11887,8 @@ export class Client extends GameShell {
 
         for (let i: number = 0; i < parent.children.length && parent.children[i] !== -1; i++) {
             const child: IfType = IfType.list[parent.children[i]];
-            if (child.type === 1) {
-                updated ||= this.animateInterface(child.id, delta);
+            if (child.type === ComponentType.TYPE_LAYER) {
+                updated = this.animateInterface(child.id, delta) || updated;
             }
 
             if (child.type === 6 && (child.modelAnim !== -1 || child.modelAnim2 !== -1)) {
@@ -11886,7 +11906,7 @@ export class Client extends GameShell {
                     child.animCycle += delta;
 
                     while (child.animCycle > type.getDelay(child.animFrame)) {
-                        child.animCycle -= type.getDelay(child.animFrame) + 1;
+                        child.animCycle -= type.getDelay(child.animFrame);
                         child.animFrame++;
 
                         if (child.animFrame >= type.numFrames) {
@@ -11900,6 +11920,12 @@ export class Client extends GameShell {
                         updated = true;
                     }
                 }
+            }
+            const modelRotate = state.modelRotateByComponentId.get(child.id) ?? 0;
+            if (child.type === 6 && modelRotate !== 0) {
+                child.modelXAn = (child.modelXAn + delta * (modelRotate >> 16)) & 0x7ff;
+                child.modelYAn = (child.modelYAn + delta * ((modelRotate << 16) >> 16)) & 0x7ff;
+                updated = true;
             }
         }
 
@@ -11949,7 +11975,7 @@ export class Client extends GameShell {
                 setMidiVolume(this.midiVolume);
             }
 
-            if (this.midiActive !== lastMidiActive) {
+            if (this.midiActive !== lastMidiActive && !Client.lowMem) {
                 if (this.midiActive) {
                     this.midiSong = this.nextMidiSong;
                     this.midiFading = true;
@@ -12167,7 +12193,7 @@ export class Client extends GameShell {
                 com.text = 'Moderator option: Mute player for 48 hours: <OFF>';
             }
         } else if (clientCode === ClientCode.CC_LAST_LOGIN_INFO) {
-            const state = this as unknown as Client377State;
+            const state = getClient377State(this);
             const daysAgo: number = state.currentDay - state.previousLoginDay;
             let when: string;
             if (daysAgo <= 0) {
@@ -12180,7 +12206,7 @@ export class Client extends GameShell {
             const host = this.dnsReq ?? JString.formatIPv4(this.lastAddress >>> 0);
             com.text = 'You last logged in @red@' + when + '@bla@ from: @red@' + host;
         } else if (clientCode === ClientCode.CC_RECOVERY_QUESTIONS) {
-            const state = this as unknown as Client377State;
+            const state = getClient377State(this);
             if (state.recoveriesLastChangedDay === 0) {
                 com.text =
                     '\\nYou have not yet set any recovery questions.\\nIt is @lre@strongly@yel@ recommended that you do so.\\n\\nIf you don\'t you will be @lre@unable to recover your\\n@lre@password@yel@ if you forget it, or it is stolen.';
@@ -12213,14 +12239,14 @@ export class Client extends GameShell {
             }
             com.text = 'You have ' + message + '\\nin your message centre.';
         } else if (clientCode === ClientCode.CC_PASSWORD_CHANGE) {
-            const state = this as unknown as Client377State;
+            const state = getClient377State(this);
             if (state.daysSincePasswordChanged > 0 && state.daysSincePasswordChanged <= state.currentDay + 10) {
                 com.text = 'Last password change:\\n@gre@' + this.getDateString(state.daysSincePasswordChanged);
             } else {
                 com.text = 'Last password change:\\n@gre@Never changed';
             }
         } else if (clientCode === ClientCode.CC_MEMBERS_CREDIT) {
-            const state = this as unknown as Client377State;
+            const state = getClient377State(this);
             if (state.daysOfMembersRemaining > 2 && !Client.memServer) {
                 com.text = 'This is a non-members\\nworld. To enjoy your\\nmembers benefits we\\nrecommend you play on a\\nmembers world instead.';
             } else if (state.daysOfMembersRemaining > 2) {
@@ -12234,7 +12260,7 @@ export class Client extends GameShell {
                 com.text = 'You are not a member.\\n\\nChoose to subscribe and\\nyou\'ll get loads of extra\\nbenefits and features.';
             }
         } else if (clientCode === ClientCode.CC_MEMBERS_HELP) {
-            const state = this as unknown as Client377State;
+            const state = getClient377State(this);
             if (state.daysOfMembersRemaining > 2 && !Client.memServer) {
                 com.text =
                     'To switch to a members-only world:\\n1) Logout and return to the world selection page.\\n2) Choose one of the members world with a gold star next to it\'s name.\\n\\nIf you prefer you can continue to use this world,\\nbut members only features will be unavailable here.';
@@ -12245,7 +12271,7 @@ export class Client extends GameShell {
                 com.text = 'To start a subscripton:\\n1) Logout and return to the frontpage of this website.\\n2) Choose \'Start a new subscription\'';
             }
         } else if (clientCode === ClientCode.CC_RECOVERY_HELP) {
-            const state = this as unknown as Client377State;
+            const state = getClient377State(this);
             if (state.recoveriesLastChangedDay > state.currentDay) {
                 com.text =
                     'To cancel this request:\\n1) Logout and return to the frontpage of this website.\\n2) Choose \'Cancel recovery questions\'.';
@@ -12257,7 +12283,7 @@ export class Client extends GameShell {
     }
 
     private getDateString(day: number): string {
-        const currentDay = (this as unknown as Client377State).currentDay;
+        const currentDay = getClient377State(this).currentDay;
         if (day > currentDay + 10) {
             return 'Unknown';
         }
@@ -12266,6 +12292,7 @@ export class Client extends GameShell {
     }
 
     private closeModal(): void {
+        const state = getClient377State(this);
         this.out.p1Enc(ClientProt.CLOSE_MODAL);
 
         if (this.sideModalId !== -1) {
@@ -12282,14 +12309,23 @@ export class Client extends GameShell {
         }
 
         this.mainModalId = -1;
+        if (state.fullscreenInterfaceId0 !== -1) {
+            state.fullscreenInterfaceId0 = -1;
+            this.redrawFrame = true;
+        }
+        if (state.fullscreenInterfaceId1 !== -1) {
+            state.fullscreenInterfaceId1 = -1;
+        }
     }
 
     private clientButton(com: IfType): boolean {
+        const state = getClient377State(this);
         const clientCode: number = com.clientCode;
 
         if (this.friendServerStatus === 2) {
             if (clientCode === ClientCode.CC_ADD_FRIEND) {
                 this.redrawChat = true;
+                state.chatbackInputOpen = 0;
                 this.dialogInputOpen = false;
                 this.socialInputOpen = true;
                 this.socialInput = '';
@@ -12297,6 +12333,7 @@ export class Client extends GameShell {
                 this.socialInputHeader = 'Enter name of friend to add to list';
             } else if (clientCode === ClientCode.CC_DEL_FRIEND) {
                 this.redrawChat = true;
+                state.chatbackInputOpen = 0;
                 this.dialogInputOpen = false;
                 this.socialInputOpen = true;
                 this.socialInput = '';
@@ -12312,6 +12349,7 @@ export class Client extends GameShell {
             return true;
         } else if (clientCode === ClientCode.CC_ADD_IGNORE) {
             this.redrawChat = true;
+            state.chatbackInputOpen = 0;
             this.dialogInputOpen = false;
             this.socialInputOpen = true;
             this.socialInput = '';
@@ -12319,6 +12357,7 @@ export class Client extends GameShell {
             this.socialInputHeader = 'Enter name of player to add to list';
         } else if (clientCode === ClientCode.CC_DEL_IGNORE) {
             this.redrawChat = true;
+            state.chatbackInputOpen = 0;
             this.dialogInputOpen = false;
             this.socialInputOpen = true;
             this.socialInput = '';
@@ -12394,7 +12433,7 @@ export class Client extends GameShell {
             return true;
         } else if (clientCode === ClientCode.CC_MOD_MUTE) {
             this.reportAbuseMuteOption = !this.reportAbuseMuteOption;
-        } else if (clientCode >= ClientCode.CC_REPORT_RULE1 && clientCode <= ClientCode.CC_REPORT_RULE12) {
+        } else if (clientCode >= ClientCode.CC_REPORT_RULE1 && clientCode <= ClientCode.CC_REPORT_RULE13) {
             this.closeModal();
 
             if (this.reportAbuseInput.length > 0) {

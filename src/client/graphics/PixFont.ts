@@ -172,9 +172,6 @@ export default class PixFont extends Linkable2 {
         }
     }
 
-    stringWidTag(str: string | null): number {
-        return this.stringWid(str);
-    }
 
     centreStringWave2(str: string | null, x: number, y: number, rgb: number, phase: number): void {
         if (str === null) {
@@ -235,9 +232,6 @@ export default class PixFont extends Linkable2 {
         }
     }
 
-    centreStringWave3(str: string | null, x: number, y: number, rgb: number, strength: number, phase: number): void {
-        this.centreStringShake(str, x, y, rgb, strength, phase);
-    }
     drawStringTag(str: string, x: number, y: number, rgb: number, shadowed: boolean): void {
         x |= 0;
         y |= 0;

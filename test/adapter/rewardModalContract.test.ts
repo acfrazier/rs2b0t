@@ -124,8 +124,13 @@ test('stale close and STOP_TRANSMIT cannot acknowledge a new close', async () =>
     IfType.list[6963] = new IfType();
     IfType.list[6963].linkObjType = new Int32Array(0);
     IfType.list[6963].linkObjNumber = new Int32Array(0);
-    stop.p2(6963);
-    await receive(client, ServerProt.UPDATE_INV_STOP_TRANSMIT, stop);
+    stop.p2_alt1(6963);
+    const stopSize = stop.pos;
+    stop.pos = 0;
+    client['in'] = stop;
+    client['psize'] = stopSize;
+    expect(client['handleUpdateInvStopTransmit']()).toBe(true);
+    expect(client['in'].pos).toBe(client['psize']);
     await pump();
     const premature = settled;
     await receive(client, ServerProt.IF_CLOSE, new Packet(new Uint8Array(0)));

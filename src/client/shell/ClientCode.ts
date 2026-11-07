@@ -63,6 +63,7 @@ export const enum ClientCode {
     CC_REPORT_RULE10 = 610,
     CC_REPORT_RULE11 = 611,
     CC_REPORT_RULE12 = 612,
+    CC_REPORT_RULE13 = 613,
     CC_MOD_MUTE = 620,
 
     CC_LAST_LOGIN_INFO = 660,

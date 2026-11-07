@@ -99,9 +99,6 @@ export default class Pix32 extends Pix2D {
     setPixels(): void {
         Pix2D.setPixels(this.data, this.wi, this.hi);
     }
-    bind(): void {
-        this.setPixels();
-    }
 
     rgbAdjust(r: number, g: number, b: number): void {
         for (let i: number = 0; i < this.data.length; i++) {
