@@ -6,6 +6,7 @@ content_dir=${CONTENT_DIR:-}
 pack_path=${NAV_PACK_PATH:-out/collision.lcnav.gz}
 data_root=${NAV_DATA_ROOT:-.}
 data_dir="$data_root/src/bot/event/webwalk/data"
+export NAV_DATA_ROOT="$data_root"
 bun_bin=${BUN_BIN:-bun}
 python_bin=${PYTHON_BIN:-python3}
 

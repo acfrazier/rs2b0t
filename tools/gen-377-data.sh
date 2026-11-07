@@ -188,8 +188,9 @@ NAV_DATA_ROOT="$STAGE"
 NAV_DATA_DIR="$NAV_DATA_ROOT/src/bot/event/webwalk/data"
 NAV_WORK="$WORK/nav"
 mkdir -p "$NAV_DATA_DIR" "$NAV_DATA_ROOT/tools/nav" "$NAV_DATA_ROOT/out" "$NAV_WORK"
-cp tools/nav/door-categories.json "$NAV_DATA_ROOT/tools/nav/door-categories.json"
-cp tools/nav/stair-prices.json "$NAV_DATA_ROOT/tools/nav/stair-prices.json"
+# Preserve reviewed 377 inputs on regeneration.
+test -f "$NAV_DATA_ROOT/tools/nav/door-categories.json" || cp tools/nav/door-categories.json "$NAV_DATA_ROOT/tools/nav/door-categories.json"
+test -f "$NAV_DATA_ROOT/tools/nav/stair-prices.json" || cp tools/nav/stair-prices.json "$NAV_DATA_ROOT/tools/nav/stair-prices.json"
 # The 377 bake starts from the checked-in 289 transport seed, then regenerates both graphs.
 cp src/bot/event/webwalk/data/transports.json "$NAV_DATA_DIR/transports.json"
 cp src/bot/event/webwalk/data/stairEdges.json "$NAV_DATA_DIR/stairEdges.json"
@@ -198,7 +199,7 @@ REVISION=$REVISION ENGINE_DIR="$ENGINE" "$BUN_BIN" tools/nav/build-collision.ts 
     --engine "$ENGINE" \
     --out "$NAV_WORK/collision.lcnav" 2>&1 | tee "$WORK/logs/nav-collision.log"
 cp "$NAV_WORK/collision.lcnav.gz" "$NAV_DATA_ROOT/out/collision.lcnav.gz"
-REVISION=$REVISION ENGINE_DIR="$ENGINE" CONTENT_DIR="$WORK/source/content" \
+REVISION=$REVISION ENGINE_DIR="$ENGINE" CONTENT_DIR="$WORK/source/content" NAV_DATA_ROOT="$NAV_DATA_ROOT" \
     "$BUN_BIN" tools/nav/derive-doors.ts \
     --engine "$ENGINE" \
     --content "$WORK/source/content" \

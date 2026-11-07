@@ -30,7 +30,8 @@ interface DoorCategoryTable {
 }
 
 function loadDoorCategoryTable(): DoorCategoryTable {
-    const table = JSON.parse(fs.readFileSync(new URL('./door-categories.json', import.meta.url), 'utf8')) as DoorCategoryTable;
+    const rulesPath = path.join(process.env.NAV_DATA_ROOT ?? '.', 'tools/nav/door-categories.json');
+    const table = JSON.parse(fs.readFileSync(rulesPath, 'utf8')) as DoorCategoryTable;
     if (table.schemaVersion !== 1 || !table.categories || !table.uncategorized || !table.locOverrides) {
         throw new Error('Invalid tools/nav/door-categories.json schema');
     }
