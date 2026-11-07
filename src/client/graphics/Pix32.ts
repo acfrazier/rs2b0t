@@ -486,7 +486,7 @@ export default class Pix32 extends Pix2D {
                 let srcY: number = leftY;
 
                 for (let j: number = -w; j < 0; j++) {
-                    const rgb = this.data[(srcX >> 16) + (srcY >> 16) * this.owi];
+                    const rgb = this.data[(srcX >> 16) + (srcY >> 16) * this.wi];
                     if (rgb == 0) {
                         dstX++;
                     } else {

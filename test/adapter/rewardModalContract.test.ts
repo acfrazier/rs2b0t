@@ -55,7 +55,7 @@ async function receive(client: Client, opcode: ServerProt, payload: Packet): Pro
     expect(await client['tcpInDispatch']()).toBe(true);
 }
 
-test('reads the normal reward inventory after genuine UPDATE_INV_FULL and IF_OPENMAIN handlers', async () => {
+test('reads the normal reward inventory after genuine UPDATE_INV_FULL and IF_OPENMAIN handlers', () => {
     const client = clientFixture();
     const root = new IfType();
     root.id = 6960;
@@ -75,13 +75,18 @@ test('reads the normal reward inventory after genuine UPDATE_INV_FULL and IF_OPE
     const packet = new Packet(new Uint8Array(64));
     packet.p2(6963);
     packet.p2(3);
-    for (const id of [145, 157, 163]) { packet.p2(id + 1); packet.p1(3); }
-    await receive(client, ServerProt.UPDATE_INV_FULL, packet);
+    for (const id of [145, 157, 163]) { packet.p2_alt3(id + 1); packet.p1_alt2(3); }
+    const packetSize = packet.pos;
+    packet.pos = 0;
+    client['in'] = packet;
+    client['psize'] = packetSize;
+    expect(client['handleUpdateInvFull']()).toBe(true);
+
     const modal = new Packet(new Uint8Array(2));
-    modal.p2(6960);
-
-    await receive(client, ServerProt.IF_OPENMAIN, modal);
-
+    modal.p2_alt3(6960);
+    modal.pos = 0;
+    client['in'] = modal;
+    expect(client['handleIfOpenMain']()).toBe(true);
     expect(reader.modals().main).toBe(6960);
     expect(reader.shopInv(6963).map(({ id, count }) => ({ id, count }))).toEqual([
         { id: 145, count: 3 }, { id: 157, count: 3 }, { id: 163, count: 3 }
@@ -119,8 +124,13 @@ test('stale close and STOP_TRANSMIT cannot acknowledge a new close', async () =>
     IfType.list[6963] = new IfType();
     IfType.list[6963].linkObjType = new Int32Array(0);
     IfType.list[6963].linkObjNumber = new Int32Array(0);
-    stop.p2(6963);
-    await receive(client, ServerProt.UPDATE_INV_STOP_TRANSMIT, stop);
+    stop.p2_alt1(6963);
+    const stopSize = stop.pos;
+    stop.pos = 0;
+    client['in'] = stop;
+    client['psize'] = stopSize;
+    expect(client['handleUpdateInvStopTransmit']()).toBe(true);
+    expect(client['in'].pos).toBe(client['psize']);
     await pump();
     const premature = settled;
     await receive(client, ServerProt.IF_CLOSE, new Packet(new Uint8Array(0)));
