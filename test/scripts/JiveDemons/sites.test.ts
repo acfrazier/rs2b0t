@@ -3,6 +3,13 @@ import { SPELL_TELEPORTS } from '#/bot/event/webwalk/teleportCatalog.js';
 import { TAVERLEY_BLUE } from '#/bot/scripts/JiveDragons/sites.js';
 import { DEMON_SITES, SITE_OPTIONS, TAVERLEY_BLACK_DEMON, siteFor } from '#/bot/scripts/JiveDemons/sites.js';
 import { BLACK_DEMON, derive, inputsPresent } from '../../../tools/nav/jive-safespots.js';
+import { skip377 } from '../../lib/skip377.js';
+
+// Why: JiveDemons is one of the 76 registry scripts the plan keeps as a 289 content program at cutover (docs/plans/rs2b0t-377.md:76); L2 qualifies it per content unit (lines 166 and 214, Q3) and S10b refuses it until then (line 168).
+const skipAnchor = skip377(
+    'test/scripts/JiveDemons/sites.test.ts',
+    'JiveDemons is unqualified on 377 until L2/Q3 (rs2b0t-377.md:76,166,168,214): the 377 pack derives the Taverley black demon anchor at (2852,9773), not the 289 site anchor (2859,9786)'
+);
 
 describe('DEMON_SITES', () => {
     test('Taverley black is the only entry and every option resolves', () => {
@@ -90,7 +97,7 @@ describe('DEMON_SITES', () => {
 
 // Why: the derivation needs out/collision.lcnav.gz and the rs2b2t-content maps, and CI carries neither.
 describe.skipIf(!inputsPresent(BLACK_DEMON))('the checked-in demon derivation (pack-gated)', () => {
-    test('every ladder tile is a derived safespot and the anchor is the derived one', () => {
+    skipAnchor('every ladder tile is a derived safespot and the anchor is the derived one', () => {
         const site = TAVERLEY_BLACK_DEMON;
         const derived = derive(BLACK_DEMON);
         expect([derived.anchor.x, derived.anchor.z]).toEqual([site.meleeAnchor.x, site.meleeAnchor.z]);

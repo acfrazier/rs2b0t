@@ -25,7 +25,7 @@ export const DESERT_CAMP_ITEMS = {
     metalKey: 'Metal key',
     wroughtKey: 'Wrought iron key',
     desert: ['Desert shirt', 'Desert robe', 'Desert boots'],
-    slave: ["Slaves' shirt", 'Slave robe', 'Slave boots']
+    slave: ['Slave shirt', 'Slave robe', 'Slave boots']
 } as const;
 
 type DesertOutfitItem = (typeof DESERT_CAMP_ITEMS.desert)[number];

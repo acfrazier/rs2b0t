@@ -659,7 +659,7 @@ describe('shilo module', () => {
     });
 
     test('the engine names that differ from the wiki are recorded exactly', () => {
-        expect(SV_ITEM.RASH_CORPSE.name).toBe('Rashiliya corpse');
+        expect(SV_ITEM.RASH_CORPSE.name).toBe('Rashiliyia corpse');
         expect(SV_ITEM.DEAD_BEADS.name).toBe('Beads of the dead');
     });
 });

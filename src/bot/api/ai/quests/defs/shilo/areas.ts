@@ -6,7 +6,7 @@ export interface ShiloItem {
     name: string;
 }
 
-// Why: these are the engine's names, some misspelled in the configs ("Rashiliya corpse", "Stone-plaque"), and the 5 Jungle Potion unids all render "Unidentified herb", so lookups go by id.
+// Why: these are the engine's names, some misspelled in the configs ("Stone-plaque"), and the 5 Jungle Potion unids all render "Unidentified herb", so lookups go by id.
 export const SV_ITEM = {
     COINS: { id: 995, name: 'Coins' },
     ROPE: { id: 954, name: 'Rope' },
@@ -28,7 +28,7 @@ export const SV_ITEM = {
     SWORD_POMMEL: { id: 623, name: 'Sword pommel' },
     BONE_BEADS: { id: 618, name: 'Bone beads' },
     DEAD_BEADS: { id: 616, name: 'Beads of the dead' },
-    RASH_CORPSE: { id: 609, name: 'Rashiliya corpse' }
+    RASH_CORPSE: { id: 609, name: 'Rashiliyia corpse' }
 } as const satisfies Record<string, ShiloItem>;
 
 export const SV_LOC = {

@@ -141,11 +141,11 @@ const TICK_MS = 300;
 const FOOD_TARGET = 7;
 const CAKE_FORMS = ['Cake', '2/3 cake', 'Slice of cake'] as const;
 const DESERT_OUTFIT = ['Desert shirt', 'Desert robe', 'Desert boots'] as const;
-const SLAVE_OUTFIT = ["Slaves' shirt", 'Slave robe', 'Slave boots'] as const;
+const SLAVE_OUTFIT = ['Slave shirt', 'Slave robe', 'Slave boots'] as const;
 const RECOVERED_KEYS = ['Metal key', 'Wrought iron key'] as const;
 const BANK_SEED = [
     { debug: 'cake', name: 'Cake', count: 20 },
-    { debug: 'slave_shirt', name: "Slaves' shirt", count: 1 },
+    { debug: 'slave_shirt', name: 'Slave shirt', count: 1 },
     { debug: 'slave_robe', name: 'Slave robe', count: 1 },
     { debug: 'slave_boots', name: 'Slave boots', count: 1 }
 ] as const;

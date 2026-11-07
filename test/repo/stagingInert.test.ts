@@ -15,7 +15,7 @@ describe('data/377/ is configured inert', () => {
     test('bun test discovers only test/', () => {
         const bunfig = readFileSync('bunfig.toml', 'utf8');
         expect(bunfig).toMatch(/^root = "test"$/m);
-        expect(bunfig).toMatch(/^preload = \["\.\/test\/setup-dom\.ts"\]$/m);
+        expect(bunfig).toMatch(/^preload = \["\.\/test\/setup-dom\.ts", "\.\/test\/setup-env-guard\.ts"\]$/m);
     });
 
     test('tsc excludes data/377', () => {

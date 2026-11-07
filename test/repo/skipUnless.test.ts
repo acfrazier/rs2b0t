@@ -72,33 +72,52 @@ describe('driftVerdict reads the skip list', () => {
     });
 });
 
+function setEnv(name: 'CONTENT_DIR' | 'ENGINE_DIR', value: string | undefined): void {
+    if (value === undefined) {
+        delete process.env[name];
+    } else {
+        process.env[name] = value;
+    }
+}
+
+// Why: bun runs every test file in one process, so a deleted CONTENT_DIR or ENGINE_DIR made every later file skip its content and engine gates (the clue audit among them); the caller's value goes back in `finally`, and test/setup-env-guard.ts fails any test that leaves either one changed.
+/** Run `fn` with `name` set to `value` (unset when undefined), then restore the caller's value and the skip cache. */
+function withEnv(name: 'CONTENT_DIR' | 'ENGINE_DIR', value: string | undefined, fn: () => void): void {
+    const caller = process.env[name];
+    setEnv(name, value);
+    resetSkipInputs();
+    try {
+        fn();
+    } finally {
+        setEnv(name, caller);
+        resetSkipInputs();
+    }
+}
+
 describe('skipUnless detects the local inputs', () => {
     test('CONTENT_DIR with a scripts/ directory is present', () => {
         const dir = mkdtempSync(join(tmpdir(), 'skip-content-'));
         try {
             mkdirSync(join(dir, 'scripts'));
-            process.env.CONTENT_DIR = dir;
-            resetSkipInputs();
-            expect(missingInput('content')).toBeNull();
-            expect(quietly(() => skipUnless('content'))).toEqual({ value: false, lines: [] });
+            withEnv('CONTENT_DIR', dir, () => {
+                expect(missingInput('content')).toBeNull();
+                expect(quietly(() => skipUnless('content'))).toEqual({ value: false, lines: [] });
+            });
         } finally {
-            delete process.env.CONTENT_DIR;
-            resetSkipInputs();
             rmSync(dir, { recursive: true, force: true });
         }
     });
 
     test('an unset CONTENT_DIR skips with the reason the parser knows', () => {
-        delete process.env.CONTENT_DIR;
-        resetSkipInputs();
-        expect(missingInput('content')).toBe('CONTENT_DIR is unset');
-        const run = quietly(() => skipUnless('content'));
-        expect(run.value).toBe(true);
-        expect(run.lines).toHaveLength(1);
-        expect(run.lines[0]).toMatch(/^SKIP: test\/repo\/skipUnless\.test\.ts: CONTENT_DIR absent \(CONTENT_DIR is unset\)$/);
-        // One line per file and reason, however many call sites ask.
-        expect(quietly(() => skipUnless('content')).lines).toEqual([]);
-        resetSkipInputs();
+        withEnv('CONTENT_DIR', undefined, () => {
+            expect(missingInput('content')).toBe('CONTENT_DIR is unset');
+            const run = quietly(() => skipUnless('content'));
+            expect(run.value).toBe(true);
+            expect(run.lines).toHaveLength(1);
+            expect(run.lines[0]).toMatch(/^SKIP: test\/repo\/skipUnless\.test\.ts: CONTENT_DIR absent \(CONTENT_DIR is unset\)$/);
+            // One line per file and reason, however many call sites ask.
+            expect(quietly(() => skipUnless('content')).lines).toEqual([]);
+        });
     });
 
     test('an engine on another revision skips', () => {
@@ -107,17 +126,24 @@ describe('skipUnless detects the local inputs', () => {
             mkdirSync(join(dir, 'src/util'), { recursive: true });
             // A revision the committed 377 client is not on.
             writeFileSync(join(dir, 'src/util/WorldConfig.ts'), 'revision: 289\n');
-            process.env.ENGINE_DIR = dir;
-            resetSkipInputs();
-            const why = missingInput('engine');
-            expect(why).toContain('engine is revision 289');
-            const run = quietly(() => skipUnless('engine'));
-            expect(run.value).toBe(true);
-            expect(run.lines[0]).toContain('SKIP: test/repo/skipUnless.test.ts: ENGINE_DIR absent or on another revision');
+            withEnv('ENGINE_DIR', dir, () => {
+                const why = missingInput('engine');
+                expect(why).toContain('engine is revision 289');
+                const run = quietly(() => skipUnless('engine'));
+                expect(run.value).toBe(true);
+                expect(run.lines[0]).toContain('SKIP: test/repo/skipUnless.test.ts: ENGINE_DIR absent or on another revision');
+            });
         } finally {
-            delete process.env.ENGINE_DIR;
-            resetSkipInputs();
             rmSync(dir, { recursive: true, force: true });
         }
+    });
+
+    test('each case hands the caller its CONTENT_DIR and ENGINE_DIR back', () => {
+        const content = process.env.CONTENT_DIR;
+        const engine = process.env.ENGINE_DIR;
+        withEnv('CONTENT_DIR', undefined, () => expect(process.env.CONTENT_DIR).toBeUndefined());
+        withEnv('ENGINE_DIR', '/nonexistent-engine', () => expect(process.env.ENGINE_DIR).toBe('/nonexistent-engine'));
+        expect(process.env.CONTENT_DIR).toBe(content);
+        expect(process.env.ENGINE_DIR).toBe(engine);
     });
 });

@@ -85,7 +85,7 @@
     },
     {
       "path": "src/bot/api/ai/clues/data/unreachable.ts",
-      "sha256": "fc9ad1c0341757d7dc9381ce23aa93f90901a07a2c1f2cfbf6f8ca2866910c80",
+      "sha256": "c3cd344861782be115a754e9dd91b726bc186c4f82df9854532053dbf2bfc3a5",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -217,7 +217,7 @@
     },
     {
       "path": "src/bot/event/webwalk/travelCatalog.ts",
-      "sha256": "dd49401ded52720342b00dcc5bb44a56b38d483d9f59b8e00224338981985b7b",
+      "sha256": "3e2884de207b0db5f488fb2b6160321e703959c964b9ee2a37fb81c036c8ab8f",
       "kind": "edition",
       "qualification": "offline"
     },

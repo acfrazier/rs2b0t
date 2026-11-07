@@ -192,9 +192,9 @@ describe('QUEST_JUNK', () => {
         });
         expect(QUEST_JUNK.find(item => item.id === 2399)?.quest).toBe('Demon Slayer');
         expect(QUEST_JUNK.find(item => item.id === 600)?.name).toBe('Astrology book');
-        expect(QUEST_JUNK.find(item => item.id === 415)?.name).toBe('Ethanea');
+        expect(QUEST_JUNK.find(item => item.id === 415)?.name).toBe('Ethenea');
         expect(QUEST_JUNK.find(item => item.id === 78)?.name).toBe('Ice arrows');
-        expect(QUEST_JUNK.find(item => item.id === 3)?.name).toBe("Nulodion's notes.");
+        expect(QUEST_JUNK.find(item => item.id === 3)?.name).toBe("Nulodion's notes");
         expect(QUEST_JUNK.find(item => item.id === 3102)?.quest).toBe('Death Plateau');
     });
 

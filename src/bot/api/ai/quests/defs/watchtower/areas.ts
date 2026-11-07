@@ -28,7 +28,7 @@ export const WT_ITEM = {
     RELIC_PART3: { id: 2375, name: 'Relic part 3' },
     SKAVID_MAP: { id: 2376, name: 'Skavid map' },
     OGRE_TOOTH: { id: 2377, name: 'Ogre tooth' },
-    TOBAN_KEY: { id: 2378, name: 'Toban key' },
+    TOBAN_KEY: { id: 2378, name: "Toban's key" },
     ROCK_CAKE: { id: 2379, name: 'Rock cake' },
     CRYSTAL1: { id: 2380, name: 'Crystal' },
     CRYSTAL2: { id: 2381, name: 'Crystal' },

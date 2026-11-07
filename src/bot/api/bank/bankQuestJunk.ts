@@ -69,7 +69,7 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
     ...junk('Vampire Slayer', [[1549, 'Stake']]),
     ...junk("Witch's Potion", [[300, "Rat's tail"]]),
     ...junk('Biohazard', [
-        [415, 'Ethanea'],
+        [415, 'Ethenea'],
         [416, 'Liquid honey'],
         [417, 'Sulphuric broline'],
         [418, 'Plague sample'],
@@ -94,7 +94,7 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
         [678, 'Panning tray'],
         [679, 'Panning tray'],
         [680, 'Nuggets'],
-        [681, 'Talisman of zaros'],
+        [681, 'Zaros talisman'],
         [682, 'Unstamped letter'],
         [683, 'Stamped letter'],
         [684, 'Belt buckle'],
@@ -132,7 +132,7 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
     ...junk('Dwarf Cannon', [
         [0, 'Dwarf remains'],
         [1, 'Tool kit'],
-        [3, "Nulodion's notes."],
+        [3, "Nulodion's notes"],
         [14, 'Railing']
     ]),
     ...junk("Eadgar's Ruse", [
@@ -180,9 +180,9 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
         [794, 'Invasion plans']
     ]),
     ...junk('Hazeel Cult', [
-        [2403, 'Scroll of hazeel'],
-        [2404, 'Key'],
-        [2406, 'Mark of hazeel']
+        [2403, 'Hazeel scroll'],
+        [2404, 'Chest key'],
+        [2406, "Hazeel's mark"]
     ]),
     ...junk("Hero's Quest", [
         [1579, "Thieves' armband"],
@@ -267,13 +267,13 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
         [1805, 'Silver needle'],
         [1806, 'Silver pot'],
         [1807, 'Silver pot'],
-        [1808, "Criminals' thread"],
-        [1809, "Criminals' thread"],
-        [1810, "Criminals' thread"],
+        [1808, "Criminal's thread"],
+        [1809, "Criminal's thread"],
+        [1810, "Criminal's thread"],
         [1811, 'Flypaper'],
         [1812, 'Pungent pot'],
-        [1813, "Criminals' dagger"],
-        [1814, "Criminals' dagger"]
+        [1813, "Criminal's dagger"],
+        [1814, "Criminal's dagger"]
     ]),
     ...junk('Nature Spirit', [
         [2964, 'Washing bowl'],
@@ -319,8 +319,8 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
         [1469, 'Broken glass']
     ]),
     ...junk('Sheep Herder', [
-        [278, 'Prod'],
-        [279, 'Feed']
+        [278, 'Cattleprod'],
+        [279, 'Sheep feed']
     ]),
     ...junk('Tai Bwo Wannai Trio', [
         [3161, 'Crafting manual'],
@@ -333,7 +333,7 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
     ]),
     ...junk('The Tourist Trap', [
         [1841, 'Barrel'],
-        [1844, "Slaves' shirt"],
+        [1844, 'Slave shirt'],
         [1845, 'Slave robe'],
         [1846, 'Slave boots'],
         [1847, 'Scrumpled paper'],
@@ -360,7 +360,7 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
         [2374, 'Relic part 2'],
         [2375, 'Relic part 3'],
         [2377, 'Ogre tooth'],
-        [2378, 'Toban key'],
+        [2378, "Toban's key"],
         [2379, 'Rock cake'],
         [2384, 'Finger nails'],
         [2385, 'Old robe'],
@@ -393,7 +393,7 @@ export const QUEST_JUNK: readonly QuestJunkEntry[] = [
         [606, 'Stone-plaque'],
         [607, 'Tattered scroll'],
         [608, 'Crumpled scroll'],
-        [609, 'Rashiliya corpse'],
+        [609, 'Rashiliyia corpse'],
         [610, 'Zadimus corpse'],
         [611, 'Locating crystal'],
         [612, 'Locating crystal'],

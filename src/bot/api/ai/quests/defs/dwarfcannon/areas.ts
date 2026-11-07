@@ -30,11 +30,11 @@ export const MC_LOC = {
     RAILING_LAST: 20
 } as const;
 
-/** Server obj ids. `Nulodion's notes.` carries a trailing period in its display name. */
+/** Server obj ids. */
 export const MC_OBJ = {
     REMAINS: { id: 0, name: 'Dwarf remains' },
     TOOLKIT: { id: 1, name: 'Tool kit' },
-    NOTES: { id: 3, name: "Nulodion's notes." },
+    NOTES: { id: 3, name: "Nulodion's notes" },
     MOULD: { id: 4, name: 'Ammo mould' },
     RAILING: { id: 14, name: 'Railing' }
 } as const;

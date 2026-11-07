@@ -96,7 +96,7 @@ describe('Sheep Herder decide', () => {
     });
 
     test('fetches the prod from the barn before herding', () => {
-        expect(customName(decide(snap({ wornIds: [JACKET_OBJ, TROUSERS_OBJ] })))).toBe('fetch the Prod from the barn');
+        expect(customName(decide(snap({ wornIds: [JACKET_OBJ, TROUSERS_OBJ] })))).toBe('fetch the Cattleprod from the barn');
     });
 
     test('asks Halgrive for more feed when the pack has none', () => {
@@ -148,7 +148,7 @@ describe('Sheep Herder module', () => {
     });
 
     test('keeps the coin float and every quest item off the deposit list', () => {
-        for (const tool of ['coins', 'prod', 'feed', 'plague jacket', 'plague trousers', 'bones']) {
+        for (const tool of ['coins', 'cattleprod', 'sheep feed', 'plague jacket', 'plague trousers', 'bones']) {
             expect(sheepherder.tools).toContain(tool);
         }
     });

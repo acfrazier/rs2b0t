@@ -427,7 +427,7 @@ export function desertMiningCampEdges(): TransportEdgeData[] {
     };
     const disguised: TransportRequires = {
         worn: [
-            { name: "Slaves' shirt", count: 1 },
+            { name: 'Slave shirt', count: 1 },
             { name: 'Slave robe', count: 1 },
             { name: 'Slave boots', count: 1 }
         ]

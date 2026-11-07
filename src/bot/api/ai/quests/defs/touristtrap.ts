@@ -240,7 +240,7 @@ const ITEM = {
     DESERT_SHIRT: 'Desert shirt',
     DESERT_ROBE: 'Desert robe',
     DESERT_BOOTS: 'Desert boots',
-    SLAVE_SHIRT: "Slaves' shirt",
+    SLAVE_SHIRT: 'Slave shirt',
     SLAVE_ROBE: 'Slave robe',
     SLAVE_BOOTS: 'Slave boots',
     WATERSKIN: 'Waterskin(4)',

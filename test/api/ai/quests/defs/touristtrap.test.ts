@@ -32,7 +32,7 @@ const SURFACE_JAIL = tile(3285, 3034);
 const UNDERGROUND_JAIL = tile(3288, 9437);
 
 const DESERT_OUTFIT = ['Desert shirt', 'Desert robe', 'Desert boots'] as const;
-const SLAVE_OUTFIT = ["Slaves' shirt", 'Slave robe', 'Slave boots'] as const;
+const SLAVE_OUTFIT = ['Slave shirt', 'Slave robe', 'Slave boots'] as const;
 const DESERT_WORN = [...DESERT_OUTFIT, 'Bronze pickaxe'];
 const SLAVE_WORN = [...SLAVE_OUTFIT, 'Bronze pickaxe'];
 
@@ -1125,7 +1125,7 @@ describe('Tourist Trap survival accounting', () => {
         const sharedInventory: CountEntry[] = [
             ['Desert shirt', 2],
             ['Desert robe', 2],
-            ["Slaves' shirt", 1],
+            ['Slave shirt', 1],
             ['Bronze pickaxe', 1]
         ];
         const firstBoot = decide(snap({
@@ -1181,7 +1181,7 @@ describe('Tourist Trap survival accounting', () => {
         const step = decide(snap({
             stage: TOURIST_TRAP_STAGE.RESCUE,
             tile: MINE_ENTRANCE,
-            inv: [["Slaves' shirt", 1]],
+            inv: [['Slave shirt', 1]],
             food: 0,
             skins: 0,
             coins: 0
