@@ -95,7 +95,10 @@ export function deployIsolatedClient(tag: string, engineDir = process.env.ENGINE
     for (const name of readdirSync(buildDir)) {
         if (!name.endsWith('.js')) continue;
         const path = `${buildDir}/${name}`;
-        if (readFileSync(path, 'utf8').includes('tap-377')) fail(`deploy: ${path} names the recording tap module`);
+        const contents = readFileSync(path, 'utf8');
+        if (contents.includes('tap-377') || contents.includes('jpeg-js')) {
+            fail(`deploy: ${path} names the recording tap module or replay JPEG decoder`);
+        }
     }
     // Why: `build:bot` does not bake the collision pack, and without it every Navigator dies on boot and walking degrades in silence to the scene stepper.
     if (!existsSync('out/collision.lcnav.gz')) {

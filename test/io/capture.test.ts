@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { sameQuiescentState, type CaptureSnapshot } from '../../e2e/tap-377/capture-page.js';
+import { assertNoForeignPlayer, sameQuiescentState, type CaptureSnapshot } from '../../e2e/tap-377/capture-page.js';
 import { assertCaptureFrames, bankSlotPoint, rearranged } from '../../e2e/tap-377/capture-scenarios.js';
 import type { Direction, FrameRecord, RecordingRecord } from '../../tools/tap-377/format.js';
 import protocol from './fixtures/prot377/engine-prot.json';
@@ -31,6 +31,13 @@ describe('capture checkpoint admission', () => {
             after.state.serverTile[key]++;
             expect(sameQuiescentState(ready(), after)).toBe(false);
         }
+    });
+
+    test('rejects foreign players after a checkpoint snapshot', () => {
+        expect(() => assertNoForeignPlayer(ready())).not.toThrow();
+        expect(() => assertNoForeignPlayer({ ...ready(), foreignPlayer: true })).toThrow(
+            'capture refused: a player outside the account prefix entered the scene'
+        );
     });
 });
 

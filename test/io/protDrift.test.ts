@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { skipUnless } from '../lib/skipUnless.js';
@@ -10,6 +11,7 @@ import {
     parseProtocols,
     parseRevision
 } from '../../tools/gen-prot.js';
+import { loadEngineProtocol } from '../../tools/tap-377/protocol.js';
 
 const ENGINE_DIR = process.env.ENGINE_DIR?.trim() || undefined;
 const JAVA_DIR = process.env.JAVA_DIR?.trim() || undefined;
@@ -111,6 +113,26 @@ describe('protocol fixtures generated tables', () => {
         expect(engineFixture.serverProtKnown).toHaveLength(75);
         expect(engineFixture.serverProtSizes).toEqual(generated.sizes);
         expect(engineFixture.serverProtKnown).toEqual(generated.known);
+    });
+});
+
+describe('engine protocol path redaction', () => {
+    test('does not expose a missing engine source path', () => {
+        const engineDir = mkdtempSync(join(tmpdir(), 'frtap-protocol-test-'));
+        try {
+            mkdirSync(join(engineDir, 'src', 'util'), { recursive: true });
+            writeFileSync(join(engineDir, 'src', 'util', 'WorldConfig.ts'), 'revision: 289');
+            let message = '';
+            try {
+                loadEngineProtocol(engineDir);
+            } catch (error) {
+                message = error instanceof Error ? error.message : String(error);
+            }
+            expect(message).toBe('engine protocol source files are unavailable');
+            expect(message).not.toContain(engineDir);
+        } finally {
+            rmSync(engineDir, { recursive: true, force: true });
+        }
     });
 });
 

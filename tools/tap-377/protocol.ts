@@ -62,17 +62,26 @@ export function load377Protocol(): Protocol {
     return validateProtocol({ revision: fixture.revision, client: fixture.client, server: fixture.server });
 }
 
+function isMissingFileError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
 export function loadEngineProtocol(engineDir: string): Protocol {
-    const generated = generateProt(resolve(engineDir));
-    const protocol = validateProtocol({
-        revision: generated.revision,
-        client: generated.clientProtocols.map(({ name, id, length }) => ({ name, id, length })),
-        server: generated.serverProtocols.map(({ name, id, length }) => ({ name, id, length }))
-    });
-    if (protocol.revision === 377 && !sameDescriptors(protocol, load377Protocol())) {
-        throw new Error('engine protocol differs from pinned revision 377 inventory');
+    try {
+        const generated = generateProt(resolve(engineDir));
+        const protocol = validateProtocol({
+            revision: generated.revision,
+            client: generated.clientProtocols.map(({ name, id, length }) => ({ name, id, length })),
+            server: generated.serverProtocols.map(({ name, id, length }) => ({ name, id, length }))
+        });
+        if (protocol.revision === 377 && !sameDescriptors(protocol, load377Protocol())) {
+            throw new Error('engine protocol differs from pinned revision 377 inventory');
+        }
+        return protocol;
+    } catch (error) {
+        if (isMissingFileError(error)) throw new Error('engine protocol source files are unavailable');
+        throw error;
     }
-    return protocol;
 }
 
 export function validateProtocolForRevision(protocol: Protocol): Protocol {

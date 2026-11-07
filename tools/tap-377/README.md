@@ -8,7 +8,7 @@ The tap binds to loopback and requires an explicit engine directory and origin. 
 
 The key reader accepts unencrypted two-prime RSA in PKCS#1 or version-0 PKCS#8. PKCS#8 must declare the RSA encryption algorithm; other algorithms and encrypted keys are rejected. The same integer decoder handles the large public exponent used by older engines.
 
-A JSONL file starts with a versioned header: revision, engine/content/client commits, disposable account prefix, and hashes of the nine HTTP archive responses. Each segment contains the accepted login replies, plaintext game frames, checkpoints, and a clean segment end. Frames include the opcode and any variable-length prefix. `tick` counts inbound `PLAYER_INFO` packets; each direction also has its own ordinal. A checkpoint names the exact number of inbound packets the browser has consumed, not the number the network has received.
+A JSONL file starts with a versioned header: revision, engine/content/client commits, disposable account prefix, and hashes of the nine HTTP archive responses. Each segment contains the accepted login replies, plaintext game frames, checkpoints, and a clean segment end. Reply `2` includes two metadata bytes. Reply `15` is accepted only for reconnects and has no metadata bytes. Frames include the opcode and any variable-length prefix. `tick` counts inbound `PLAYER_INFO` packets. Each direction also has its own ordinal. A checkpoint names the exact inbound packet count consumed by the browser, not the count received by the network.
 
 The cache bundle is separate from the public recording. It contains the nine archive responses and the compressed OnDemand files requested during capture. `test/io/recordings/index.json` pins both the recording and the cache bundle by SHA-256. Keep cache bundles and receipts in the approved evidence directory; never add the engine key or raw content source to Git.
 
@@ -27,11 +27,13 @@ bun e2e/tap-377/capture-session.ts \
   --quiet-lock "$QUIET_LOCK"
 ```
 
-The output directory must not exist. The driver creates a fresh disposable account under the supplied prefix and keeps its secret in memory. The reference browser is built inside the output directory and served by the tap; no engine public files are changed. Headed Chrome is the default. `--headless` is explicit.
+The output directory must not exist. The driver creates a fresh disposable account under the supplied prefix and keeps its secret in memory. The reference browser uses a temporary build directory outside the evidence directory. Capture removes that directory on success or failure. No engine public files are changed. Headed Chrome is the default. `--headless` is explicit.
 
 For revision 377, select `tutorial`, `mainland`, or `instance`. The latter two require `--harness-lib` naming the operator-approved account helper module. Its `mainlandAccount` prepares only the fixture account. The receipt labels every seed operation; no seed is credited as the interaction being proved. Teleport seeds use the shared engine-coordinate encoder and must reach their exact target tile. No scenario starts, stops, repacks, or edits an engine.
 
 The driver asserts a built scene and a stable route head for five server ticks before each checkpoint. It rejects packet-handler failures and players outside the disposable prefix. It asserts movement, interface results, count-dialog withdrawal, both non-adjacent bank rearrangement modes, instanced scene construction, clean logout, and a same-client relogin. Before finalization it also waits for the tap's outstanding cache requests and partial wire buffers to drain; the client's urgent-request count alone does not include background prefetch. Successful checkpoints have screenshots. Failure receipts retain allowlisted state and packet byte counts, not arbitrary packet dumps or exception text. A failed attempt is retained, not silently promoted to a recording.
+
+The foreign-player check remains active after the last checkpoint, during cache drain, and around finalization. Key parsing never prints private RSA parameters. Missing engine and replay-cache files produce path-free errors.
 
 Bank drags wait for the client to observe the hovered source slot before pressing the mouse. Both modes use occupied, non-adjacent slots. Each drag is checked again after closing and reopening the bank, so the client's optimistic reorder alone cannot pass the capture.
 
@@ -57,9 +59,13 @@ ENGINE_DIR="$ENGINE_DIR" RS2B0T_CACHE_BUNDLE="$CACHE_BUNDLE" \
   bun test test/io/replay.test.ts
 ```
 
-Before the client cutover this selects the 289 recording. The 377 captures are checked for wire validity now and replay through the 377 production client after cutover.
+The runtime loads every indexed recording for `CLIENT_VERSION`. Before cutover, this selects the 289 reference recording. After cutover, this selects all three 377 recordings. Set `RS2B0T_CACHE_BUNDLE` to a directory containing `<cacheSha256>.json` for each required bundle. The existing single-file form remains valid when all selected recordings use that file's hash. Missing or mismatched bundles fail the test. Hosted CI checks every committed 377 recording against the index and P1 descriptors without any cache bundle.
 
-The runtime checks the adapter's packet-listener sequence for every notifying packet. `LOGOUT` is a terminal handler: it returns false to stop the frame, so the adapter does not notify it. Replay instead requires that this recorded packet has already run production logout before segment cleanup; the next login must reset the same client's session state.
+Each checkpoint requires observed locations on the active level and non-default collision flags inside the player's eight-tile zone. Allocated maps and default boundary flags do not satisfy this check. The instance flag comes directly from the client, not from an absent reader field. Cache-free tests reject empty worlds, reset collision maps, wrong-level flags, and wrong-zone flags.
+
+The runtime checks the adapter's packet-listener sequence for every notifying packet. `LOGOUT` is a terminal handler: it returns false, so the adapter does not notify it. Replay requires that this packet runs production logout. A new login must reset the same client's session state. A reconnect uses production `lostCon`. Reply `15` must preserve the preceding player and scene.
+
+Negative tests drive `RecordedStream` through the attached adapter and real `Client.tcpIn`. They cover unknown membership, both T1 paths, T2 rethrow after logout, handler under-read and over-read, and wrong decoded values. Malformed variable-length frames also fail through `replayRecording`.
 
 The replay receipt names `Jpeg.decodeJpeg: jpeg-js` as a substituted boot step. Happy-dom does not load the title image, so the test harness decodes its captured JPEG bytes with the development-only decoder. Production `Pix32.fromJpeg`, archive loading, configuration initialization, and the rest of `maininit` still run. The bundle guard rejects this decoder in browser or worker output.
 

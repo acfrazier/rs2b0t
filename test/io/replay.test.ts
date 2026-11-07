@@ -1,19 +1,19 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, mock, spyOn, test } from 'bun:test';
+import { describe, expect, mock, spyOn, test, type Mock } from 'bun:test';
 
 import * as loginKey from '#/client/config/loginKey.js';
 import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import { assertPacketConsumed } from '#/client/io/packetGuard.js';
 import Packet from '#/client/io/Packet.js';
 import OnDemand, { type OnDemandWorker } from '#/client/io/OnDemand.js';
-import { ServerProt } from '#/client/io/ServerProt.js';
+import { ServerProt, ServerProtSizes } from '#/client/io/ServerProt.js';
 
 import { skipUnless } from '../lib/skipUnless.js';
 import { ARCHIVES, type CacheBundle, type FrameRecord, type LoginRecord, type Protocol, type RecordingHeader, type RecordingRecord } from '../../tools/tap-377/format.js';
-import { loadReplayFixture } from './replay/recording.js';
-import { decodeRecordedFrame, RecordedStream, replayRecording } from './replay/runtime.js';
+import { loadReplayFixtures } from './replay/recording.js';
+import { decodeRecordedFrame, installCanvasMock, RecordedStream, replayRecording } from './replay/runtime.js';
 import { nativeFetch } from '../setup-dom.js';
 
 mock.module('#/client/3rdparty/audio.js', () => ({
@@ -115,6 +115,19 @@ describe('RecordedStream', () => {
         expect(second).toEqual(new Uint8Array([11, 2, 0xa1, 0xa2]));
         expect(stream.consumedInboundCount).toBe(2);
     });
+
+    test('reply 15 has no metadata bytes and requires a reconnect', async () => {
+        const stream = new RecordedStream({ ...login, reconnect: true, replies: [0, 15] }, [frame(1, '0a0102')], protocol);
+        const handshake = new Uint8Array(18);
+        await stream.readBytes(handshake, 0, handshake.length);
+        expect(handshake[17]).toBe(15);
+        stream.beginGame();
+        stream.exposeInboundThrough(1);
+        const packet = new Uint8Array(3);
+        await stream.readBytes(packet, 0, packet.length);
+        expect(packet).toEqual(Uint8Array.of(10, 1, 2));
+        expect(() => new RecordedStream({ ...login, replies: [0, 15] }, [], protocol)).toThrow('successful recorded login');
+    });
 });
 
 test('OnDemand retains its injected worker, forwards requests, and terminates it once', () => {
@@ -207,36 +220,110 @@ const missingEngine = CLIENT_VERSION === 289 ? skipUnless('engine') : false;
 const missingCacheBundle = skipUnless('cache-bundle');
 
 describe.skipIf(missingIndex || missingEngine || missingCacheBundle)('production replay runtime', () => {
-    test('boots and replays the current client recording through production mainloop', async () => {
-        const fixture = loadReplayFixture();
-        const report = await replayRecording(fixture.records, fixture.cacheBundle, fixture.protocol);
-        const recordedCheckpoints = fixture.records.filter(record => record.type === 'checkpoint');
-        const inboundFrames = fixture.records.filter((record): record is FrameRecord => record.type === 'frame' && record.direction === 'in');
+    test('boots and replays every current-client recording through production mainloop', async () => {
+        const fixtures = loadReplayFixtures();
+        expect(fixtures.length).toBeGreaterThan(0);
+        for (const fixture of fixtures) {
+            const report = await replayRecording(fixture.records, fixture.cacheBundle, fixture.protocol);
+            const recordedCheckpoints = fixture.records.filter(record => record.type === 'checkpoint');
+            const inboundFrames = fixture.records.filter((record): record is FrameRecord => record.type === 'frame' && record.direction === 'in');
 
-        expect(report.revision).toBe(fixture.indexEntry.revision);
-        expect(report.segmentCount).toBeGreaterThan(0);
-        expect(report.checkpointCount).toBe(recordedCheckpoints.length);
-        expect(report.recordedOpcodeCoverage.inbound.descriptors).toEqual(
-            fixture.protocol.server.map(descriptor => descriptor.name).sort()
-        );
-        expect(report.recordedOpcodeCoverage.outbound.descriptors).toEqual(
-            fixture.protocol.client.map(descriptor => descriptor.name).sort()
-        );
-        const logoutOpcode = fixture.protocol.server.find(descriptor => descriptor.name === 'LOGOUT')?.id;
-        expect(report.packetListenerCount).toBe(inboundFrames.filter(frame => parseInt(frame.bytes.slice(0, 2), 16) !== logoutOpcode).length);
-        expect(report.checkpoints.map(checkpoint => ({ label: checkpoint.label, inboundCount: checkpoint.inboundCount }))).toEqual(
-            recordedCheckpoints.map(checkpoint => ({ label: checkpoint.label, inboundCount: checkpoint.inboundCount }))
-        );
-        expect(
-            report.checkpoints.every(checkpoint => checkpoint.sceneBuild.world && checkpoint.sceneBuild.collisionLevels > 0)
-        ).toBe(true);
-        expect(report.boot).toEqual({
-            mode: 'production-maininit',
-            substitutedSteps: ['Jpeg.decodeJpeg: jpeg-js', 'loginKey: synthetic public parameters'],
-            mainredrawCalls: 0,
-            onDemandWireParser: false,
-            gameSockets: false
+            expect(report.revision).toBe(fixture.indexEntry.revision);
+            expect(report.segmentCount).toBeGreaterThan(0);
+            expect(report.checkpointCount).toBe(recordedCheckpoints.length);
+            expect(report.recordedOpcodeCoverage.inbound.descriptors).toEqual(
+                fixture.protocol.server.map(descriptor => descriptor.name).sort()
+            );
+            expect(report.recordedOpcodeCoverage.outbound.descriptors).toEqual(
+                fixture.protocol.client.map(descriptor => descriptor.name).sort()
+            );
+            const logoutOpcode = fixture.protocol.server.find(descriptor => descriptor.name === 'LOGOUT')?.id;
+            expect(report.packetListenerCount).toBe(inboundFrames.filter(frame => parseInt(frame.bytes.slice(0, 2), 16) !== logoutOpcode).length);
+            expect(report.checkpoints.map(checkpoint => ({ label: checkpoint.label, inboundCount: checkpoint.inboundCount }))).toEqual(
+                recordedCheckpoints.map(checkpoint => ({ label: checkpoint.label, inboundCount: checkpoint.inboundCount }))
+            );
+            expect(
+                report.checkpoints.every(checkpoint => checkpoint.sceneBuild.locCount > 0 && checkpoint.sceneBuild.collisionZoneTiles > 0)
+            ).toBe(true);
+            expect(report.boot).toEqual({
+                mode: 'production-maininit',
+                substitutedSteps: ['Jpeg.decodeJpeg: jpeg-js', 'loginKey: synthetic public parameters'],
+                mainredrawCalls: 0,
+                onDemandWireParser: false,
+                gameSockets: false
+            });
+        }
+    });
+
+    test('mismatched captured tiles and instance checkpoints fail real replay', async () => {
+        const [fixture] = loadReplayFixtures();
+        if (!fixture) throw new Error('no replay fixtures');
+        for (const field of ['serverTile', 'sceneInstanced'] as const) {
+            const records = fixture.records.map(record => record.type === 'checkpoint' ? {
+                ...record,
+                state: {
+                    ...record.state,
+                    ...(field === 'serverTile'
+                        ? { serverTile: { ...record.state.serverTile, x: record.state.serverTile.x + 1 } }
+                        : { sceneInstanced: !record.state.sceneInstanced })
+                }
+            } : record);
+            await expect(replayRecording(records, fixture.cacheBundle, fixture.protocol)).rejects.toThrow('differs from its captured adapter state');
+        }
+    });
+
+    test('reply 15 resumes the existing scene through production lostCon and then cleanly logs out', async () => {
+        const [fixture] = loadReplayFixtures();
+        if (!fixture) throw new Error('no replay fixtures');
+        const checkpointIndex = fixture.records.findIndex(record => record.type === 'checkpoint' && record.segment === 1);
+        const checkpoint = fixture.records[checkpointIndex];
+        const firstLogin = fixture.records.find(record => record.type === 'login');
+        if (checkpoint?.type !== 'checkpoint' || firstLogin?.type !== 'login') throw new Error('reconnect fixture has no first checkpoint');
+        const prefix = fixture.records.slice(0, checkpointIndex + 1);
+        const counts = { in: 0, out: 0 };
+        let tick = 0;
+        for (const record of prefix) {
+            if (record.type === 'frame') { counts[record.direction]++; tick = record.tick; }
+        }
+        const suffix = fixture.records.slice(checkpointIndex + 1).map((record): RecordingRecord => {
+            if (record.type === 'header') throw new Error('unexpected replay header');
+            const segment = record.segment + 1;
+            if (record.segment !== 1) return { ...record, segment };
+            if (record.type === 'frame') return { ...record, segment, ordinal: record.ordinal - counts[record.direction], tick: record.tick - tick };
+            if (record.type === 'checkpoint') return { ...record, segment, inboundCount: record.inboundCount - counts.in };
+            if (record.type === 'end') return { ...record, segment, inboundCount: record.inboundCount - counts.in, outboundCount: record.outboundCount - counts.out };
+            throw new Error('unexpected replay login');
         });
+        const records: RecordingRecord[] = [
+            ...prefix,
+            { type: 'end', segment: 1, reason: 'reconnect', inboundCount: counts.in, outboundCount: counts.out },
+            { ...firstLogin, segment: 2, replies: [0, 15], reconnect: true },
+            { ...checkpoint, segment: 2, label: 'reconnect-preserved', inboundCount: 0 },
+            ...suffix
+        ];
+        const report = await replayRecording(records, fixture.cacheBundle, fixture.protocol);
+        expect(report.segmentCount).toBe(fixture.records.filter(record => record.type === 'login').length + 1);
+        const preserved = report.checkpoints.find(record => record.label === 'reconnect-preserved');
+        expect(preserved?.state).toEqual(checkpoint.state);
+        expect(preserved?.frames).toBe(0);
+    });
+
+    test('a validly framed handler under-read propagates through replayRecording and production mainloop', async () => {
+        const [fixture] = loadReplayFixtures();
+        if (!fixture) throw new Error('no replay fixtures');
+        const message = fixture.protocol.server.find(descriptor => descriptor.name === 'MESSAGE_GAME');
+        if (!message || message.length !== -1) throw new Error('replay fixture has no variable MESSAGE_GAME descriptor');
+        let changed = false;
+        const records = fixture.records.map(record => {
+            if (changed || record.type !== 'frame' || record.direction !== 'in' || parseInt(record.bytes.slice(0, 2), 16) !== message.id) return record;
+            const bytes = Buffer.from(record.bytes, 'hex');
+            if (bytes[1] === 255) throw new Error('replay message is too long for corruption fixture');
+            bytes[1]!++;
+            changed = true;
+            return { ...record, bytes: bytes.toString('hex') + '00' };
+        });
+        expect(changed).toBe(true);
+        await expect(replayRecording(records, fixture.cacheBundle, fixture.protocol)).rejects.toThrow(`packet ${message.id} declared`);
     });
 });
 
@@ -271,4 +358,97 @@ test('production HINT_ARROW consumes entity and clear padding without skipping t
     expect(Reflect.get(client, 'hintTileZ')).toBe(3201);
     await decode([255, 0, 0, 0, 0, 0]);
     expect(Reflect.get(client, 'hintType')).toBe(255);
+});
+
+describe('production tcpIn fail-closed replay path', () => {
+    async function dispatch(
+        opcode: number, body: readonly number[],
+        assertion: (client: object, run: () => Promise<boolean>, logout: Mock<() => Promise<void>>, stream: RecordedStream) => Promise<void>,
+        prepare?: (client: object) => void
+    ): Promise<void> {
+        const restoreCanvas = await installCanvasMock();
+        try {
+            const [{ Client }, adapter] = await Promise.all([import('#/client/shell/Client.js'), import('#/bot/adapter/ClientAdapter.js')]);
+            const client = new Client(undefined as never, undefined as never, undefined as never);
+            const size = ServerProtSizes[opcode] ?? 0;
+            const wire = [opcode, ...(size === -1 ? [body.length] : size === -2 ? [body.length >> 8, body.length & 255] : []), ...body];
+            const stream = new RecordedStream(login, [frame(1, Buffer.from(wire).toString('hex'))], {
+                revision: CLIENT_VERSION, client: [], server: [{ name: 'NEGATIVE', id: opcode, length: size }]
+            });
+            await stream.readBytes(new Uint8Array(20), 0, 20);
+            stream.beginGame();
+            stream.exposeInboundThrough(1);
+            Object.assign(client, { stream, randomIn: null, ingame: true, ptype: -1, ptype0: -1, ptype1: -1, ptype2: -1, psize: 0 });
+            const logout = spyOn(client as unknown as { logout(): Promise<void> }, 'logout');
+            const errors = spyOn(console, 'error').mockImplementation(() => {});
+            try {
+                expect(adapter.attach(client)).toEqual([]);
+                expect(adapter.reader.attached()).toBe(true);
+                adapter.setPacketListener(mock(() => {}));
+                prepare?.(client);
+                await assertion(client, () => Reflect.get(client, 'tcpIn').call(client), logout, stream);
+            } finally {
+                adapter.setPacketListener(null);
+                adapter.detach();
+                logout.mockRestore();
+                errors.mockRestore();
+                stream.close();
+            }
+        } finally {
+            restoreCanvas();
+        }
+    }
+
+    test('unknown zero-sized opcode is rejected by membership as StrictPacketError, not swallowed by T2', async () => {
+        await dispatch(0, [], async (_client, run, logout) => {
+            const error = await run().then(() => null, error => error as Error);
+            expect(error?.constructor.name).toBe('StrictPacketError');
+            expect(error?.message).toContain('T1 - unknown opcode 0,0');
+            expect(logout).not.toHaveBeenCalled();
+        });
+    });
+
+    test('T1 unhandled-dispatch StrictPacketError is rethrown without logout', async () => {
+        // A resumed packet has already passed admission. Seed an unmapped dispatch value
+        // to exercise the final T1 branch separately from membership rejection.
+        await dispatch(0, [], async (_client, run, logout) => {
+            const error = await run().then(() => null, error => error as Error);
+            expect(error?.constructor.name).toBe('StrictPacketError');
+            expect(error?.message).toContain('T1 - 256,0');
+            expect(logout).not.toHaveBeenCalled();
+        }, client => Object.assign(client, { ptype: 256, psize: 0 }));
+    });
+
+    test('real MESSAGE_GAME handler under-read and over-read reach the strict consumption guard', async () => {
+        for (const [body, consumed] of [[[10, 99], 1], [[65], 2]] as const) {
+            await dispatch(ServerProt.MESSAGE_GAME, body, async (_client, run, logout) => {
+                await expect(run()).rejects.toThrow(`packet ${ServerProt.MESSAGE_GAME} declared ${body.length} bytes, consumed ${consumed}`);
+                expect(logout).not.toHaveBeenCalled();
+            }, client => {
+                // Stale bytes past psize must not turn a handler over-read into success.
+                Reflect.get(client, 'in').data[1] = 10;
+            });
+        }
+    });
+
+    test('a real handler exception takes T2 logout and is still rethrown', async () => {
+        await dispatch(ServerProt.IF_SETTEXT, [255, 255, 10], async (_client, run, logout, stream) => {
+            await expect(run()).rejects.toBeInstanceOf(TypeError);
+            expect(logout).toHaveBeenCalledTimes(1);
+            expect(stream.closed).toBe(true);
+        });
+    });
+
+    test('same-length wrong transform reaches the handler but fails the independent value oracle', async () => {
+        await dispatch(ServerProt.HINT_ARROW, [2, 12, 128, 12, 129, 16], async (client, run) => {
+            expect(await run()).toBe(true);
+            expect(Reflect.get(client, 'hintTileX')).toBe(3200);
+        });
+        await dispatch(ServerProt.HINT_ARROW, [2, 0, 12, 12, 129, 16], async (client, run) => {
+            expect(await run()).toBe(true);
+            expect(() => {
+                if (Reflect.get(client, 'hintTileX') !== 3200) throw new Error('decoded tile differs from fixture');
+            }).toThrow('decoded tile differs from fixture');
+        });
+    });
 });

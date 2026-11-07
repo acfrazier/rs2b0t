@@ -6,6 +6,9 @@ import { decode as decodeJpegBytes } from 'jpeg-js';
 import * as loginKey from '#/client/config/loginKey.js';
 import { TARGET } from '#/client/config/target.js';
 import { decodeJpeg } from '#/client/graphics/Jpeg.js';
+import CollisionMap, { BuildArea } from '#/client/dash3d/CollisionMap.js';
+import { CollisionFlag } from '#/client/dash3d/CollisionFlag.js';
+import type World from '#/client/dash3d/World.js';
 
 import type { ClientStreamLike } from '#/client/io/ClientStream.js';
 import type JagFile from '#/client/io/JagFile.js';
@@ -91,19 +94,21 @@ export class RecordedStream implements ClientStreamLike {
     readonly outboundChunks: Uint8Array[] = [];
 
     constructor(login: LoginRecord, inboundFrames: readonly FrameRecord[], protocol: Protocol) {
-        if (login.replies.length !== 2 || login.replies[0] !== 0 || login.replies[1] !== 2) {
+        const reply = login.replies[1];
+        if (login.replies.length !== 2 || login.replies[0] !== 0 || (reply !== 2 && !(reply === 15 && login.reconnect))) {
             throw new Error('replay requires a successful recorded login reply sequence');
         }
 
-        this.loginBytes = new Uint8Array(8 + 1 + SYNTHETIC_LOGIN_SEED.length + 1 + 2);
-        this.loginBytes.fill(0, 0, 8);
+        this.loginBytes = new Uint8Array(8 + 1 + SYNTHETIC_LOGIN_SEED.length + 1 + (reply === 2 ? 2 : 0));
         let loginPos = 8;
         this.loginBytes[loginPos++] = login.replies[0]!;
         this.loginBytes.set(SYNTHETIC_LOGIN_SEED, loginPos);
         loginPos += SYNTHETIC_LOGIN_SEED.length;
-        this.loginBytes[loginPos++] = login.replies[1]!;
-        this.loginBytes[loginPos++] = login.staffmodlevel;
-        this.loginBytes[loginPos] = login.mouseTracked ? 1 : 0;
+        this.loginBytes[loginPos++] = reply;
+        if (reply === 2) {
+            this.loginBytes[loginPos++] = login.staffmodlevel;
+            this.loginBytes[loginPos] = login.mouseTracked ? 1 : 0;
+        }
 
         const serverDescriptors = descriptorMap(protocol.server);
         const packets: Uint8Array[] = [];
@@ -262,17 +267,16 @@ class CacheReplayWorker implements OnDemandWorker {
 
 interface ClientReplayMethods {
     logout(): Promise<void>;
+    lostCon(): Promise<void>;
 }
 
-interface ClientReplayState {
+interface ClientReplayState extends ReplayScene {
     errorLoading: boolean;
     loginAttempt: { done: Promise<void> } | null;
     randomIn: unknown;
     out: { random: unknown };
     localPlayer: object | null;
     statSessionGeneration: number;
-    world: unknown;
-    collision: readonly unknown[];
     onDemand: { remaining(): number } | null;
 }
 
@@ -281,7 +285,7 @@ interface CheckpointReport {
     inboundCount: number;
     frames: number;
     state: CheckpointState;
-    sceneBuild: { world: boolean; collisionLevels: number };
+    sceneBuild: { locCount: number; collisionZoneTiles: number };
 }
 
 interface OpcodeCoverage {
@@ -322,37 +326,62 @@ function clientState(client: object): ClientReplayState {
     return client as unknown as ClientReplayState;
 }
 
-interface SceneInstancedReader {
-    sceneInstanced?: boolean | (() => boolean);
+interface ReplayScene {
+    world: Pick<World, 'wallType' | 'sceneType' | 'gdType' | 'decorType'> | null;
+    collision: readonly (CollisionMap | null)[];
+    sceneInstanced?: boolean;
 }
 
-function sceneInstanced(adapter: object): boolean {
-    const value = (adapter as SceneInstancedReader).sceneInstanced;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'function') return Boolean(value.call(adapter));
-    return false;
-}
-
-function checkpointState(adapter: {
+/** Reads the client-owned instance flag and rejects allocated but unpopulated scene maps. */
+export function readReplayCheckpoint(client: ReplayScene, adapter: {
     ingame(): boolean;
     sceneState(): number;
     serverTile(): CheckpointState['serverTile'] | null;
     mapBuildBase(): { x: number; z: number } | null;
-}): CheckpointState {
+}): Pick<CheckpointReport, 'state' | 'sceneBuild'> {
     const serverTile = adapter.serverTile();
     const base = adapter.mapBuildBase();
     if (!serverTile || !base) {
         throw new Error('replay checkpoint has no adapter server tile or map-build base');
     }
 
-    return {
+    const level = serverTile.level;
+    const collision = client.collision[level];
+    if (!client.world || !collision) throw new Error('replay checkpoint has no world or collision map');
+    const localX = serverTile.x - base.x, localZ = serverTile.z - base.z;
+    if (localX < 1 || localZ < 1 || localX >= BuildArea.SIZE - 1 || localZ >= BuildArea.SIZE - 1) {
+        throw new Error('replay checkpoint player is outside the built scene interior');
+    }
+    let locCount = 0;
+    for (let x = 1; x < BuildArea.SIZE - 1; x++) {
+        for (let z = 1; z < BuildArea.SIZE - 1; z++) {
+            locCount += Number(client.world.wallType(level, x, z) !== 0);
+            locCount += Number(client.world.sceneType(level, x, z) !== 0);
+            locCount += Number(client.world.gdType(level, x, z) !== 0);
+            locCount += Number(client.world.decorType(level, z, x) !== 0);
+        }
+    }
+    let collisionZoneTiles = 0;
+    const zoneX = localX & ~7, zoneZ = localZ & ~7;
+    for (let x = Math.max(1, zoneX); x < Math.min(BuildArea.SIZE - 1, zoneX + 8); x++) {
+        for (let z = Math.max(1, zoneZ); z < Math.min(BuildArea.SIZE - 1, zoneZ + 8); z++) {
+            const flags = collision.flags[CollisionMap.index(x, z)];
+            if (flags !== CollisionFlag._BOUNDS && (flags & CollisionFlag.UNLOADED) === 0 &&
+                (flags & (CollisionFlag.WALK_BLOCK_FLAGS | CollisionFlag.WALK_SCENERY | CollisionFlag.WR_GROUND_DECOR | CollisionFlag.WR_GRND)) !== 0) {
+                collisionZoneTiles++;
+            }
+        }
+    }
+    if (locCount === 0 || collisionZoneTiles === 0) throw new Error('replay checkpoint has no populated world or collision in the player zone');
+    const state: CheckpointState = {
         serverTile,
         sceneState: adapter.sceneState(),
         ingame: adapter.ingame(),
-        sceneInstanced: sceneInstanced(adapter),
+        sceneInstanced: client.sceneInstanced === true,
         mapBuildBaseX: base.x,
         mapBuildBaseZ: base.z
     };
+    return { state, sceneBuild: { locCount, collisionZoneTiles } };
 }
 
 function concatenate(chunks: readonly Uint8Array[]): Uint8Array {
@@ -448,6 +477,7 @@ export async function replayRecording(
         startLogin(username: string, password: string): boolean;
         disposeReplay(): void;
         logoutReplay(): Promise<void>;
+        reconnectReplay(): Promise<void>;
         nextLoginAttempt(): Promise<void>;
     } | null = null;
     let detachAdapter: (() => void) | null = null;
@@ -521,10 +551,20 @@ export async function replayRecording(
                 const attempt = state.loginAttempt;
                 if (!attempt) throw new Error('production login attempt was not created');
                 await attempt.done;
+                this.finishLogin();
+            }
+
+            private finishLogin(): void {
                 if (!reader.ingame()) throw new Error('production login did not reach its successful reply path');
+                const state = clientState(this);
                 state.randomIn = null;
                 state.out.random = null;
                 streams[this.streamIndex - 1]!.beginGame();
+            }
+
+            async reconnectReplay(): Promise<void> {
+                await (this as unknown as ClientReplayMethods).lostCon();
+                this.finishLogin();
             }
 
             async logoutReplay(): Promise<void> {
@@ -573,22 +613,28 @@ export async function replayRecording(
 
         let priorPlayer: object | null = null;
         let priorGeneration = state.statSessionGeneration;
+        let priorSceneState = 0;
         for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
             const segment = segments[segmentIndex]!;
             const stream = streams[segmentIndex]!;
-            if (segmentIndex > 0) {
-                if (!client.startLogin('replay', 'replay')) {
-                    throw new Error('production relogin was rejected');
-                }
+            if (segment.login.replies[1] === 15 && segmentIndex === 0) {
+                throw new Error('replay reconnect reply 15 requires a preceding live scene');
+            }
+            if (segmentIndex > 0 && segment.login.reconnect) {
+                await client.reconnectReplay();
+            } else {
+                if (!client.startLogin('replay', 'replay')) throw new Error('production login was rejected');
                 await client.nextLoginAttempt();
-                if (reader.sceneState() !== 0 || state.statSessionGeneration <= priorGeneration || state.localPlayer === priorPlayer) {
+            }
+            if (segmentIndex > 0) {
+                if (state.statSessionGeneration <= priorGeneration) throw new Error('production login did not advance its session generation');
+                if (segment.login.replies[1] === 15) {
+                    if (reader.sceneState() !== priorSceneState || state.localPlayer !== priorPlayer) {
+                        throw new Error('production reconnect discarded its existing scene');
+                    }
+                } else if (reader.sceneState() !== 0 || state.localPlayer === priorPlayer) {
                     throw new Error('production relogin did not reset the prior session state');
                 }
-            } else {
-                if (!client.startLogin('replay', 'replay')) {
-                    throw new Error('production login was rejected');
-                }
-                await client.nextLoginAttempt();
             }
 
             const inboundCount = stream.inboundFrameCount;
@@ -623,20 +669,16 @@ export async function replayRecording(
                     throw new Error(`replay checkpoint ${checkpoint.label} did not consume its exact inbound count`);
                 }
 
-                const actual = checkpointState(reader);
+                const { state: actual, sceneBuild } = readReplayCheckpoint(state, reader);
                 if (!isDeepStrictEqual(actual, checkpoint.state)) {
                     throw new Error(`replay checkpoint ${checkpoint.label} differs from its captured adapter state`);
-                }
-                const collisionLevels = state.collision.filter(Boolean).length;
-                if (!state.world || collisionLevels === 0) {
-                    throw new Error(`replay checkpoint ${checkpoint.label} has no built world or collision maps`);
                 }
                 checkpointReports.push({
                     label: checkpoint.label,
                     inboundCount: checkpoint.inboundCount,
                     frames,
                     state: actual,
-                    sceneBuild: { world: true, collisionLevels }
+                    sceneBuild
                 });
             }
 
@@ -682,8 +724,13 @@ export async function replayRecording(
             runtimeOutboundChunks = runtimeOutboundChunks.concat(stream.outboundChunks);
             priorPlayer = state.localPlayer;
             priorGeneration = state.statSessionGeneration;
-            await client.logoutReplay();
-            if (reader.ingame()) throw new Error('production logout did not leave the client logged out');
+            priorSceneState = reader.sceneState();
+            if (!segments[segmentIndex + 1]?.login.reconnect) {
+                await client.logoutReplay();
+                if (reader.ingame()) throw new Error('production logout did not leave the client logged out');
+            } else if (!reader.ingame()) {
+                throw new Error('replay reconnect has no live preceding session');
+            }
         }
 
         if (checkpointReports.length === 0) {
@@ -754,7 +801,7 @@ function installSyntheticLoginKey(): () => void {
     return () => { mock.module('#/client/config/loginKey.js', () => previous); };
 }
 
-async function installCanvasMock(): Promise<() => void> {
+export async function installCanvasMock(): Promise<() => void> {
     if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') {
         throw new Error('replay requires happy-dom canvas globals');
     }

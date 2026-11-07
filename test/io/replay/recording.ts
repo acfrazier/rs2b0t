@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
@@ -37,6 +37,9 @@ function parseIndex(text: string): RecordingIndex {
             item.revision <= 0
         ) {
             throw new Error('invalid replay recording index entry');
+        }
+        if (recordings.some(entry => entry.file === item.file)) {
+            throw new Error('duplicate replay recording index entry');
         }
 
         recordings.push({
@@ -84,78 +87,72 @@ function protocolFor(revision: number): Protocol {
     return protocol;
 }
 
-export interface ReplayFixture {
+export interface ReplayRecording {
     readonly recordingFile: string;
     readonly records: RecordingRecord[];
-    readonly cacheBundle: CacheBundle;
     readonly protocol: Protocol;
     readonly indexEntry: RecordingIndex['recordings'][number];
     readonly recordingSha256: string;
+}
+
+export interface ReplayFixture extends ReplayRecording {
+    readonly cacheBundle: CacheBundle;
     readonly cacheSha256: string;
 }
 
-export interface LoadReplayFixtureOptions {
-    /** Index-relative JSONL path; defaults to the first entry for the built client revision. */
-    recordingFile?: string;
-    /** Caller-selected CacheBundle JSON; normally RS2B0T_CACHE_BUNDLE. */
-    cacheBundlePath?: string;
-    /** Tests that already resolved descriptors can avoid loading the local engine. */
-    protocol?: Protocol;
+function readReplayFile(path: string, label: string): Buffer {
+    try {
+        return readFileSync(path);
+    } catch {
+        throw new Error(`replay ${label} is not readable`);
+    }
 }
 
-/** Loads one current-revision recording and authenticates both files against the committed index. */
-export function loadReplayFixture(options: LoadReplayFixtureOptions = {}): ReplayFixture {
-    if (!existsSync(INDEX_PATH)) {
-        throw new Error('test/io/recordings/index.json is missing');
-    }
-
-    const index = parseIndex(readFileSync(INDEX_PATH, 'utf8'));
-    const indexEntry = options.recordingFile
-        ? index.recordings.find(entry => entry.file === options.recordingFile)
-        : index.recordings.find(entry => entry.revision === CLIENT_VERSION);
-    if (!indexEntry) {
-        throw new Error('replay index has no recording for this client');
-    }
-    if (indexEntry.revision !== CLIENT_VERSION) {
-        throw new Error('selected replay recording does not match the built client revision');
-    }
-
-    const recordingPath = resolveRecordingPath(indexEntry.file);
-    const recordingBytes = readFileSync(recordingPath);
-    const recordingSha256 = digest(recordingBytes);
-    if (recordingSha256 !== indexEntry.sha256) {
-        throw new Error('replay recording hash differs from its index');
-    }
-
-    const cachePath = options.cacheBundlePath ?? process.env.RS2B0T_CACHE_BUNDLE;
-    if (!cachePath) {
-        throw new Error('RS2B0T_CACHE_BUNDLE must identify the replay cache JSON');
-    }
-    const cacheBytes = readFileSync(resolve(cachePath));
-    const cacheSha256 = digest(cacheBytes);
-    if (cacheSha256 !== indexEntry.cacheSha256) {
-        throw new Error('replay cache hash differs from the recording index');
-    }
-
-    const records = parseRecording(recordingBytes.toString('utf8'));
-    const cacheBundle = parseCacheBundle(cacheBytes.toString('utf8'));
-    const protocol = options.protocol ?? protocolFor(CLIENT_VERSION);
-    const check = checkRecording(records, protocol, cacheBundle, {
-        recordingSha256,
-        cacheSha256,
-        indexEntry
+/** Authenticates every recording for a revision, without requiring any private cache bytes. */
+export function loadReplayRecordings(revision = CLIENT_VERSION, protocol = protocolFor(revision)): ReplayRecording[] {
+    const index = parseIndex(readReplayFile(INDEX_PATH, 'recording index').toString('utf8'));
+    const entries = index.recordings.filter(entry => entry.revision === revision);
+    if (entries.length === 0) throw new Error('replay index has no recordings for this revision');
+    return entries.map(indexEntry => {
+        const recordingBytes = readReplayFile(resolveRecordingPath(indexEntry.file), 'recording');
+        const recordingSha256 = digest(recordingBytes);
+        const records = parseRecording(recordingBytes.toString('utf8'));
+        const check = checkRecording(records, protocol, undefined, { recordingSha256, indexEntry });
+        if (!check.valid) throw new Error(`recording validation failed: ${check.errors.join(', ')}`);
+        return { recordingFile: indexEntry.file, records, protocol, indexEntry, recordingSha256 };
     });
-    if (!check.valid) {
-        throw new Error(`recording validation failed: ${check.errors.join(', ')}`);
-    }
+}
 
-    return {
-        recordingFile: indexEntry.file,
-        records,
-        cacheBundle,
-        protocol,
-        indexEntry,
-        recordingSha256,
-        cacheSha256
-    };
+/** Resolves each recording's own pinned cache; a directory contains <cacheSha256>.json files. */
+export function loadReplayCaches(recordings: readonly ReplayRecording[], cacheBundlePath: string): ReplayFixture[] {
+    let directory: boolean;
+    try {
+        directory = statSync(cacheBundlePath).isDirectory();
+    } catch {
+        throw new Error('replay cache location is not readable');
+    }
+    const caches = new Map<string, CacheBundle>();
+    return recordings.map(recording => {
+        const cacheSha256 = recording.indexEntry.cacheSha256;
+        let cacheBundle = caches.get(cacheSha256);
+        if (!cacheBundle) {
+            const path = directory ? resolve(cacheBundlePath, `${cacheSha256}.json`) : resolve(cacheBundlePath);
+            const bytes = readReplayFile(path, 'cache bundle');
+            if (digest(bytes) !== cacheSha256) throw new Error('replay cache hash differs from the recording index');
+            cacheBundle = parseCacheBundle(bytes.toString('utf8'));
+            caches.set(cacheSha256, cacheBundle);
+        }
+        const check = checkRecording(recording.records, recording.protocol, cacheBundle, {
+            recordingSha256: recording.recordingSha256, cacheSha256, indexEntry: recording.indexEntry
+        });
+        if (!check.valid) throw new Error(`recording validation failed: ${check.errors.join(', ')}`);
+        return { ...recording, cacheBundle, cacheSha256 };
+    });
+}
+
+/** Loads ALL recordings for the built client, never silently selecting just the first. */
+export function loadReplayFixtures(options: { cacheBundlePath?: string; protocol?: Protocol } = {}): ReplayFixture[] {
+    const cachePath = options.cacheBundlePath ?? process.env.RS2B0T_CACHE_BUNDLE;
+    if (!cachePath) throw new Error('RS2B0T_CACHE_BUNDLE must identify a cache JSON or hash-keyed directory');
+    return loadReplayCaches(loadReplayRecordings(CLIENT_VERSION, options.protocol), cachePath);
 }

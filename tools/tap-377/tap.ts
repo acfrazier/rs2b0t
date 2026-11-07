@@ -72,7 +72,7 @@ interface SocketData {
 type Socket = Bun.ServerWebSocket<SocketData>;
 type ProxyKind = 'unknown' | 'game' | 'ondemand';
 
-class Recorder {
+export class Recorder {
     readonly records: RecordingRecord[] = [];
     readonly failures = new Set<string>();
     readonly seen = { inbound: new Set<string>(), outbound: new Set<string>() };
@@ -109,6 +109,14 @@ class Recorder {
         this.active = segment;
         this.records.push({ ...login, segment: segment.number });
         return segment;
+    }
+
+    lastLogin(): LoginRecord | null {
+        for (let index = this.records.length - 1; index >= 0; index--) {
+            const record = this.records[index];
+            if (record?.type === 'login') return record;
+        }
+        return null;
     }
 
     frame(segment: SegmentState, frame: DecodedFrame): void {
@@ -211,7 +219,7 @@ class Recorder {
     }
 }
 
-class GameConnection {
+export class GameConnection {
     private clientStage: 'handshake' | 'await-seed' | 'login' | 'await-reply' | 'game' | 'failed' = 'handshake';
     private serverStage: 'hello' | 'handshake-reply' | 'seed' | 'login-reply' | 'login-meta' | 'game' | 'failed' = 'hello';
     private handshakeSent = 0;
@@ -312,9 +320,17 @@ class GameConnection {
                 const reply = this.serverControl[0];
                 this.serverControl = this.serverControl.slice(1);
                 this.replies.push(reply);
-                if (reply !== 2) this.reject('game-login-rejected');
-                this.serverStage = 'login-meta';
-                continue;
+                if (reply === 2) {
+                    this.serverStage = 'login-meta';
+                    continue;
+                }
+                if (reply === 15 && this.pendingLogin.reconnect) {
+                    const previousLogin = this.recorder.lastLogin();
+                    this.openGame(previousLogin?.staffmodlevel ?? 0, previousLogin?.mouseTracked ?? false, send);
+                    this.serverStage = 'game';
+                    continue;
+                }
+                this.reject('game-login-rejected');
             }
             if (this.serverStage === 'login-meta') {
                 if (this.serverControl.length < 2) return;

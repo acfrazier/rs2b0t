@@ -35,9 +35,9 @@ TARGET=prod PROD_RSAE="${PROD_RSAE:-65537}" PROD_RSAN="$PROD_RSAN" bun run build
 
 refuse_dummy
 
-# Why: the tap is development-only; a bundle that names it would ship recording code (pitfall 20).
-if grep -l "tap-377" out/*.js >/dev/null 2>&1; then
-    echo "refuse: a tap module name is in the shipped bundles: $(grep -l "tap-377" out/*.js | tr '\n' ' ')" >&2
+# Why: the tap and replay JPEG decoder are development-only and must not ship in product bundles (pitfalls 20 and 26).
+if grep -lE "tap-377|jpeg-js" out/*.js >/dev/null 2>&1; then
+    echo "refuse: a tap or replay JPEG decoder marker is in the shipped bundles: $(grep -lE "tap-377|jpeg-js" out/*.js | tr '\n' ' ')" >&2
     exit 1
 fi
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { constants, createHash, generateKeyPairSync, publicEncrypt } from 'node:crypto';
+import { constants, createHash, generateKeyPairSync, publicEncrypt, type KeyObject } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ import Isaac from '../../src/client/io/Isaac.js';
 import { checkRecording, parseRecording } from '../../tools/tap-377/check-recording.js';
 import { ARCHIVES, type ArchiveName, type Descriptor, type Protocol, type RecordingHeader, type RecordingRecord } from '../../tools/tap-377/format.js';
 import { load377Protocol } from '../../tools/tap-377/protocol.js';
-import { acceptsLoginRequest, archiveForRequest } from '../../tools/tap-377/tap.js';
+import { acceptsLoginRequest, archiveForRequest, GameConnection, Recorder } from '../../tools/tap-377/tap.js';
 import { GameFrameDecoder, OnDemandStream } from '../../tools/tap-377/wire.js';
 import { decryptRsaBlock, readRsaPrivateKey, type RsaPrivateKey } from '../../tools/tap-377/rsa.js';
 
@@ -163,6 +163,118 @@ describe('tap RSA login guard', () => {
     });
 });
 
+describe('tap game connection', () => {
+    test('inherits reconnect metadata and preserves a fragmented first ISAAC frame after reply 15', () => {
+        const initial = syntheticLogin('frtapPlayer');
+        const recorder = new Recorder();
+        const modulusBytes = Math.ceil(initial.privateKey.modulus.toString(16).length / 2);
+        try {
+            const first = new GameConnection(protocol, initial.privateKey, modulusBytes, 'frtap', recorder);
+            const firstIo = prepareGameConnection(first, initial.packet, initial.challenge);
+            firstIo.server(Uint8Array.of(2, 5, 1));
+            first.finish();
+
+            const reconnectReply2 = syntheticLoginPacket(initial.publicKey, 'frtapPlayer', 18);
+            const second = new GameConnection(protocol, initial.privateKey, modulusBytes, 'frtap', recorder);
+            const secondIo = prepareGameConnection(second, reconnectReply2.packet, reconnectReply2.challenge);
+            secondIo.server(Uint8Array.of(2, 1, 0));
+            second.finish();
+
+            const lostCon = syntheticLoginPacket(initial.publicKey, 'frtapPlayer', 18);
+            const third = new GameConnection(protocol, initial.privateKey, modulusBytes, 'frtap', recorder);
+            const thirdIo = prepareGameConnection(third, lostCon.packet, lostCon.challenge);
+            const playerInfo = descriptor(protocol, 'server', 'PLAYER_INFO');
+            const serverSeed = new Int32Array([0x10203040, 0x50607080, 0x12345678, 0x9abcdef0]);
+            for (let index = 0; index < serverSeed.length; index++) serverSeed[index] += 50;
+            const frameBody = Uint8Array.of(0x31, 0x42, 0x53);
+            const wireFrame = encodeGameFrame(new Isaac(serverSeed), playerInfo, frameBody);
+            serverSeed.fill(0);
+            const replyAndFrameByte = concat(Uint8Array.of(15), wireFrame.subarray(0, 1));
+            const frameRemainder = wireFrame.subarray(1);
+            thirdIo.server(replyAndFrameByte);
+            thirdIo.server(frameRemainder);
+            third.finish();
+
+            const logins = recorder.records.filter(record => record.type === 'login');
+            expect(logins).toHaveLength(3);
+            expect(logins[0]).toMatchObject({ replies: [0, 2], staffmodlevel: 5, mouseTracked: true, reconnect: false });
+            expect(logins[1]).toMatchObject({ replies: [0, 2], staffmodlevel: 1, mouseTracked: false, reconnect: true });
+            expect(logins[2]).toMatchObject({ replies: [0, 15], staffmodlevel: 1, mouseTracked: false, reconnect: true });
+
+            const firstFrame = recorder.records.find(record => record.type === 'frame' && record.segment === 3);
+            expect(firstFrame).toEqual({
+                type: 'frame',
+                segment: 3,
+                direction: 'in',
+                tick: 1,
+                ordinal: 1,
+                bytes: Buffer.from(plainFrame(playerInfo, frameBody)).toString('hex')
+            });
+            expect(thirdIo.downstream.slice(-2)).toEqual([replyAndFrameByte, frameRemainder]);
+            expect(concat(...thirdIo.upstream)).toEqual(concat(Uint8Array.of(14, 0), lostCon.packet));
+
+            reconnectReply2.packet.fill(0);
+            reconnectReply2.challenge.fill(0);
+            lostCon.packet.fill(0);
+            lostCon.challenge.fill(0);
+        } finally {
+            initial.packet.fill(0);
+            initial.challenge.fill(0);
+        }
+    });
+
+    test('uses safe fallback metadata and preserves a coalesced first frame for a reply 15 reconnect', () => {
+        const login = syntheticLogin('frtapPlayer', 'pkcs1', 18);
+        const recorder = new Recorder();
+        const modulusBytes = Math.ceil(login.privateKey.modulus.toString(16).length / 2);
+        try {
+            const connection = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+            const io = prepareGameConnection(connection, login.packet, login.challenge);
+            const playerInfo = descriptor(protocol, 'server', 'PLAYER_INFO');
+            const serverSeed = new Int32Array([0x10203040, 0x50607080, 0x12345678, 0x9abcdef0]);
+            for (let index = 0; index < serverSeed.length; index++) serverSeed[index] += 50;
+            const frameBody = Uint8Array.of(0x61, 0x72);
+            const wireFrame = encodeGameFrame(new Isaac(serverSeed), playerInfo, frameBody);
+            serverSeed.fill(0);
+            const replyAndFrame = concat(Uint8Array.of(15), wireFrame);
+            io.server(replyAndFrame);
+            connection.finish();
+
+            expect(recorder.records.find(record => record.type === 'login')).toMatchObject({
+                replies: [0, 15],
+                staffmodlevel: 0,
+                mouseTracked: false,
+                reconnect: true
+            });
+            expect(recorder.records.find(record => record.type === 'frame')).toMatchObject({
+                direction: 'in',
+                tick: 1,
+                bytes: Buffer.from(plainFrame(playerInfo, frameBody)).toString('hex')
+            });
+            expect(io.downstream[io.downstream.length - 1]).toEqual(replyAndFrame);
+        } finally {
+            login.packet.fill(0);
+            login.challenge.fill(0);
+        }
+    });
+
+    test('rejects reply 15 for a non-reconnect login', () => {
+        const login = syntheticLogin('frtapPlayer');
+        const recorder = new Recorder();
+        const modulusBytes = Math.ceil(login.privateKey.modulus.toString(16).length / 2);
+        try {
+            const connection = new GameConnection(protocol, login.privateKey, modulusBytes, 'frtap', recorder);
+            const io = prepareGameConnection(connection, login.packet, login.challenge);
+            expect(() => io.server(Uint8Array.of(15))).toThrow('tap session failed');
+            expect(recorder.failures).toContain('game-login-rejected');
+            expect(recorder.records.some(record => record.type === 'login')).toBe(false);
+        } finally {
+            login.packet.fill(0);
+            login.challenge.fill(0);
+        }
+    });
+});
+
 describe('tap recording checker', () => {
     test('accepts a complete reconnect recording and parses its JSONL form', () => {
         const { records, bundle } = sampleRecording();
@@ -173,6 +285,29 @@ describe('tap recording checker', () => {
         expect(result.segmentCount).toBe(2);
         expect(result.frameCount).toBe(4);
         expect(parseRecording(records.map(record => JSON.stringify(record)).join('\n'))).toEqual(records);
+    });
+
+    test('accepts reply 15 only for reconnect and supports cache-free identity checks', () => {
+        const { records, bundle } = sampleRecording();
+        const lostCon = records.map(record => record.type === 'login' && record.segment === 2
+            ? { ...record, replies: [0, 15] }
+            : record);
+        expect(checkRecording(lostCon, protocol, bundle).valid).toBe(true);
+
+        const invalid = records.map(record => record.type === 'login' && record.segment === 1
+            ? { ...record, replies: [0, 15] }
+            : record);
+        expect(checkRecording(invalid, protocol, bundle).errors).toContain('login-replies');
+
+        const recordingText = records.map(record => JSON.stringify(record)).join('\n') + '\n';
+        const recordingSha256 = createHash('sha256').update(recordingText).digest('hex');
+        const indexEntry = {
+            file: '377/sample.jsonl',
+            revision: protocol.revision,
+            sha256: recordingSha256,
+            cacheSha256: 'd'.repeat(64)
+        };
+        expect(checkRecording(records, protocol, undefined, { recordingSha256, indexEntry }).valid).toBe(true);
     });
 
     test('CLI resolves a nested recording relative to its index and checks both hashes', () => {
@@ -287,9 +422,47 @@ function concat(...parts: readonly Uint8Array[]): Uint8Array {
     return output;
 }
 
-function syntheticLogin(username: string, keyFormat: 'pkcs1' | 'pkcs8' = 'pkcs1'): { privateKey: RsaPrivateKey; packet: Uint8Array; challenge: Uint8Array } {
+function prepareGameConnection(connection: GameConnection, packet: Uint8Array, challenge: Uint8Array): {
+    upstream: Uint8Array[];
+    downstream: Uint8Array[];
+    server(bytes: Uint8Array): void;
+} {
+    const upstream: Uint8Array[] = [];
+    const downstream: Uint8Array[] = [];
+    const sendUpstream = (bytes: Uint8Array): void => { upstream.push(bytes.slice()); };
+    const sendClient = (bytes: Uint8Array): void => { downstream.push(bytes.slice()); };
+    const server = (bytes: Uint8Array): void => connection.handleServer(bytes, sendUpstream, sendClient);
+
+    connection.handleClient(Uint8Array.of(14), sendUpstream);
+    connection.handleClient(Uint8Array.of(0), sendUpstream);
+    const hello = new Uint8Array(8);
+    server(hello.subarray(0, 3));
+    server(hello.subarray(3));
+    server(Uint8Array.of(0));
+    server(challenge);
+    connection.handleClient(packet.subarray(0, 2), sendUpstream);
+    connection.handleClient(packet.subarray(2), sendUpstream);
+    return { upstream, downstream, server };
+}
+
+function syntheticLogin(
+    username: string,
+    keyFormat: 'pkcs1' | 'pkcs8' = 'pkcs1',
+    opcode: 16 | 18 = 16
+): { privateKey: RsaPrivateKey; publicKey: KeyObject; packet: Uint8Array; challenge: Uint8Array } {
     const pair = generateKeyPairSync('rsa', { modulusLength: 1024 });
-    const modulusLength = pair.privateKey.asymmetricKeyDetails?.modulusLength;
+    const pem = Buffer.from(pair.privateKey.export({ format: 'pem', type: keyFormat }));
+    try {
+        const privateKey = readRsaPrivateKey(pem);
+        const { packet, challenge } = syntheticLoginPacket(pair.publicKey, username, opcode);
+        return { privateKey, publicKey: pair.publicKey, packet, challenge };
+    } finally {
+        pem.fill(0);
+    }
+}
+
+function syntheticLoginPacket(publicKey: KeyObject, username: string, opcode: 16 | 18): { packet: Uint8Array; challenge: Uint8Array } {
+    const modulusLength = publicKey.asymmetricKeyDetails?.modulusLength;
     if (!modulusLength || modulusLength % 8 !== 0) throw new Error('synthetic key invalid');
     const modulusBytes = modulusLength / 8;
     const challenge = Uint8Array.from([0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0]);
@@ -308,14 +481,14 @@ function syntheticLogin(username: string, keyFormat: 'pkcs1' | 'pkcs8' = 'pkcs1'
     plaintext.set(identity, modulusBytes - identity.length);
     let encrypted: Buffer;
     try {
-        encrypted = publicEncrypt({ key: pair.publicKey, padding: constants.RSA_NO_PADDING }, plaintext);
+        encrypted = publicEncrypt({ key: publicKey, padding: constants.RSA_NO_PADDING }, plaintext);
     } finally {
         plaintext.fill(0);
         identity.fill(0);
         seedWords.fill(0);
     }
     const packet = Buffer.alloc(43 + encrypted.length);
-    packet[0] = 16;
+    packet[0] = opcode;
     packet[1] = packet.length - 2;
     packet[2] = 0xff;
     packet[3] = 0x01;
@@ -324,9 +497,7 @@ function syntheticLogin(username: string, keyFormat: 'pkcs1' | 'pkcs8' = 'pkcs1'
     packet[42] = encrypted.length;
     encrypted.copy(packet, 43);
     encrypted.fill(0);
-    const pem = Buffer.from(pair.privateKey.export({ format: 'pem', type: keyFormat }));
-    try { return { privateKey: readRsaPrivateKey(pem), packet, challenge }; }
-    finally { pem.fill(0); }
+    return { packet, challenge };
 }
 
 function sampleRecording(): { records: RecordingRecord[]; bundle: { format: 1; archives: Record<ArchiveName, string>; ondemand: Record<string, string> } } {

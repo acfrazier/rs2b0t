@@ -1,11 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { engineLoginKey } from '../lib/engineLoginKey.js';
-import { cycles, installObserver, observe, quiescent, type CaptureSnapshot } from './capture-page.js';
+import { assertNoForeignPlayer, cycles, installObserver, observe, quiescent, type CaptureSnapshot } from './capture-page.js';
 import { assertCaptureFrames, captureScenario, type Scenario, type ScenarioContext } from './capture-scenarios.js';
 import { startTap, type TapSession } from '../../tools/tap-377/tap.js';
 import { loadEngineProtocol } from '../../tools/tap-377/protocol.js';
@@ -49,9 +50,8 @@ function options(): Options {
     };
 }
 
-async function referenceAssets(engineDir: string, output: string): Promise<(request: Request) => Promise<Response | undefined>> {
-    const build = join(output, 'browser');
-    const key = engineLoginKey(engineDir); // Read in place; only the public half enters the browser build.
+async function referenceAssets(engineDir: string, build: string): Promise<(request: Request) => Promise<Response | undefined>> {
+    const key = engineLoginKey(engineDir); // Read in place; only the public half enters the temporary browser build.
     const child = Bun.spawn([process.execPath, 'bot.bundle.ts', 'dev'], {
         cwd: ROOT, env: { ...process.env, TARGET: 'local', STRICT_PACKETS: '1', STRICT_CONFIG: '1', B0T_OUT_DIR: build, LOCAL_RSAE: key.rsae, LOCAL_RSAN: key.rsan },
         stdout: 'ignore', stderr: 'ignore'
@@ -94,6 +94,7 @@ export async function capture(options: Options): Promise<void> {
     const secret = randomBytes(8).toString('hex');
     const steps: { label: string; details?: Record<string, unknown> }[] = [];
     let browser: Browser | undefined, page: Page | undefined, tap: TapSession | undefined;
+    let browserBuild: string | undefined;
     let stage = 'initialization', succeeded = false;
     let failure: { name: string; message?: string } | undefined;
     let failureState: CaptureSnapshot | undefined;
@@ -103,7 +104,11 @@ export async function capture(options: Options): Promise<void> {
         if (protocol.revision !== (options.scenario === 'reference' ? 289 : 377)) throw new Error('capture scenario and engine revisions differ');
         const playerInfo = protocol.server.find(packet => packet.name === 'PLAYER_INFO');
         if (!playerInfo) throw new Error('capture protocol has no PLAYER_INFO descriptor');
-        const requestHandler = options.scenario === 'reference' ? await referenceAssets(options.engineDir, options.output) : undefined;
+        let requestHandler: ((request: Request) => Promise<Response | undefined>) | undefined;
+        if (options.scenario === 'reference') {
+            browserBuild = mkdtempSync(join(tmpdir(), 'frtap-capture-browser-'));
+            requestHandler = await referenceAssets(options.engineDir, browserBuild);
+        }
         const mainlandAccount = await approvedAccountHelper(options.harnessLib);
         stage = 'tap-start';
         tap = await startTap({
@@ -130,20 +135,26 @@ export async function capture(options: Options): Promise<void> {
                 await activePage.screenshot({ path: join(options.output, `${label}.png`) });
             }
         });
+        assertNoForeignPlayer(await observe(activePage));
+
         if (pageErrors) throw new Error('capture browser reported an uncaught error');
         stage = 'cache-drain';
         const pendingBefore = tap.diagnostics.pendingCounts;
         const drainDeadline = Date.now() + 30_000;
         while (true) {
+            assertNoForeignPlayer(await observe(activePage));
+
             const diagnostics = tap.diagnostics;
             if (diagnostics.failures.length) throw new Error('capture tap failed before finalization');
             if (Object.values(diagnostics.pendingCounts).every(count => count === 0)) break;
             if (Date.now() >= drainDeadline) throw new Error('capture cache stream did not drain');
-            await cycles(page, 1);
+            await cycles(activePage, 1);
         }
         steps.push({ label: 'cache-drained', details: { pendingBefore, pendingAfter: tap.diagnostics.pendingCounts } });
         stage = 'finalization';
-        await tap.finalize();
+        assertNoForeignPlayer(await observe(activePage));
+        await activeTap.finalize();
+        assertNoForeignPlayer(await observe(activePage));
         assertCaptureFrames(options.scenario, tap.records, protocol);
         succeeded = true;
     } catch (error) {
@@ -151,8 +162,15 @@ export async function capture(options: Options): Promise<void> {
         // A failed scene may contain another account. Retain only the allowlisted state, never a failure screenshot.
         if (page) failureState = await observe(page).catch(() => undefined);
     } finally {
-        await browser?.close();
-        await tap?.close();
+        try {
+            await browser?.close();
+        } finally {
+            try {
+                await tap?.close();
+            } finally {
+                if (browserBuild) rmSync(browserBuild, { recursive: true, force: true });
+            }
+        }
         const receipt = {
             status: succeeded ? 'passed' : 'failed', scenario: options.scenario, accountPrefix: options.accountPrefix, account: username,
             clientCommit: options.clientCommit, contentCommit: options.contentCommit, stage, failure, failureState, pageErrors, steps,

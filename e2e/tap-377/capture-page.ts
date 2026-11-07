@@ -148,6 +148,11 @@ export async function observe(page: Page): Promise<CaptureSnapshot> {
     });
 }
 
+export function assertNoForeignPlayer(snapshot: CaptureSnapshot): void {
+    if (snapshot.foreignPlayer) throw new Error('capture refused: a player outside the account prefix entered the scene');
+}
+
+
 export function sameQuiescentState(a: CaptureSnapshot, b: CaptureSnapshot): boolean {
     return a.state.ingame && b.state.ingame && a.state.sceneState === 2 && b.state.sceneState === 2 &&
         !a.moving && !b.moving && a.remaining === 0 && b.remaining === 0 &&
@@ -171,7 +176,7 @@ export async function quiescent(page: Page, timeout = 60_000): Promise<CaptureSn
     while (Date.now() < deadline) {
         await cycles(page, 1);
         const current = await observe(page);
-        if (current.foreignPlayer) throw new Error('capture refused: a player outside the account prefix entered the scene');
+        assertNoForeignPlayer(current);
         if (current.packetFailure) throw new Error('capture refused: packet handler failed');
         if (!sameQuiescentState(anchor, current)) anchor = current;
         else if (current.tick - anchor.tick >= 5) return current;

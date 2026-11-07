@@ -44,10 +44,10 @@ function engineRevision(engineDir: string): number | null {
 function engineWhy(): string | null {
     const dir = (process.env.ENGINE_DIR ?? '').trim();
     if (!dir) return 'ENGINE_DIR is unset';
-    if (!existsSync(dir)) return `ENGINE_DIR ${dir} does not exist`;
+    if (!existsSync(dir)) return 'ENGINE_DIR does not exist';
     const engine = engineRevision(dir);
     const committed = committedRevision();
-    if (engine === null) return `${dir} has no readable engine revision`;
+    if (engine === null) return 'ENGINE_DIR has no readable engine revision';
     if (committed === null) return 'src/client/io/ClientProt.ts has no CLIENT_VERSION';
     if (engine !== committed) return `engine is revision ${engine}, the committed client is ${committed}`;
     return null;
@@ -63,7 +63,7 @@ function contentWhy(): string | null {
 function cacheBundleWhy(): string | null {
     const dir = (process.env.RS2B0T_CACHE_BUNDLE ?? '').trim();
     if (!dir) return 'RS2B0T_CACHE_BUNDLE is unset';
-    if (!existsSync(dir)) return `${dir} does not exist`;
+    if (!existsSync(dir)) return 'RS2B0T_CACHE_BUNDLE does not exist';
     return null;
 }
 

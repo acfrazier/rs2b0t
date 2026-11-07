@@ -78,7 +78,7 @@ export function parseCacheBundle(text: string): CacheBundle {
 export function checkRecording(
     records: readonly RecordingRecord[],
     protocol: Protocol,
-    cacheBundle: CacheBundle,
+    cacheBundle: CacheBundle | undefined = undefined,
     expected: CheckOptions = {}
 ): CheckRecordingResult {
     const errors = new Set<string>();
@@ -120,7 +120,7 @@ export function checkRecording(
         }
     }
 
-    validateCache(cacheBundle, header, expected, errors);
+    if (cacheBundle !== undefined) validateCache(cacheBundle, header, errors);
     validateIdentity(expected, header, errors);
 
     const clientById = new Map(safeProtocol?.client.map(entry => [entry.id, entry]) ?? []);
@@ -284,11 +284,12 @@ function validateHeader(
 
 function validateLogin(record: RecordingRecord & { type: 'login' }, errors: Set<string>): void {
     if (!Number.isSafeInteger(record.segment) || record.segment < 1) errors.add('login-segment');
+    const lastReply = Array.isArray(record.replies) ? record.replies[record.replies.length - 1] : undefined;
     if (
         !Array.isArray(record.replies) ||
         record.replies.length < 2 ||
         record.replies[0] !== 0 ||
-        record.replies[record.replies.length - 1] !== 2 ||
+        (lastReply !== 2 && !(record.reconnect === true && lastReply === 15)) ||
         record.replies.some(reply => !Number.isInteger(reply) || reply < 0 || reply > 255)
     ) {
         errors.add('login-replies');
@@ -340,7 +341,6 @@ function validateCheckpoint(
 function validateCache(
     bundle: CacheBundle,
     header: (RecordingRecord & { type: 'header' }) | null,
-    expected: CheckOptions,
     errors: Set<string>
 ): void {
     if (!isObject(bundle)) {
@@ -373,7 +373,6 @@ function validateCache(
         const bytes = decodeBase64(encoded, errors, 'cache-ondemand-base64');
         if (bytes && bytes.length < 2) errors.add('cache-ondemand-size');
     }
-    if (expected.cacheSha256 !== undefined && !SHA256.test(expected.cacheSha256)) errors.add('cache-sha-format');
 }
 
 function validateIdentity(
@@ -381,6 +380,7 @@ function validateIdentity(
     header: (RecordingRecord & { type: 'header' }) | null,
     errors: Set<string>
 ): void {
+    if (expected.cacheSha256 !== undefined && !SHA256.test(expected.cacheSha256)) errors.add('cache-sha-format');
     const entry = expected.indexEntry;
     if (entry) {
         try {
