@@ -1465,7 +1465,7 @@ export class Client extends GameShell {
                 if ((this.onDemand.getModelUse(req.file) & 0x62) != 0) {
                     this.redrawSide = true;
 
-                    if (this.chatModalId !== -1) {
+                    if (this.chatModalId !== -1 || this.tutComId !== -1) {
                         this.redrawChat = true;
                     }
                 }
@@ -10698,9 +10698,6 @@ export class Client extends GameShell {
             com.text = text;
             if (com.layerId === this.sideIcon[this.activeIcon]) {
                 this.redrawSide = true;
-            }
-            if (com.layerId === this.chatModalId || this.chatModalId === comId || com.layerId === this.tutComId || this.tutComId === comId) {
-                this.redrawChat = true;
             }
         }
         this.ptype = -1;

@@ -260,6 +260,21 @@ describe('onDemandLoop null completions (Java 377 updateOnDemand 2535-2578)', ()
         expect(c['mapBuildGroundData']![1]).toBe(data);
     });
 
+    test('model-load flags redraw sticky chatback (Java Client.java:2541-2547)', async () => {
+        const saved = Model.meta;
+        Model.meta = [];
+        try {
+            const c = requests(req(0, 42, null));
+            Object.assign(c['onDemand']!, { getModelUse: (): number => 0x62 });
+            c['chatModalId'] = -1;
+            c['tutComId'] = 123;
+            await c.onDemandLoop();
+            expect(c['redrawSide']).toBe(true);
+            expect(c['redrawChat']).toBe(true);
+        } finally {
+            Model.meta = saved;
+        }
+    });
     test('null model data installs empty metadata so the model counts as ready', async () => {
         const saved = Model.meta;
         Model.meta = [];

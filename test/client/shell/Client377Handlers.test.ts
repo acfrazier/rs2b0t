@@ -143,11 +143,12 @@ function writeG4Alt1(packet: Packet, value: number): void {
     packet.data[packet.pos++] = (unsigned >>> 24) & 0xff;
 }
 
-test('IF handlers apply transformed text, colour and packed rotation values', () => {
+test('IF_SETTEXT updates text and the selected sidebar only (Java Client.java:8540-8551)', () => {
     IfType.list = [];
     const component = IfType.list[100] = new IfType();
     const client = clientFixture();
     component.layerId = 0x1234;
+    client['sideIcon'][0] = 0x1234;
     client['tutComId'] = 0x1234;
 
     const text = packet();
@@ -157,7 +158,8 @@ test('IF handlers apply transformed text, colour and packed rotation values', ()
     expect(client['handleIfSetText']()).toBe(true);
     expectConsumed(client);
     expect(component.text).toBe('Welcome');
-    expect(client['redrawChat']).toBe(true);
+    expect(client['redrawSide']).toBe(true);
+    expect(client['redrawChat']).toBe(false);
 
     const colour = packet();
     colour.p2(100);
