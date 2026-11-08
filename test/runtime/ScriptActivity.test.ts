@@ -5,6 +5,7 @@ import { ScriptRunner } from '#/bot/runtime/ScriptRunner.js';
 import { Scheduler } from '#/bot/runtime/Scheduler.js';
 import { ScriptContext, ScriptAborted } from '#/bot/runtime/ScriptContext.js';
 import { Execution } from '#/bot/api/execution/Execution.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 const host = () => new ScriptActivity(() => {});
 afterEach(() => { ScriptRunner.stop('test cleanup'); Scheduler.active = null; });
@@ -91,7 +92,7 @@ test('death interruption unwinds pending child work without aborting the parent'
 });
 
 test('standalone owned completion still stops the script runner', async () => {
-    ScriptRunner.start({name:'finishing',description:'',create:()=>new class extends LoopingBot {
+    ScriptRunner.start({name:'finishing',description:'',revision:CLIENT_VERSION,create:()=>new class extends LoopingBot {
         override onStart() { this.requestFinish('complete'); }
         loop() { throw new Error('must not loop'); }
     }()});

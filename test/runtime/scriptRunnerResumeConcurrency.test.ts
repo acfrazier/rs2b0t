@@ -4,6 +4,7 @@ import { LoopingBot } from '#/bot/api/bot/Bot.js';
 import { Execution } from '#/bot/api/execution/Execution.js';
 import { BotHost } from '#/bot/runtime/BotHost.js';
 import { ScriptRunner } from '#/bot/runtime/ScriptRunner.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 /** Counts how many loop bodies are inside the parked await at once. */
 class ParkedLoopBot extends LoopingBot {
@@ -70,6 +71,7 @@ test('a resume does not start a second loop on top of the one still parked', asy
     ScriptRunner.start({
         name: 'Parked loop probe',
         description: 'resume concurrency regression fixture',
+        revision: CLIENT_VERSION,
         create: () => bot
     });
     await settle();
@@ -111,6 +113,7 @@ test('a resume still frees a loop wedged on a promise the scheduler does not own
     ScriptRunner.start({
         name: 'Wedged loop probe',
         description: 'resume deadlock regression fixture',
+        revision: CLIENT_VERSION,
         create: () => bot
     });
     await settle();

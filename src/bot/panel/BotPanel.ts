@@ -8,7 +8,7 @@ import { boxId, boxKey, wallLinkHref } from '../runtime/box.js';
 import { Credentials } from '../runtime/Credentials.js';
 import { ScriptRegistry, type ScriptMeta } from '../runtime/ScriptRegistry.js';
 import { resolveDestination } from '../api/map/WalkDestinations.js';
-import { ScriptRunner } from '../runtime/ScriptRunner.js';
+import { ScriptRunner, scriptAdmissionReason } from '../runtime/ScriptRunner.js';
 import { GLOBAL_SETTINGS_CORE, NAV_SETTINGS, SettingsStore } from '../runtime/Settings.js';
 import ScriptLibrary from './ScriptLibrary.js';
 import ParamsModal from './ParamsModal.js';
@@ -40,6 +40,8 @@ export default class BotPanel {
     private pauseBtn: HTMLButtonElement;
     private stopBtn: HTMLButtonElement;
     private scriptStatus: HTMLElement;
+    private admissionWarning: HTMLElement;
+    private unqualifiedStartBtn: HTMLButtonElement;
     private logBox: HTMLElement;
     private unsubLog: (() => void) | null = null;
     private settingsBox: HTMLElement;
@@ -103,9 +105,13 @@ export default class BotPanel {
         pick.appendChild(this.scriptName);
         this.browseBtn = button(pick, 'Browse…', () => this.library.open());
         script.appendChild(pick);
+        this.admissionWarning = el('div', 'rs2b0t-banner rs2b0t-banner-warn rs2b0t-admission-warning');
+        this.admissionWarning.hidden = true;
+        script.appendChild(this.admissionWarning);
 
         const buttons = el('div', 'rs2b0t-buttons');
         this.startBtn = button(buttons, 'Start', () => this.startSelectedScript());
+        this.unqualifiedStartBtn = button(buttons, 'Run unqualified', () => this.handleStart(false, true));
         this.pauseBtn = button(buttons, 'Pause', () => this.handlePause());
         this.stopBtn = button(buttons, 'Stop', () => this.stopScript());
         script.appendChild(buttons);
@@ -176,6 +182,7 @@ export default class BotPanel {
         ScriptRegistry.onChange(() => {
             this.ensureSelection();
             this.renderSettings();
+            this.renderScriptControls();
         });
 
         const status = el('div', 'rs2b0t-section');
@@ -525,7 +532,7 @@ export default class BotPanel {
         return sec;
     }
 
-    private handleStart(rethrow = false): void {
+    private handleStart(rethrow = false, runUnqualified = false): void {
         const meta = ScriptRegistry.get(this.selectedScript);
         if (!meta) {
             return;
@@ -533,8 +540,13 @@ export default class BotPanel {
 
         this.paramsModal.close();
         try {
-            this.runner.start(meta);
+            this.runner.start(meta, runUnqualified ? { runUnqualified: true } : undefined);
         } catch (err) {
+            const admissionReason = scriptAdmissionReason(meta);
+            if (admissionReason) {
+                this.admissionWarning.textContent = `Warning: ${admissionReason} Use Run unqualified only if you accept this mismatch.`;
+                this.admissionWarning.hidden = false;
+            }
             if (rethrow) throw err;
             console.error('[rs2b0t] start failed', err);
             return;
@@ -557,8 +569,16 @@ export default class BotPanel {
     private renderScriptControls(): void {
         const state = this.runner.state;
         const active = state === 'running' || state === 'paused' || state === 'stopping';
+        const meta = ScriptRegistry.get(this.selectedScript);
+        const admissionReason = meta ? scriptAdmissionReason(meta) : null;
+        this.admissionWarning.hidden = !admissionReason;
+        this.admissionWarning.textContent = admissionReason
+            ? `Warning: ${admissionReason} Use Run unqualified only if you accept this mismatch.`
+            : '';
 
         this.startBtn.disabled = this.worldSwitchPending || this.scriptChangePending || active;
+        this.unqualifiedStartBtn.hidden = !admissionReason || active;
+        this.unqualifiedStartBtn.disabled = this.worldSwitchPending || this.scriptChangePending || active;
         this.pauseBtn.disabled = this.worldSwitchPending || !(state === 'running' || state === 'paused');
         this.pauseBtn.textContent = state === 'paused' ? 'Resume' : 'Pause';
         this.stopBtn.disabled = !active || state === 'stopping';

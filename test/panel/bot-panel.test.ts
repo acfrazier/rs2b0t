@@ -6,6 +6,7 @@ import { ScriptRunner } from '#/bot/runtime/ScriptRunner.js';
 import BotPanel from '#/bot/panel/BotPanel.js';
 import { TARGET, resolveTarget } from '#/client/config/target.js';
 import { attach, detach } from '#/bot/adapter/ClientAdapter.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 // Why: the URL is process-global and `boxId()` reads it per call, so a `?box=alice` left behind re-namespaces every later `boxKey()` in the run.
 const setURL = (url: string): void =>
@@ -123,6 +124,7 @@ test('wall start and stop use the script selected in the bot panel', async () =>
     ScriptRegistry.register({
         name,
         description: 'test fixture',
+        revision: CLIENT_VERSION,
         create: () => {
             const bot = new SelectedBot();
             instances.push(bot);
@@ -176,7 +178,7 @@ test('a pending world switch blocks panel and wall script starts until cancelled
     const name = 'World switch start gate';
     let starts = 0;
     class SelectedBot extends LoopingBot { override loop(): void {} }
-    ScriptRegistry.register({ name, description: 'test fixture', create: () => { starts++; return new SelectedBot(); } });
+    ScriptRegistry.register({ name, description: 'test fixture', revision: CLIENT_VERSION, create: () => { starts++; return new SelectedBot(); } });
     localStorage.setItem('rs2b0t:selectedScript', name);
     const root = document.createElement('div');
     const host = { selfTestMissing: [], addDrawListener: () => {} } as unknown as BotHostImpl;
@@ -229,8 +231,8 @@ test('local status and wall link preserve a custom engine node despite an unused
 test.each(['local', 'session'])('restores a NatureCrafter selection from %s storage as JiveRC', async layer => {
     const previous = ScriptRegistry.get('JiveRC');
     class SelectedBot extends LoopingBot { override loop(): void {} }
-    ScriptRegistry.register({ name: 'Legacy selection fallback', description: 'test fixture', create: () => new SelectedBot() });
-    ScriptRegistry.register({ name: 'JiveRC', description: 'test fixture', create: () => new SelectedBot() });
+    ScriptRegistry.register({ name: 'Legacy selection fallback', description: 'test fixture', revision: CLIENT_VERSION, create: () => new SelectedBot() });
+    ScriptRegistry.register({ name: 'JiveRC', description: 'test fixture', revision: CLIENT_VERSION, create: () => new SelectedBot() });
     localStorage.clear();
     sessionStorage.clear();
     const storage = layer === 'local' ? localStorage : sessionStorage;
