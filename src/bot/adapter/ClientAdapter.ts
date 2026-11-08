@@ -193,6 +193,32 @@ export function resolveLocModelExtents(
     return null;
 }
 
+/**
+ * Model extents from the placed (base) LocType.
+ * Why: ClientLocAnim.getTempModel resolves the morph child, and plan §1.5 keeps hull height and radius on the base.
+ */
+function locTypeModelExtents(lt: LocType): { minY: number; maxY: number; radius: number } | null {
+    try {
+        const built = lt.getModel(0, 0, 0, 0, 0, 0, -1) as unknown;
+        if (!built || typeof built !== 'object') {
+            return null;
+        }
+        const src = built as ModelSource & { minY?: number; maxY?: number; radius?: number };
+        if (typeof src.getTempModel === 'function' || src instanceof Model) {
+            const fromSource = resolveLocModelExtents(src);
+            if (fromSource) {
+                return fromSource;
+            }
+        }
+        if (typeof src.minY === 'number') {
+            return { minY: src.minY, maxY: src.maxY ?? 0, radius: src.radius ?? 0 };
+        }
+    } catch {
+        return null;
+    }
+    return null;
+}
+
 /** Java REBUILD_REGION 26-bit template: srcLevel 24..25, srcZoneX 14..23, srcZoneZ 3..13, rotation 1..2. Absent is -1. */
 function unpackSceneTemplate(bits: number): { srcLevel: number; rotation: number; srcZoneX: number; srcZoneZ: number } | null {
     if (bits === -1) {
@@ -846,7 +872,9 @@ export const reader = {
                         }
                     }
                 }
-                const model = resolveLocModelExtents(modelSrc);
+                // Why: name/ops come from the morph child; hull height and radius stay on the base LocType.
+                const morphing = lt.multiloc.length > 0;
+                const model = morphing ? locTypeModelExtents(lt) : (resolveLocModelExtents(modelSrc) ?? locTypeModelExtents(lt));
                 // resizey is a % scale (128 = 100%), not a height, never use it as topH.
                 topH = locHullHeight(model, 128);
                 if (

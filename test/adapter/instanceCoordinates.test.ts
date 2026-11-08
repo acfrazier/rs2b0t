@@ -1,13 +1,21 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import { attach, detach, invalidateLocSnapshots, reader } from '#/bot/adapter/ClientAdapter.js';
+import { GroundItem } from '#/bot/api/model/GroundItem.js';
+import { Loc } from '#/bot/api/model/Loc.js';
+import { Navigator } from '#/bot/event/webwalk/Navigator.js';
 import { Input } from '#/bot/input/Input.js';
 import LocType from '#/client/config/LocType.js';
 import NpcType from '#/client/config/NpcType.js';
 import ClientNpc from '#/client/dash3d/ClientNpc.js';
 import ClientPlayer from '#/client/dash3d/ClientPlayer.js';
+import CollisionMap from '#/client/dash3d/CollisionMap.js';
 import WorldRegion from '#/client/dash3d/WorldRegion.js';
+import { ClientProt } from '#/client/io/ClientProt.js';
+import { writeLocOp, writeObjOp } from '#/client/io/gameOutbound.js';
+import Packet from '#/client/io/Packet.js';
 import { Int32Array3d } from '#/client/util/Arrays.js';
+import { installCanvasMock } from '../io/replay/runtime.js';
 
 const origLocList = LocType.list;
 
@@ -180,5 +188,176 @@ describe('templateSource', () => {
         expect(reader.templateSource(-1, 0)).toBeNull();
         expect(reader.templateSource(1, 8)).toBeNull();
         expect(reader.templateSource(0, 0)).not.toBeNull();
+    });
+});
+
+type NavProbe = {
+    state: string;
+    worker: { postMessage: (message: { id: number }) => void } | null;
+    failReason: string;
+    onMessage: (message: { type: string; id: number; ok: boolean; reason: string; expanded: number }) => void;
+};
+
+describe('webwalk suspended in an instance', () => {
+    test('Navigator.findPath submits no worker request while sceneInstanced is true', async () => {
+        const nav = Navigator as unknown as NavProbe;
+        const previous = { state: nav.state, worker: nav.worker, failReason: nav.failReason };
+        let sent = 0;
+        try {
+            attach({
+                sceneInstanced: true,
+                sceneMapRegion: emptyRegion(),
+                mapBuildBaseX: 6632,
+                mapBuildBaseZ: 48,
+                minusedlevel: 0
+            } as never);
+            nav.state = 'ready';
+            nav.worker = {
+                postMessage(message) {
+                    sent++;
+                    queueMicrotask(() => nav.onMessage({ type: 'path', id: message.id, ok: false, reason: 'intercepted', expanded: 0 }));
+                }
+            };
+            const result = await Navigator.findPath({ x: 6680, z: 100, level: 0 }, { x: 6681, z: 100, level: 0 }, { state: {} as never });
+            expect(sent).toBe(0);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.reason).toBe('webwalk suspended in instanced scene');
+            }
+        } finally {
+            nav.state = previous.state;
+            nav.worker = previous.worker;
+            nav.failReason = previous.failReason;
+        }
+    });
+
+    test('Navigator.findPath still submits when the scene is not instanced', async () => {
+        const nav = Navigator as unknown as NavProbe;
+        const previous = { state: nav.state, worker: nav.worker, failReason: nav.failReason };
+        let sent = 0;
+        try {
+            attach({
+                sceneInstanced: false,
+                sceneMapRegion: emptyRegion(),
+                mapBuildBaseX: 2944,
+                mapBuildBaseZ: 3320,
+                minusedlevel: 0
+            } as never);
+            nav.state = 'ready';
+            nav.worker = {
+                postMessage(message) {
+                    sent++;
+                    queueMicrotask(() => nav.onMessage({ type: 'path', id: message.id, ok: false, reason: 'intercepted', expanded: 0 }));
+                }
+            };
+            const result = await Navigator.findPath({ x: 3220, z: 3220, level: 0 }, { x: 3221, z: 3220, level: 0 }, { state: {} as never });
+            expect(sent).toBe(1);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.reason).toBe('intercepted');
+            }
+        } finally {
+            nav.state = previous.state;
+            nav.worker = previous.worker;
+            nav.failReason = previous.failReason;
+        }
+    });
+});
+
+describe('instance world-local-outbound round trip', () => {
+    const BASE_X = 6632;
+    const BASE_Z = 48;
+    const LOC_TYPECODE = (2 << 29) | (7 << 14) | 1;
+    const OBJ_ID = 995;
+
+    test('Loc.interact, GroundItem.interact and Input.walk use production writers with mapBuildBase', async () => {
+        const region = emptyRegion();
+        region[0]![1]![1] = packTemplate(2, 400, 401, 1);
+        LocType.list = ((id: number) => ({ name: `loc${id}`, op: ['Open'], multiloc: [] })) as unknown as typeof LocType.list;
+        const restoreCanvas = await installCanvasMock();
+        // Canvas.js binds at import time, so Client cannot be a static import: the mock has to land first.
+        const { Client } = await import('#/client/shell/Client.js');
+        try {
+            const probe = new Client(undefined as never, undefined as never, undefined as never) as unknown as {
+                collision: (CollisionMap | null)[];
+                mapBuildBaseX: number;
+                mapBuildBaseZ: number;
+                minusedlevel: number;
+                keyHeld: number[];
+                out: Packet;
+                ingame: boolean;
+                sceneInstanced: boolean;
+                sceneMapRegion: Int32Array[][];
+                var: number[];
+                localPlayer: ClientPlayer | null;
+                world: unknown;
+            };
+            probe.collision[0] = new CollisionMap();
+            probe.collision[0]!.flags.fill(0);
+            probe.mapBuildBaseX = BASE_X;
+            probe.mapBuildBaseZ = BASE_Z;
+            probe.minusedlevel = 0;
+            probe.keyHeld[5] = 1;
+            probe.out.pos = 0;
+            probe.ingame = true;
+            probe.sceneInstanced = true;
+            probe.sceneMapRegion = region;
+            probe.localPlayer = new ClientPlayer();
+            probe.localPlayer.routeX[0] = 48;
+            probe.localPlayer.routeZ[0] = 52;
+            probe.localPlayer.x = 48 << 7;
+            probe.localPlayer.z = 52 << 7;
+            probe.world = {
+                wallType: () => 0,
+                sceneType: (_level: number, x: number, z: number) => (x === 10 && z === 11 ? LOC_TYPECODE : 0),
+                gdType: () => 0,
+                decorType: () => 0,
+                typeCode2: () => 0
+            };
+            expect(attach(probe)).not.toContain('tryMove');
+            expect(reader.sceneInstanced()).toBe(true);
+            expect(reader.templateSource(10, 11, 0)).toMatchObject({ srcZoneX: 400, srcZoneZ: 401, rotation: 1 });
+            expect(reader.toLocal(BASE_X + 10, BASE_Z + 11)).toEqual({ lx: 10, lz: 11 });
+
+            const locSnap = reader.locs()[0];
+            expect(locSnap?.tile).toEqual({ x: BASE_X + 10, z: BASE_Z + 11, level: 0 });
+            probe.out.pos = 0;
+            expect(new Loc(locSnap!).interact('Open')).toBe(true);
+            const locSent = Buffer.from(probe.out.data.subarray(0, probe.out.pos)).toString('hex');
+            const locExpected = new Packet(new Uint8Array(16));
+            writeLocOp(locExpected, ClientProt.OPLOC1, 1, BASE_X + 10, BASE_Z + 11, 7);
+            expect(locSent.endsWith(Buffer.from(locExpected.data.subarray(0, locExpected.pos)).toString('hex'))).toBe(true);
+
+            probe.out.pos = 0;
+            expect(
+                new GroundItem({
+                    id: OBJ_ID,
+                    name: 'Coins',
+                    count: 1,
+                    ops: ['Take', null, null, null, null],
+                    tile: { x: BASE_X + 12, z: BASE_Z + 13, level: 0 },
+                    distance: 1
+                }).interact('Take')
+            ).toBe(true);
+            const objSent = Buffer.from(probe.out.data.subarray(0, probe.out.pos)).toString('hex');
+            const objExpected = new Packet(new Uint8Array(16));
+            writeObjOp(objExpected, ClientProt.OPOBJ1, 1, BASE_X + 12, BASE_Z + 13, OBJ_ID);
+            expect(objSent.endsWith(Buffer.from(objExpected.data.subarray(0, objExpected.pos)).toString('hex'))).toBe(true);
+
+            probe.out.pos = 0;
+            expect(Input.walk(49, 52)).toBe(true);
+            const walk = new Packet(probe.out.data.subarray(0, probe.out.pos));
+            expect(walk.g1()).toBe(ClientProt.MOVE_GAMECLICK & 0xff);
+            walk.g1();
+            const x = walk.g2_alt3();
+            walk.g1();
+            const z = walk.g2_alt3();
+            expect(x).toBe(BASE_X + 49);
+            expect(z).toBe(BASE_Z + 52);
+            expect(x).not.toBe(49);
+            expect(z).not.toBe(52);
+        } finally {
+            restoreCanvas();
+        }
     });
 });

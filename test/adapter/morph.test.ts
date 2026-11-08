@@ -2,15 +2,18 @@ import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:tes
 
 import { attach, detach, invalidateLocSnapshots, reader } from '#/bot/adapter/ClientAdapter.js';
 import { Input } from '#/bot/input/Input.js';
+import { Loc as SceneLoc } from '#/bot/api/model/Loc.js';
 import LocType from '#/client/config/LocType.js';
 import NpcType from '#/client/config/NpcType.js';
 import VarBitType from '#/client/config/VarBitType.js';
 import ClientNpc from '#/client/dash3d/ClientNpc.js';
 import ClientPlayer from '#/client/dash3d/ClientPlayer.js';
+import CollisionMap from '#/client/dash3d/CollisionMap.js';
 import { ClientProt } from '#/client/io/ClientProt.js';
 import { placedLocId, writeLocOp } from '#/client/io/gameOutbound.js';
 import Packet from '#/client/io/Packet.js';
 import { MiniMenuAction } from '#/client/shell/MiniMenuAction.js';
+import { installCanvasMock } from '../io/replay/runtime.js';
 
 const BASE_LOC = 1781;
 const CHILD_LOC = 1782;
@@ -18,14 +21,14 @@ const BASE_NPC = 3;
 const CHILD_NPC = 9;
 const TYPECODE = (2 << 29) | (BASE_LOC << 14) | (2 << 7) | 1;
 
-type Loc = InstanceType<typeof LocType>;
-const locs = new Map<number, Loc>();
+type LocDef = InstanceType<typeof LocType>;
+const locs = new Map<number, LocDef>();
 const origLocList = LocType.list;
 const origNpcList = NpcType.list;
 const origVarbits = VarBitType.list;
 
-function loc(id: number, name: string, op: string, width = 1): Loc {
-    const result = Object.create(LocType.prototype) as Loc;
+function loc(id: number, name: string, op: string, width = 1): LocDef {
+    const result = Object.create(LocType.prototype) as LocDef;
     result.id = id;
     result.name = name;
     result.op = [op, null, null, null, null];
@@ -239,6 +242,51 @@ describe('locBox morph', () => {
         expect(dx).toBe(256);
         expect(dx).not.toBe(128);
     });
+
+    test('hull height and radius come from the base model, not the child', () => {
+        const base = loc(BASE_LOC, 'millbase', 'Search', 1);
+        base.multivarbit = -1;
+        base.multivar = 0;
+        base.multiloc = [CHILD_LOC];
+        base.getModel = (() => ({ minY: 64, maxY: 0, radius: 64 })) as unknown as LocDef['getModel'];
+        const child = loc(CHILD_LOC, 'millbase_flour', 'Take', 1);
+        child.getModel = (() => ({ minY: 300, maxY: 0, radius: 180 })) as unknown as LocDef['getModel'];
+        locs.set(BASE_LOC, base);
+        locs.set(CHILD_LOC, child);
+        const lx = 5;
+        const lz = 6;
+        attach({
+            world: {
+                getWall: () => null,
+                getDecor: (_level: number, tz: number, tx: number) => {
+                    if (tx !== lx || tz !== lz) {
+                        return null;
+                    }
+                    return {
+                        typecode: TYPECODE,
+                        x: (lx << 7) + 64,
+                        z: (lz << 7) + 64,
+                        model: { getTempModel: () => ({ minY: 300, maxY: 0, radius: 180 }) }
+                    };
+                },
+                getGd: () => null,
+                getScene: () => null
+            },
+            minusedlevel: 0,
+            mapBuildBaseX: 3200,
+            mapBuildBaseZ: 3200,
+            var: [0],
+            overlayPos: (sx: number, _sz: number, h: number) => ({ x: sx, y: h })
+        } as never);
+        const hull = reader.locBox({ x: 3205, z: 3206, id: BASE_LOC });
+        expect(hull).not.toBeNull();
+        const width = Math.abs(hull![1]!.x - hull![0]!.x);
+        const top = hull![4]!.y;
+        expect(width).toBe(128);
+        expect(top).toBe(64);
+        expect(width).not.toBe(360);
+        expect(top).not.toBe(300);
+    });
 });
 
 describe('placed-id outbound across a morph', () => {
@@ -276,5 +324,69 @@ describe('placed-id outbound across a morph', () => {
         expect(out.data[5]).toBe(BASE_LOC & 0xff);
         expect(out.data[6]).toBe(BASE_LOC >> 8);
         expect(out.data[5]).not.toBe(CHILD_LOC & 0xff);
+    });
+
+    test('Loc.interact writes the placed id through production doAction after a varp morph', async () => {
+        locs.get(BASE_LOC)!.multivarbit = -1;
+        locs.get(BASE_LOC)!.multivar = 0;
+        const restoreCanvas = await installCanvasMock();
+        // Canvas.js binds at import time, so Client cannot be a static import: the mock has to land first.
+        const { Client } = await import('#/client/shell/Client.js');
+        try {
+            const probe = new Client(undefined as never, undefined as never, undefined as never) as unknown as {
+                collision: (CollisionMap | null)[];
+                mapBuildBaseX: number;
+                mapBuildBaseZ: number;
+                minusedlevel: number;
+                keyHeld: number[];
+                out: Packet;
+                ingame: boolean;
+                var: number[];
+                localPlayer: ClientPlayer | null;
+                world: unknown;
+                doAction: (slot: number) => void;
+            };
+            probe.collision[0] = new CollisionMap();
+            probe.collision[0]!.flags.fill(0);
+            probe.mapBuildBaseX = 3200;
+            probe.mapBuildBaseZ = 3200;
+            probe.minusedlevel = 0;
+            probe.keyHeld[5] = 1;
+            probe.out.pos = 0;
+            probe.ingame = true;
+            probe.var[0] = 0;
+            probe.localPlayer = new ClientPlayer();
+            probe.localPlayer.routeX[0] = 0;
+            probe.localPlayer.routeZ[0] = 0;
+            probe.localPlayer.x = 0;
+            probe.localPlayer.z = 0;
+            probe.world = {
+                wallType: () => 0,
+                sceneType: (_level: number, x: number, z: number) => (x === 1 && z === 2 ? TYPECODE : 0),
+                gdType: () => 0,
+                decorType: () => 0,
+                typeCode2: () => 0
+            };
+            expect(attach(probe)).not.toContain('doAction');
+            const snap = reader.locs()[0];
+            expect(snap).toMatchObject({ id: BASE_LOC, name: 'millbase_flour' });
+            expect(placedLocId(snap!.typecode)).toBe(BASE_LOC);
+            probe.var[0] = 1;
+            invalidateLocSnapshots();
+            expect(reader.locs()).toEqual([]);
+            probe.out.pos = 0;
+            expect(new SceneLoc(snap!).interact('Take')).toBe(true);
+            const sent = Buffer.from(probe.out.data.subarray(0, probe.out.pos)).toString('hex');
+            const placed = new Packet(new Uint8Array(16));
+            writeLocOp(placed, ClientProt.OPLOC1, 1, 3201, 3202, BASE_LOC);
+            const child = new Packet(new Uint8Array(16));
+            writeLocOp(child, ClientProt.OPLOC1, 1, 3201, 3202, CHILD_LOC);
+            const placedHex = Buffer.from(placed.data.subarray(0, placed.pos)).toString('hex');
+            const childHex = Buffer.from(child.data.subarray(0, child.pos)).toString('hex');
+            expect(sent.endsWith(placedHex)).toBe(true);
+            expect(sent.includes(childHex)).toBe(false);
+        } finally {
+            restoreCanvas();
+        }
     });
 });
