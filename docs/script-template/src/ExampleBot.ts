@@ -1,6 +1,6 @@
 // Example using only @rs2b0t/api: pick up nearby bones and bury them.
 // Try it: stand anywhere, ::give bones 25, Start.
-import { defineBot, Execution, Game, GroundItems, Inventory, LoopingBot } from '@rs2b0t/api';
+import { defineBot, Execution, Game, GroundItems, Inventory, LoopingBot, Prayer } from '@rs2b0t/api';
 
 class BoneBurier extends LoopingBot {
     private buried = 0;
@@ -8,7 +8,7 @@ class BoneBurier extends LoopingBot {
 
     override async onStart(): Promise<void> {
         await Execution.delayUntil(() => Game.ingame(), 0);
-        this.log('BoneBurier (external) started');
+        this.log(`BoneBurier (external) started with ${Prayer.points()} prayer points`);
 
         this.on('skill.xp', e => {
             if (e.name === 'prayer') {

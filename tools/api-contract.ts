@@ -29,7 +29,10 @@ export type DriftKind =
     | 'missing-type-only'
     | 'missing-extra-root'
     | 'missing-reader-method'
-    | 'missing-docs-held';
+    | 'missing-docs-held'
+    | 'missing-published-export'
+    | 'missing-published-member'
+    | 'unexpected-published-member';
 export interface Drift {
     kind: DriftKind;
     export: string;
@@ -389,6 +392,42 @@ export function packageExports(js = readFileSync(JS_FILE, 'utf8')): string[] {
         .filter(Boolean);
 }
 
+/**
+ * Exact published runtime member sets, documented in docs/API.md.
+ */
+export const PUBLISHED_API_MEMBERS = {
+    Prayer: ['points', 'max', 'full', 'known', 'available', 'active', 'set', 'clear'],
+    Reachability: ['canReach', 'canStep', 'lineOfSight', 'walkable', 'probeable', 'arrivalProbe'],
+    SettingsStore: ['saved', 'save', 'onChange', 'displayString', 'resolve', 'globalBag', 'isUrlOverride', 'clear']
+} as const;
+
+export function publishedRootDrifts(runtime: Surface, exports: readonly string[]): Drift[] {
+    const drifts: Drift[] = [];
+    for (const [name, expected] of Object.entries(PUBLISHED_API_MEMBERS)) {
+        if (!exports.includes(name)) {
+            drifts.push({ kind: 'missing-published-export', export: name });
+            continue;
+        }
+        const actual = runtime.get(name);
+        if (actual === undefined) {
+            continue;
+        }
+        const actualMembers = actual ?? new Map<string, Member>();
+        const expectedMembers = new Set<string>(expected);
+        for (const member of expectedMembers) {
+            if (!actualMembers.has(member)) {
+                drifts.push({ kind: 'missing-published-member', export: name, member });
+            }
+        }
+        for (const member of actualMembers.keys()) {
+            if (!expectedMembers.has(member)) {
+                drifts.push({ kind: 'unexpected-published-member', export: name, member });
+            }
+        }
+    }
+    return drifts;
+}
+
 export function compare(runtime: Surface, declared: Surface, exports: readonly string[], allow: ReadonlySet<string> = new Set()): Drift[] {
     const drifts: Drift[] = [];
     const add = (d: Drift): void => {
@@ -426,6 +465,16 @@ export function compare(runtime: Surface, declared: Surface, exports: readonly s
     for (const name of declared.keys()) {
         if (!exported.has(name)) {
             add({ kind: 'phantom-export', export: name });
+        }
+    }
+    return drifts;
+}
+
+export function checkContract(runtime: Surface, declared: Surface, exports: readonly string[], allow: ReadonlySet<string> = new Set()): Drift[] {
+    const drifts = compare(runtime, declared, exports, allow);
+    for (const d of publishedRootDrifts(runtime, exports)) {
+        if (!drifts.some(existing => existing.export === d.export && existing.member === d.member)) {
+            drifts.push(d);
         }
     }
     return drifts;
@@ -741,7 +790,7 @@ export function publicationDrifts(sources: PublicationSources): Drift[] {
 
 export function report(drifts: readonly Drift[]): string {
     if (drifts.length === 0) {
-        return 'api-contract: published ledger holds, and index.d.ts matches the runtime ABI over every index.js export';
+        return 'api-contract: published ledger and roots hold, and index.d.ts matches the runtime ABI over every index.js export';
     }
     const lines = [`api-contract: ${drifts.length} drift(s)`];
     for (const d of drifts) {
@@ -752,7 +801,7 @@ export function report(drifts: readonly Drift[]): string {
 }
 
 if (import.meta.main) {
-    const drifts = [...compare(runtimeSurface(), declaredSurface(), packageExports(), allowlist()), ...publicationDrifts(repoSources())];
+    const drifts = [...checkContract(runtimeSurface(), declaredSurface(), packageExports(), allowlist()), ...publicationDrifts(repoSources())];
     console.log(report(drifts));
     if (process.argv.includes('--check') && drifts.length > 0) {
         process.exit(1);

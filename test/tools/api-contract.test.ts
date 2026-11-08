@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { EXTRA_ROOT_HOLDS, PAINT_FRAME_WIDGET_HOLDS, READER_METHOD_HOLDS, TYPE_ONLY_HOLDS, allowlist, compare, declaredSurface, packageExports, publicationDrifts, report, repoSources, runtimeSurface } from '../../tools/api-contract.js';
+import { EXTRA_ROOT_HOLDS, PAINT_FRAME_WIDGET_HOLDS, READER_METHOD_HOLDS, TYPE_ONLY_HOLDS, allowlist, checkContract, compare, declaredSurface, packageExports, publicationDrifts, publishedRootDrifts, report, repoSources, runtimeSurface } from '../../tools/api-contract.js';
 import type { Member, PublicationSources, Surface } from '../../tools/api-contract.js';
 
 function members(names: string[], optional: string[] = []): Map<string, Member> {
@@ -121,6 +121,39 @@ describe('compare', () => {
     });
 });
 
+test('publication ledger pins the roots and exact runtime member sets', () => {
+    expect(publishedRootDrifts(runtimeSurface(), packageExports())).toEqual([]);
+});
+
+test('publication ledger rejects missing roots and changed member sets', () => {
+    const runtime = new Map(runtimeSurface());
+    const prayer = runtime.get('Prayer');
+    if (!(prayer instanceof Map)) throw new Error('Prayer runtime surface is not an object');
+    const changedPrayer = new Map(prayer);
+    changedPrayer.delete('points');
+    changedPrayer.set('unexpected', { type: '() => void', optional: false });
+    runtime.set('Prayer', changedPrayer);
+
+    expect(
+        publishedRootDrifts(
+            runtime,
+            packageExports().filter(name => name !== 'SettingsStore')
+        )
+    ).toEqual([
+        { kind: 'missing-published-member', export: 'Prayer', member: 'points' },
+        { kind: 'unexpected-published-member', export: 'Prayer', member: 'unexpected' },
+        { kind: 'missing-published-export', export: 'SettingsStore' }
+    ]);
+});
+
+test('contract check keeps the published roots required', () => {
+    expect(checkContract(new Map(), new Map(), [])).toEqual([
+        { kind: 'missing-published-export', export: 'Prayer' },
+        { kind: 'missing-published-export', export: 'Reachability' },
+        { kind: 'missing-published-export', export: 'SettingsStore' }
+    ]);
+});
+
 test('packageExports reads the destructured names and drops comments', () => {
     expect(packageExports('export const {\n    apiVersion,\n    // Tools\n    Game, Tile\n} = abi;')).toEqual(['apiVersion', 'Game', 'Tile']);
 });
@@ -131,12 +164,12 @@ test('report is one line per drift', () => {
         { kind: 'phantom-export', export: 'NAV' }
     ]);
     expect(text).toBe('api-contract: 2 drift(s)\n  undeclared-member   Game.sceneReady: () => boolean\n  phantom-export      NAV');
-    expect(report([])).toBe('api-contract: published ledger holds, and index.d.ts matches the runtime ABI over every index.js export');
+    expect(report([])).toBe('api-contract: published ledger and roots hold, and index.d.ts matches the runtime ABI over every index.js export');
 });
 
 test('index.d.ts matches the runtime ABI over every index.js export', () => {
-    const drifts = compare(runtimeSurface(), declaredSurface(), packageExports(), allowlist());
-    expect(report(drifts)).toBe('api-contract: published ledger holds, and index.d.ts matches the runtime ABI over every index.js export');
+    const drifts = checkContract(runtimeSurface(), declaredSurface(), packageExports(), allowlist());
+    expect(report(drifts)).toBe('api-contract: published ledger and roots hold, and index.d.ts matches the runtime ABI over every index.js export');
 }, 120_000);
 
 test('the same-pin ledger still holds on this checkout', () => {
