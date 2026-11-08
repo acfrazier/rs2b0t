@@ -128,7 +128,7 @@ function main(): void {
     }
     const openable = new Set<number>();
     const unclassified = new Map<string, Set<number>>();
-    let refusedTypes = 0;
+    const refused: { id: number; name: string; category: string; source: string }[] = [];
     for (const id of [...wallLocIds].sort((a, b) => a - b)) {
         const type = configs[id];
         if (!type.op || !type.op.some(op => op?.toLowerCase() === 'open')) {
@@ -184,7 +184,12 @@ function main(): void {
             ]);
             const label = `${type.name ?? ''} ${type.debugname ?? ''}`.toLowerCase();
             if (label.includes('locked') || (type.debugname ?? '').startsWith('macro_') || SCRIPT_REFUSED.has(type.debugname ?? '')) {
-                refusedTypes++;
+                refused.push({
+                    id,
+                    name: type.name ?? type.debugname ?? `loc_${id}`,
+                    category: 'revision 289 script/lock policy',
+                    source: 'locked-name, macro or quest-script refusal'
+                });
                 continue;
             }
             openable.add(id);
@@ -193,7 +198,8 @@ function main(): void {
 
         const categoryId = type.category;
         const category = categoryId === null ? undefined : categoryNames?.get(categoryId);
-        const rule = categoryPolicy?.locOverrides[String(id)] ?? (
+        const override = categoryPolicy?.locOverrides[String(id)];
+        const rule = override ?? (
             categoryId === null ? categoryPolicy?.uncategorized : category ? categoryPolicy?.categories[category] : undefined
         );
         if (!rule) {
@@ -204,7 +210,12 @@ function main(): void {
         } else if (rule.decision === 'admit') {
             openable.add(id);
         } else {
-            refusedTypes++;
+            refused.push({
+                id,
+                name: type.name ?? type.debugname ?? `loc_${id}`,
+                category: categoryId === null ? 'uncategorized' : `${category ?? 'unknown'} (${categoryId})`,
+                source: rule.source
+            });
         }
     }
     if (unclassified.size > 0) {
@@ -230,9 +241,13 @@ function main(): void {
     ]) : new Set<string>();
     // Why: gates.rs2 leaves Gate#3198 closed after loc_add(type=-1); use Gate#3197 one tile north.
     const BROKEN_ENGINE_EXCLUDED = opts.revision === 289 ? new Set(['3198@3312,3235,0']) : new Set<string>();
-    // Why: 2-tile doors sit on an unwalkable loc tile, so WALL_STRAIGHT derivation never emits them.
     const CURATED_EXTRA: DoorEdge[] = opts.revision === 289 ? [
+        // Why: 2-tile doors sit on an unwalkable loc tile, so WALL_STRAIGHT derivation never emits them.
         { x: 3107, z: 3162, level: 0, locId: 1536, locName: 'Door', dir: 'E' }
+    ] : opts.revision === 377 ? [
+        // Why: all.loc:17001-17008 and game_gnomeball/scripts/gnomeball.rs2:18-43 define this bidirectional gate transition.
+        // The type remains policy-refused in the 377 audit; this content-confirmed placement is admitted only as a curated route edge.
+        { x: 2383, z: 3488, level: 0, locId: 2394, locName: 'Gate', dir: 'W' }
     ] : [];
 
     const edges: DoorEdge[] = [];
@@ -307,9 +322,18 @@ function main(): void {
         fs.writeFileSync(opts.out, json);
     }
 
-    console.log(`openable wall loc types: ${openable.size} (skipped ${refusedTypes} policy-refused types, ${oneWaySkipped} one-way instances -> curated transports, ${brokenEngineSkipped} broken Engine instances)`);
+    console.log(`openable wall loc types: ${openable.size} (skipped ${refused.length} policy-refused types, ${oneWaySkipped} one-way instances -> curated transports, ${brokenEngineSkipped} broken Engine instances)`);
     console.log(`mapsquares scanned: ${mapsquares}`);
     console.log(`door edges derived: ${edges.length} -> ${opts.out}`);
+    console.log('policy-refused Open loc types:');
+    for (const row of [...refused].sort((a, b) => a.id - b.id)) {
+        console.log(`  ${row.id}\t${row.name}\t${row.category}\t${row.source}`);
+    }
+    const uncategorized = refused.filter(row => row.category === 'uncategorized');
+    console.log(`uncategorized policy-refused Open loc types (${uncategorized.length}):`);
+    for (const row of uncategorized) {
+        console.log(`  ${row.id}\t${row.name}`);
+    }
     console.log('by name:');
     for (const [name, count] of [...nameCounts.entries()].sort((a, b) => b[1] - a[1])) {
         console.log(`  ${count}\t${name}`);

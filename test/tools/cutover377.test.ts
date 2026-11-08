@@ -1,8 +1,10 @@
 /** Why: the cutover is the first commit of the integration branch and runs once, so it moves the staged tree or refuses without touching it; both directions run here on a throwaway repository. */
 import { afterAll, describe, expect, test } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 import { CutoverError, GUARD_FIXTURES, cutover } from '../../tools/cutover-377.js';
 import { readManifest, sha256File, verifyManifest, writeManifest } from '../../tools/lib/manifest.js';
@@ -19,7 +21,7 @@ function git(root: string, args: string[]): void {
     if ((run.exitCode ?? 1) !== 0) throw new Error(`git ${args.join(' ')}: ${run.stderr.toString().trim()}`);
 }
 
-function put(root: string, path: string, content: string): string {
+function put(root: string, path: string, content: string | Uint8Array): string {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
     return sha256File(join(root, path));
@@ -39,14 +41,28 @@ function manifest(artifacts: ManifestArtifact[]): Manifest {
 }
 
 /** A throwaway repository with a staged tree, a 289 destination and one 289 recording. */
-function repo(files: Record<string, string>, entries: ManifestArtifact[]): string {
+function repo(files: Record<string, string | Uint8Array>, entries: ManifestArtifact[]): string {
     const root = mkdtempSync(join(tmpdir(), 'cutover-'));
     TEMP.push(root);
     git(root, ['init', '-q']);
-    for (const [path, content] of Object.entries(files)) put(root, path, content);
-    for (const entry of entries) entry.sha256 = sha256File(join(root, entry.stagedPath ?? entry.path));
-    writeManifest(root, manifest(entries));
-    const paths = [...Object.keys(files), 'data/manifest.json'];
+    const treeFiles: Record<string, string | Uint8Array> = { ...files };
+    const artifacts = [...entries];
+    if (!artifacts.some(entry => entry.path === 'out/collision.lcnav.gz')) {
+        const raw = Buffer.from('collision nav pack\n');
+        treeFiles['out/collision.lcnav.gz'] = gzipSync(raw);
+        artifacts.push({
+            path: 'out/collision.lcnav.gz',
+            sha256: '',
+            kind: 'out',
+            qualification: 'pending',
+            uncompressedSha256: createHash('sha256').update(raw).digest('hex')
+        });
+    }
+    for (const [path, content] of Object.entries(treeFiles)) put(root, path, content);
+    mkdirSync(join(root, 'data'), { recursive: true });
+    for (const entry of artifacts) entry.sha256 = sha256File(join(root, entry.stagedPath ?? entry.path));
+    writeManifest(root, manifest(artifacts));
+    const paths = [...Object.keys(treeFiles), 'data/manifest.json'];
     git(root, ['add', '--', ...paths]);
     git(root, ['-c', 'user.name=cutover-test', '-c', 'user.email=cutover@example.test', 'commit', '-q', '-m', 'staged']);
     return root;
@@ -86,30 +102,45 @@ describe('cutover moves the staged tree', () => {
 
         const after = readManifest(root);
         expect(after.cutover).toBe(true);
-        expect(after.artifacts.map(a => a.path)).toEqual(['src/bot/data/gen.ts', 'tools/nav/doors.json', 'src/bot/data/cookLocations.ts']);
+        expect(after.artifacts.map(a => a.path)).toEqual([
+            'src/bot/data/gen.ts',
+            'tools/nav/doors.json',
+            'src/bot/data/cookLocations.ts',
+            'out/collision.lcnav.gz'
+        ]);
         expect(verifyManifest(root)).toEqual([]);
     });
     test('moves a staged out artifact onto its final path over the 289 output', () => {
+        const raw = Buffer.from('377 collision pack\n');
+        const uncompressedSha256 = createHash('sha256').update(raw).digest('hex');
+        const compressed = gzipSync(raw);
         const entry: ManifestArtifact = {
             path: 'out/collision.lcnav.gz',
             sha256: '',
             kind: 'out',
             qualification: 'pending',
+            uncompressedSha256,
             stagedPath: 'data/377/out/collision.lcnav.gz'
         };
         const root = repo(
             {
-                'data/377/out/collision.lcnav.gz': '377 collision pack\n',
-                'out/collision.lcnav.gz': '289 collision pack\n'
+                'data/377/out/collision.lcnav.gz': compressed,
+                'out/collision.lcnav.gz': gzipSync(Buffer.from('289 collision pack\n'))
             },
             [entry]
         );
 
         expect(cutover(root)).toEqual(['out/collision.lcnav.gz']);
-        expect(readFileSync(join(root, 'out/collision.lcnav.gz'), 'utf8')).toBe('377 collision pack\n');
+        expect(readFileSync(join(root, 'out/collision.lcnav.gz'))).toEqual(compressed);
         expect(existsSync(join(root, 'data/377'))).toBe(false);
         expect(readManifest(root).artifacts).toEqual([
-            { path: 'out/collision.lcnav.gz', sha256: sha256File(join(root, 'out/collision.lcnav.gz')), kind: 'out', qualification: 'pending' }
+            {
+                path: 'out/collision.lcnav.gz',
+                sha256: sha256File(join(root, 'out/collision.lcnav.gz')),
+                kind: 'out',
+                qualification: 'pending',
+                uncompressedSha256
+            }
         ]);
         expect(verifyManifest(root)).toEqual([]);
     });

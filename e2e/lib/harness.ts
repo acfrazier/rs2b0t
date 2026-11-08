@@ -4,9 +4,9 @@ import { homedir } from 'node:os';
 import { chromium } from 'playwright-core';
 import type { Browser, Page } from 'playwright-core';
 
-import { engineArchiveProblems } from '../../tools/lib/manifest.js';
-import { pressCleanLogout } from './cleanLogout.js';
+import { engineArchiveProblems, navPackProblems } from '../../tools/lib/manifest.js';
 import { engineLoginKey, type EngineLoginKey } from './engineLoginKey.js';
+import { pressCleanLogout } from './cleanLogout.js';
 
 export function fail(msg: string): never {
     console.error(`FAIL: ${msg}`);
@@ -77,11 +77,13 @@ export function deployIsolatedClient(
     if (!existsSync(shared)) {
         fail(`deploy: ${shared} not found — set ENGINE_DIR to the engine serving this run${seedHtml ? '' : ', or pass --seed-html to use the repo template'}`);
     }
-    // Why: the bundled client decodes configs with the engine's archives; a mismatch desyncs every
-    // later entry and looks like a bot bug. The manifest pins the archives the data came from (pitfall 7).
     const archiveProblems = engineArchiveProblems(process.cwd(), engineDir);
     if (archiveProblems.length > 0) {
         fail(`deploy: ${engineDir} does not match data/manifest.json\n  ${archiveProblems.join('\n  ')}`);
+    }
+    const packProblems = navPackProblems(process.cwd());
+    if (packProblems.length > 0) {
+        fail(`deploy: out/collision.lcnav.gz does not match data/manifest.json\n  ${packProblems.join('\n  ')}`);
     }
     let key: EngineLoginKey;
     try {
@@ -121,10 +123,7 @@ export function deployIsolatedClient(
             fail(`deploy: ${path} names the recording tap module or replay JPEG decoder`);
         }
     }
-    // Why: `build:bot` does not bake the collision pack, and without it every Navigator dies on boot and walking degrades in silence to the scene stepper.
-    if (!existsSync('out/collision.lcnav.gz')) {
-        fail('deploy: out/collision.lcnav.gz missing — run tools/nav/build-collision.ts first');
-    }
+    // Why: `navPackProblems` verifies both the compressed artifact and its raw 377 pack pin before the build or deployment changes the engine's public directory.
 
     const dir = `${publicDir}/bot/${tag}`;
     const html = `${publicDir}/bot-${tag}.html`;

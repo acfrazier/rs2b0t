@@ -41,6 +41,7 @@
     {"x":2373,"z":3119,"level":0,"locId":4427,"locName":"Large door","dir":"N"},
     {"x":2380,"z":3425,"level":0,"locId":1553,"locName":"Gate","dir":"S"},
     {"x":2381,"z":3425,"level":0,"locId":1551,"locName":"Gate","dir":"S"},
+    {"x":2383,"z":3488,"level":0,"locId":2394,"locName":"Gate","dir":"W"},
     {"x":2383,"z":4445,"level":0,"locId":1557,"locName":"Gate","dir":"W"},
     {"x":2383,"z":4446,"level":0,"locId":1558,"locName":"Gate","dir":"W"},
     {"x":2384,"z":3436,"level":0,"locId":1551,"locName":"Gate","dir":"W"},

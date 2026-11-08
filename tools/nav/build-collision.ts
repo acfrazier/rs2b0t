@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
@@ -457,6 +458,8 @@ function main(): void {
         console.log(`  level ${level}: ${present} mapsquares, ${allocated} allocated tiles, ${walkable} walkable`);
     }
     console.log(`  raw: ${raw.length} bytes (${(raw.length / 1048576).toFixed(2)} MB) -> ${opts.out}`);
+    console.log(`  raw sha256: ${createHash('sha256').update(raw).digest('hex')}`);
+    console.log(`  gzip sha256: ${createHash('sha256').update(gz).digest('hex')}`);
     console.log(`  gzip: ${gz.length} bytes (${(gz.length / 1048576).toFixed(2)} MB) -> ${opts.out}.gz`);
     console.log(`  elapsed: ${((performance.now() - started) / 1000).toFixed(1)}s`);
 

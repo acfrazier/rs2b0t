@@ -23,7 +23,7 @@
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
     "tools/gen-377-data.sh": "365d10b97df560be05245f025eb3f0203d883a65163d4123641eb944ad9406eb",
-    "tools/gen-377-manifest.ts": "641a69921540b195a51d737d10c43a8a1765ea1f768b8aa18c6802c90498c380",
+    "tools/gen-377-manifest.ts": "8858ee663c1a654fdce3872c999ecced78dbf2677d8c8c4fba67c15c94a7bf3c",
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/gen-scriptdocs.ts": "9b65974cf3e5f22a4d7010869e9182ddd5068c3e8e081962ce15183c31e6ddc5",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
@@ -34,8 +34,8 @@
     "tools/lib/genout.ts": "6c92d4fb20027737a40a06f792f4ab8e01e597e35137e52c0e39a17351cfdbcc",
     "tools/map/build-basemap.ts": "f90956e475ef0a71da30629225dc3c5b40b7e2c1a07c55309fc6de1165ee14dc",
     "tools/map/encodePng.ts": "ebf62672a4035f6b0a7cfe451cb3d856dfe82201cc3b830c4eec9f4b6159f961",
-    "tools/nav/build-collision.ts": "84af9f74ac800e16cf29f9665576069346cedac043056e04d00a9cca09210bcb",
-    "tools/nav/derive-doors.ts": "24e165951b0af08eb25bcc24d7f708cc3f36a434a495e637d46bd1dc753eec41",
+    "tools/nav/build-collision.ts": "e0bed3dd92a465727e48a650460f2625658e249a5decc9c0fff8d43f6988bd7d",
+    "tools/nav/derive-doors.ts": "3cf52059e6512d76bf2b6c369cfdbc4e36d1f99cfe9aedf6df4e84c059cc43b5",
     "tools/nav/derive-ladders.py": "31fd704e47343d5bc31a2077431dda24f0052bc32cb58cf7a71836e8ee1acea5",
     "tools/nav/derive-stairs.ts": "503ff239117f0e37282ae49c77f2f223bce8766fffa8b62b0e330397791150d1",
     "tools/nav/derive-transports.sh": "62b377a4a0610e1d49a5f91c824b44ddb5601f8e8fba63b4412cf7f9c32d1c08",
@@ -57,7 +57,8 @@
       "path": "out/collision.lcnav.gz",
       "sha256": "ed64309ee43a7eb117f101cd542ceedb2bbf5db7dbaad18cab7415ce0baf5a99",
       "kind": "out",
-      "qualification": "pending"
+      "qualification": "qualified",
+      "uncompressedSha256": "80813bd54070dfcaebb25213c019076fefbf9444ff3484af2d143ccbf97403cb"
     },
     {
       "path": "out/worldmap-basemap.e6315f93c51abd46.png",
@@ -493,7 +494,7 @@
     },
     {
       "path": "src/bot/api/ai/clues/data/unreachable.ts",
-      "sha256": "459386ff173a566f429e3958589b84cae4664a151443d11ec8ae4d76c548b6a9",
+      "sha256": "774d944f9508f437e1601835fafb0b83a3566c3240c684f9eb703cff03b2bf67",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -561,7 +562,7 @@
       "path": "src/bot/data/nameCollisions.ts",
       "sha256": "2557efb121e81c9fdfa6b43a4f0e7f0f961b6d8c56b94071d172954692004625",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "offline"
     },
     {
       "path": "src/bot/data/runeCraftLocations.ts",
@@ -595,21 +596,21 @@
     },
     {
       "path": "src/bot/event/webwalk/data/doors.json",
-      "sha256": "e570581e44d9353553474af01cf47e695792818fcdefe2f343373195668af7b3",
+      "sha256": "92cb2b23d552c9019e084be1caf9763405cd42308aecfde06396b38acac26317",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "qualified"
     },
     {
       "path": "src/bot/event/webwalk/data/stairEdges.json",
       "sha256": "a093eea39c414af500d02d0d3f6c8ff0a852e5e93d18a9a1c36fade2d4d69cf3",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "qualified"
     },
     {
       "path": "src/bot/event/webwalk/data/transports.json",
-      "sha256": "5f24e2487f5c7a2daae4cf670980c82d3290a18a254f54f841978489eb849ffb",
+      "sha256": "3823721db90373b95791f63af6d888be532899596bd1298c34227aeabbd85af2",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "qualified"
     },
     {
       "path": "src/bot/event/webwalk/specialRequires.ts",
@@ -771,7 +772,7 @@
       "path": "tools/nav/door-categories.json",
       "sha256": "5a7cfc4c126d5885c3b2f78d0576d8b1562926bda25390bf73b5161fa21c49fc",
       "kind": "nav-input",
-      "qualification": "pending"
+      "qualification": "offline"
     },
     {
       "path": "tools/nav/mainland-routes.json",
@@ -783,7 +784,7 @@
       "path": "tools/nav/stair-prices.json",
       "sha256": "b0d773da25665ef3c3cb1c479a8c6ddd10594dca91a60af73d41c0239ec4da31",
       "kind": "nav-input",
-      "qualification": "pending"
+      "qualification": "offline"
     }
   ]
 }

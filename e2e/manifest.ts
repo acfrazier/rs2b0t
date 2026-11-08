@@ -3,6 +3,15 @@ import type { Case } from './manifestTypes.js';
 /** Every case the e2e suite can run. The runner iterates this; nothing globs the directory. */
 export const CASES: readonly Case[] = [
     {
+        id: 'nav-s8-live',
+        harness: 'nav-s8-live.ts',
+        covers: { subsystems: ['nav'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 30,
+        note: 'Four 377 webwalk routes, three fresh accounts each, with serverTile readback; requires canon-1108 ENGINE_DIR, CONTENT_DIR and S8_LIVE_EVIDENCE_DIR.'
+    },
+    {
         id: 'gnome-magic-north-stair-live',
         harness: 'gnome-magic-north-stair-live.ts',
         covers: { scripts: ['GnomeMagicChopper'] },

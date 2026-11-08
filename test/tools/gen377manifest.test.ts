@@ -1,8 +1,10 @@
 /** Why: a byte-identity run bakes the basemap into a scratch dir, so an `out/` row hashes the bake file while recording the repo's `out/` path. */
 import { afterAll, describe, expect, test } from 'bun:test';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 import { readManifest, sha256File, writeManifest } from '../../tools/lib/manifest.js';
 import type { Manifest } from '../../tools/lib/manifest.js';
@@ -17,7 +19,7 @@ function tempDir(): string {
     return dir;
 }
 
-function put(root: string, path: string, content: string): string {
+function put(root: string, path: string, content: string | Uint8Array): string {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
     return sha256File(join(root, path));
@@ -100,8 +102,10 @@ describe('gen-377-manifest', () => {
     test('records a staged out artifact at its final path and hashes the staged source', () => {
         const root = tempDir();
         seed(root, emptyManifest());
+        const raw = Buffer.from('377 collision pack\n');
+        const uncompressedSha256 = createHash('sha256').update(raw).digest('hex');
         const stagedPath = 'data/377/out/collision.lcnav.gz';
-        const stagedHash = put(root, stagedPath, '377 collision pack\n');
+        const stagedHash = put(root, stagedPath, gzipSync(raw));
         put(root, 'out/collision.lcnav.gz', '289 collision pack\n');
 
         const result = run(root, ['--revision', '377', '--artifact', `${stagedPath}=out`]);
@@ -112,6 +116,7 @@ describe('gen-377-manifest', () => {
                 sha256: stagedHash,
                 kind: 'out',
                 qualification: 'pending',
+                uncompressedSha256,
                 stagedPath
             }
         ]);

@@ -5,8 +5,9 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
-import { ManifestError, engineArchiveProblems, parseManifest, readManifest, sha256File, verifyManifest, verifyManifestReport, writeManifest } from '../../tools/lib/manifest.js';
+import { ManifestError, engineArchiveProblems, navPackProblems, parseManifest, readManifest, sha256File, verifyManifest, verifyManifestReport, writeManifest } from '../../tools/lib/manifest.js';
 import type { Manifest } from '../../tools/lib/manifest.js';
 
 const HASH_A = 'a'.repeat(64);
@@ -98,6 +99,18 @@ describe('manifest schema', () => {
             parseManifest({ ...empty(), artifacts: [{ path: 'out/collision.lcnav.gz', sha256: HASH_A, kind: 'out', qualification: 'pending' }] })
         ).not.toThrow();
     });
+    test('an uncompressed hash is limited to the revision-377 collision gzip', () => {
+        const collision = {
+            path: 'out/collision.lcnav.gz',
+            sha256: HASH_A,
+            kind: 'out',
+            qualification: 'pending',
+            uncompressedSha256: HASH_B
+        };
+        expect(() => parseManifest({ ...empty(), artifacts: [collision] })).not.toThrow();
+        expect(() => parseManifest({ ...empty(), artifacts: [{ ...collision, uncompressedSha256: 'bad' }] })).toThrow(/uncompressedSha256/);
+        expect(() => parseManifest({ ...empty(), artifacts: [{ ...collision, path: 'out/other.gz' }] })).toThrow(/only valid for out\/collision\.lcnav\.gz/);
+    });
     test('an out artifact may point at a staged source while keeping its final path', () => {
         expect(() =>
             parseManifest({
@@ -166,6 +179,49 @@ describe('manifest verify', () => {
             artifacts: [{ path: 'data/377/gone.ts', sha256: HASH_A, kind: 'generated', qualification: 'pending' }]
         });
         expect(verifyManifest(root)).toEqual([expect.stringContaining('is listed but missing')]);
+    });
+    test('the raw collision pack pin is checked independently of its gzip hash', () => {
+        const root = tempDir();
+        mkdirSync(join(root, 'data'), { recursive: true });
+        mkdirSync(join(root, 'out'), { recursive: true });
+        const raw = Buffer.from('raw collision bytes\n');
+        const rawPath = join(root, 'out/collision.lcnav');
+        const compressedPath = join(root, 'out/collision.lcnav.gz');
+        writeFileSync(rawPath, raw);
+        writeFileSync(compressedPath, gzipSync(raw));
+        const compressedHash = sha256File(compressedPath);
+        writeManifest(root, {
+            ...empty(),
+            revision: 377,
+            cutover: true,
+            artifacts: [
+                {
+                    path: 'out/collision.lcnav.gz',
+                    sha256: compressedHash,
+                    kind: 'out',
+                    qualification: 'qualified',
+                    uncompressedSha256: HASH_A
+                }
+            ]
+        });
+
+        expect(verifyManifest(root)).toEqual([expect.stringContaining('uncompressed bytes changed')]);
+        expect(navPackProblems(root)).toEqual([expect.stringContaining('uncompressed nav pack sha256')]);
+
+        writeManifest(root, {
+            ...readManifest(root),
+            artifacts: [
+                {
+                    path: 'out/collision.lcnav.gz',
+                    sha256: compressedHash,
+                    kind: 'out',
+                    qualification: 'qualified',
+                    uncompressedSha256: sha256File(rawPath)
+                }
+            ]
+        });
+        expect(verifyManifest(root)).toEqual([]);
+        expect(navPackProblems(root)).toEqual([]);
     });
 
     test('a missing out artifact is a printed skip, not a failure', () => {
