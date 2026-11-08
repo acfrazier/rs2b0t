@@ -1,21 +1,25 @@
-import { launchBrowser } from './lib/harness.js';
+import { deployIsolatedClient, launchBrowser, parseArgs, type IsolatedClient } from './lib/harness.js';
 import fs from 'node:fs';
+import type { Browser } from 'playwright-core';
 
-const base = process.argv[2] ?? 'http://localhost:8888';
-const username = process.argv[3] ?? `ext${Date.now().toString(36).slice(-7)}`;
+const { base } = parseArgs(process.argv.slice(2), { base: 'http://localhost:8888' });
+const origin = base.replace(/\/+$/, '');
+const prefix = process.env.BOT_LIVE_NAME_PREFIX ?? '';
+if (!/^frtap[a-z0-9]{1,3}$/.test(prefix)) {
+    throw new Error('BOT_LIVE_NAME_PREFIX must be frtap followed by 1-3 lowercase alphanumeric characters');
+}
+const username = `${prefix}${Date.now().toString(36).slice(-4)}`;
+const tag = `external-${username}`;
 const engineDir = process.env.ENGINE_DIR ?? `${process.env.HOME}/code/rs2b2t-engine`;
-
 const TELE = '::tele 0,50,50,20,20';
 
 function fail(msg: string): never {
-    console.error(`FAIL: ${msg}`);
-    process.exit(1);
+    throw new Error(`FAIL: ${msg}`);
 }
 
 const build = Bun.spawnSync(['bun', 'run', 'build'], { cwd: 'docs/script-template' });
 if (build.exitCode !== 0) fail(`template build failed: ${build.stderr.toString()}`);
-fs.copyFileSync('docs/script-template/dist/bot.js', `${engineDir}/public/bot/external-test-bot.js`);
-console.log('template built and copied to engine public/bot/');
+console.log('template built; client files will be isolated per run');
 
 type Rs2b0t = {
     rs2b0t: {
@@ -24,9 +28,15 @@ type Rs2b0t = {
     };
 };
 
-const browser = await launchBrowser();
+let client: IsolatedClient | null = null;
+let browser: Browser | null = null;
 
 try {
+    const deployed = deployIsolatedClient(tag, engineDir);
+    client = deployed;
+    fs.copyFileSync('docs/script-template/dist/bot.js', `${engineDir}/public/bot/${tag}/external-test-bot.js`);
+    console.log(`template copied into isolated client /bot/${tag}/`);
+    browser = await launchBrowser();
     const page = await browser.newPage();
     page.on('pageerror', err => console.log(`pageerror: ${err}`));
 
@@ -58,7 +68,7 @@ try {
         await page.waitForTimeout(1200);
     };
 
-    await page.goto(`${base}/bot.html`);
+    await page.goto(`${origin}${deployed.page}`);
     await boot();
     if (!(await login())) fail('first login failed');
     console.log(`logged in as '${username}'`);
@@ -76,7 +86,7 @@ try {
     if (!invTab) fail('tabs still locked');
     console.log('re-logged in, tabs unlocked');
 
-    const title = await page.evaluate(() => document.querySelector('.rs2b0t-title')?.textContent ?? '');
+    const title = await page.evaluate(() => document.querySelector('.rs2b0t-title')?.firstChild?.textContent ?? '');
     if (title !== 'rs2b0t') fail(`panel title is '${title}', expected 'rs2b0t'`);
     console.log('panel title reads rs2b0t');
 
@@ -86,8 +96,9 @@ try {
     console.log('bones acquired');
 
     const loadUrl = async () => {
-        await page.fill('.rs2b0t-input', '/bot/external-test-bot.js');
-        await page.getByRole('button', { name: 'Load URL' }).click();
+        await page.getByRole('button', { name: 'Browse…' }).click();
+        await page.locator('.rs2b0t-library-load .rs2b0t-input').fill(`/bot/${tag}/external-test-bot.js`);
+        await page.locator('.rs2b0t-library-load').getByRole('button', { name: 'Load URL' }).click();
         await page.waitForFunction(
             () => {
                 const text = document.querySelector('.rs2b0t-load-status')?.textContent ?? '';
@@ -110,12 +121,14 @@ try {
 
     await page.getByRole('button', { name: 'Start' }).click();
 
+    await page.waitForFunction(() => ((globalThis as never as Rs2b0t).rs2b0t.runner.ctx?.log ?? []).some(l => /^BoneBurier \(external\) started with \d+ prayer points$/.test(l.msg)), undefined, { timeout: 15000 });
+    console.log('external script imported and called Prayer.points()');
+
     await page.waitForFunction(() => ((globalThis as never as Rs2b0t).rs2b0t.runner.ctx?.log ?? []).filter(l => l.msg.startsWith('buried bones')).length >= 10, undefined, { timeout: 180000 });
     console.log('external bot buried 10+ bones');
 
-    status = await loadUrl();
-    if (!status.includes('stop it before reloading')) fail(`expected running-refusal, got '${status}'`);
-    console.log('hot-reload refused while running (correct)');
+    if (await page.getByRole('button', { name: 'Browse…' }).isEnabled()) fail('script library stayed available while running');
+    console.log('script library disabled while running (correct)');
 
     await page.screenshot({ path: 'out/external-script-test.png' });
 
@@ -130,5 +143,9 @@ try {
     console.log('screenshot: out/external-script-test.png');
     console.log('PASS');
 } finally {
-    await browser.close();
+    try {
+        await browser?.close();
+    } finally {
+        client?.cleanup();
+    }
 }
