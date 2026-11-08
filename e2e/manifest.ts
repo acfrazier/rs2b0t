@@ -16,10 +16,20 @@ export const CASES: readonly Case[] = [
         id: 'l2-boneburier-377-live',
         harness: 'l2-boneburier-377-live.ts',
         covers: { scripts: ['BoneBurier'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: 'f2029252',
         manual: true,
         budgetMin: 15,
         note: 'L2 377 template: three fresh accounts bury ten banked Bones through BoneBurier with bank, inventory and Prayer experience readbacks before, after and after a relog; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-bankshop-377-live',
+        harness: 'l2-bankshop-377-live.ts',
+        covers: { subsystems: ['world'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 15,
+        note: 'L2 377 template: three fresh accounts buy a Cake tin at the Varrock general store, bank it at Varrock east bank across a relog, withdraw it and sell it back, with server pack, coin and bank readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
         id: 'gnome-magic-north-stair-live',
