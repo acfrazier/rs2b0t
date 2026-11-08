@@ -52,9 +52,7 @@ bun run package        # electron-builder --dir --publish never -> desktop/dist/
 ## Requirements
 
 Electron 45 needs macOS 13 or later, 64-bit Windows, or 64-bit Linux. electron-builder
-26 builds the package, and `@types/node` follows the bundled Node major (24). Dependency
-installs wait seven days after publication (`minimumReleaseAge` in the root `bunfig.toml`),
-so `desktop/bun.lock` can trail the newest Electron patch by that long.
+26 builds the package, and `@types/node` follows the bundled Node major (24).
 
 ## Facts
 
