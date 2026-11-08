@@ -12,6 +12,7 @@ import { pressCleanLogout } from './lib/cleanLogout.js';
 import { cheatQuiet, getServerVarQuiet, mainlandAccount, relog } from './tutorial/harness.js';
 
 const RUNS_PER_ROUTE = Number(process.env.S8_LIVE_RUNS_PER_ROUTE ?? 3);
+const ACCOUNT_PREFIX = process.env.S8_LIVE_ACCOUNT_PREFIX ?? 'frs8';
 if (!Number.isInteger(RUNS_PER_ROUTE) || RUNS_PER_ROUTE < 1) throw new Error('S8_LIVE_RUNS_PER_ROUTE must be a positive integer');
 const ROUTE_FILTER = process.env.S8_LIVE_ROUTE;
 const BUDGET_MS = (Number(process.env.BUDGET_S) || 300) * 1000;
@@ -25,6 +26,10 @@ const { base } = parseArgs(process.argv.slice(2), {
     base: process.env.BASE ?? 'http://localhost:81'
 });
 
+type ExpectedDoor = { id: number; name: string; tile: NavTile };
+type DoorReadback = ExpectedDoor & { ops: (string | null)[] };
+type RoutePreparation = { seeds: string[]; doorStartReadback?: DoorReadback[] };
+
 type Route = {
     id: string;
     from: NavTile;
@@ -32,8 +37,59 @@ type Route = {
     radius: number;
     why: string;
     setup?: (page: Page, user: string) => Promise<string[]>;
+    prepareWalk?: (page: Page, from: NavTile) => Promise<RoutePreparation>;
     missingHops: (hops: NavHop[], logs: string[], serverTileTrace: NavTile[]) => string[];
 };
+
+const LUMBRIDGE_CLOSED_DOORS: readonly ExpectedDoor[] = [
+    { id: 1536, name: 'Door', tile: { x: 3215, z: 3211, level: 0 } },
+    { id: 1516, name: 'Large door', tile: { x: 3217, z: 3218, level: 0 } }
+];
+
+async function waitForLumbridgeDoorsClosed(page: Page, from: NavTile): Promise<RoutePreparation> {
+    await teleArrive(page, { x: 3214, z: 3211, level: 0 }, 12);
+    const groundTile = await serverTile(page);
+    if (!groundTile || groundTile.level !== 0) throw new Error('pre-walk Lumbridge door check did not land on level 0');
+
+    const handle = await page.waitForFunction(
+        expected => {
+            const g = globalThis as never as {
+                __rs2b0t: {
+                    reader: {
+                        locs(): { id: number; name: string | null; tile: NavTile; ops: (string | null)[] }[];
+                    };
+                };
+            };
+            const locs = g.__rs2b0t.reader.locs();
+            const readback = expected.map(wanted => {
+                const loc = locs.find(candidate =>
+                    candidate.id === wanted.id
+                    && candidate.name === wanted.name
+                    && candidate.tile.x === wanted.tile.x
+                    && candidate.tile.z === wanted.tile.z
+                    && candidate.tile.level === wanted.tile.level
+                    && candidate.ops.includes('Open')
+                );
+                return loc ? { id: loc.id, name: loc.name, tile: loc.tile, ops: loc.ops } : null;
+            });
+            return readback.every(loc => loc !== null) ? readback : false;
+        },
+        LUMBRIDGE_CLOSED_DOORS,
+        { timeout: 360_000, polling: 250 }
+    );
+    const doorStartReadback = await handle.jsonValue() as DoorReadback[];
+    console.log(`WHY pre-walk Lumbridge closed-door loc readback: ${JSON.stringify(doorStartReadback)}`);
+    await teleArrive(page, from, 12);
+    const startTile = await serverTile(page);
+    if (!startTile || startTile.level !== from.level) throw new Error('pre-walk route-start readback mismatch after Lumbridge door check');
+    return {
+        seeds: [
+            'fixture tele-seeded to Lumbridge ground scene for closed-door readback, then back to route start',
+            'waited until reader.locs read back Door#1536 at 3215,3211 and Large door#1516 at 3217,3218 with Open available before walk'
+        ],
+        doorStartReadback
+    };
+}
 
 const ROUTES: Route[] = [
     {
@@ -41,14 +97,15 @@ const ROUTES: Route[] = [
         from: { x: 3205, z: 3209, level: 2 },
         to: { x: 3253, z: 3420, level: 0 },
         radius: 4,
-        why: 'the upper-floor start forces a stair descent; the serverTile trace must show a crossing of a Lumbridge door tile before Varrock bank; product teleports are disabled',
-        missingHops: (hops, logs, serverTileTrace) => {
+        why: 'the upper-floor start forces a stair descent; each run waits for and reads back both Lumbridge doors closed before walking; the same run must plan a Lumbridge door hop and log its crossed event; product teleports are disabled',
+        prepareWalk: waitForLumbridgeDoorsClosed,
+        missingHops: (hops, logs) => {
             const missing: string[] = [];
-            const sawDoorHop = hops.some(h => h.kind === 'door' || /door/i.test(h.locName ?? ''));
+            const sawDoorHop = hops.some(h => (h.locId === 1536 || h.locId === 1516)
+                && (h.kind === 'door' || /door/i.test(h.locName ?? '')));
             const sawDoorLog = logs.some(line => /crossed '(?:Door|Large door)'/i.test(line));
-            const sawDoorTile = lumbridgeDoorPassageTiles(serverTileTrace).length > 0;
-            if (!sawDoorHop && !sawDoorTile) missing.push('no door hop or authoritative passage through a known Lumbridge door tile');
-            if (!sawDoorLog && !sawDoorTile) missing.push('door crossing not observed in logs or serverTile trace');
+            if (!sawDoorHop) missing.push('no Lumbridge Door#1536 or Large door#1516 hop');
+            if (!sawDoorLog) missing.push('Lumbridge door crossing not observed in the walk log');
             if (!hops.some(h => h.kind === 'stair' || /stair|ladder/i.test(h.locName ?? ''))) missing.push('no stair hop');
             if (!logs.some(line => /Climb-down Staircase at .+ ok/i.test(line))) missing.push('stair crossing not observed');
             return missing;
@@ -147,13 +204,13 @@ function hasSavedAccount(engineDir: string, user: string): boolean {
 
 function freshUser(engineDir: string, used: Set<string>): string {
     for (let attempt = 0; attempt < 512; attempt++) {
-        const user = `frs8${randomBytes(2).toString('hex')}`;
+        const user = `${ACCOUNT_PREFIX}${randomBytes(2).toString('hex')}`;
         if (!used.has(user) && !hasSavedAccount(engineDir, user)) {
             used.add(user);
             return user;
         }
     }
-    throw new Error('could not allocate a fresh frs8 account name');
+    throw new Error(`could not allocate a fresh ${ACCOUNT_PREFIX} account name`);
 }
 
 async function serverTile(page: Page): Promise<NavTile | null> {
@@ -252,6 +309,7 @@ const evidence: {
         hops: string[];
         serverTileTrace: NavTile[];
         doorPassageTiles: string[];
+        doorStartReadback: DoorReadback[] | null;
         pass: boolean;
         failures: string[];
     }[];
@@ -287,12 +345,18 @@ try {
             let hops: NavHop[] = [];
             let walkLogs: string[] = [];
             let serverTileTrace: NavTile[] = [];
+            let doorStartReadback: DoorReadback[] | null = null;
             let failures: string[] = [];
             let walked = false;
             try {
                 await mainlandAccount(page, base, user, deployment.page);
                 if (route.setup) seeds.push(...await route.setup(page, user));
                 await teleArrive(page, route.from, 12);
+                const preparation = await route.prepareWalk?.(page, route.from);
+                if (preparation) {
+                    seeds.push(...preparation.seeds);
+                    doorStartReadback = preparation.doorStartReadback ?? null;
+                }
                 const startTile = await serverTile(page);
                 console.log(`WHY fixture position ${startTile ? `${startTile.x},${startTile.z},L${startTile.level}` : 'unreadable'} was tele-seeded on this fresh account; walker teleports remain off`);
                 if (!startTile) throw new Error('serverTile unavailable at the seeded route start');
@@ -343,6 +407,7 @@ try {
                     walkLogs,
                     serverTileTrace,
                     doorPassageTiles,
+                    doorStartReadback,
                     pass,
                     failures
                 };
@@ -370,6 +435,7 @@ try {
                     walkLogs,
                     serverTileTrace,
                     doorPassageTiles,
+                    doorStartReadback,
                     pass: false,
                     failures: failures.length ? failures : [detail]
                 };
