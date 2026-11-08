@@ -56,7 +56,8 @@ export const CASES: readonly Case[] = [
         id: 'l2-sheepshearer-377-live',
         harness: 'l2-sheepshearer-377-live.ts',
         covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: '4632d86f',
         manual: true,
         budgetMin: 60,
         note: 'L2 377 quest cell: three fresh accounts finish Sheep Shearer through AIOQuester (runUnqualified) with no quest, item, XP or position seed; shears pen sheep 43/1765, spins by using Wool on the Lumbridge castle wheel; watched sheep/qp getvar timeline, the_thing_sheared 0, Crafting XP, coins, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
@@ -65,9 +66,10 @@ export const CASES: readonly Case[] = [
         id: 'l2-priest-377-live',
         harness: 'l2-priest-377-live.ts',
         covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: '9a962e19',
         manual: true,
-        budgetMin: 50,
+        budgetMin: 100,
         note: 'L2 377 quest cell: three fresh accounts run The Restless Ghost through AIOQuester (quests=priest, runUnqualified) with no seed beyond the fresh account; watched prieststart 0 -> 1 -> 2 -> 3 -> 4 -> 5 and qp 0 -> 1 getvar timeline, Prayer +1,125 XP, quest skull 553, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
@@ -78,6 +80,15 @@ export const CASES: readonly Case[] = [
         manual: true,
         budgetMin: 45,
         note: 'L2 377 quest cell: three fresh accounts with 50 seeded coins run Witch\'s Potion through AIOQuester (quests=hetty, runUnqualified); watched hetty 0 -> 1 -> 2 -> 3 and qp 0 -> 1 getvar timeline, Magic +325 XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-runemysteries-377-live',
+        harness: 'l2-runemysteries-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 60,
+        note: 'L2 377 quest cell: three fresh accounts run Rune Mysteries through AIOQuester (quests=runemysteries, runUnqualified) with the labelled Mugger fixture (Attack/Strength/Defence/Hitpoints 40, five trout); watched runemysteries 0 -> 1 -> ... -> 6 and qp 0 -> 1 getvar timeline, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
         id: 'gnome-magic-north-stair-live',
