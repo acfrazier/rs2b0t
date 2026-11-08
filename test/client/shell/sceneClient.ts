@@ -14,7 +14,6 @@ import { Int32Array3d, TypedArray1d, TypedArray3d, Uint8Array3d } from '#/client
 
 // Why: mock.module has to run before the client modules load, and static imports are hoisted above it.
 mock.module('#/client/3rdparty/audio.js', () => ({ playWave: async (): Promise<void> => {}, setWaveVolume: (): void => {} }));
-mock.module('#/client/3rdparty/tinymidipcm.js', () => ({ playMidi: (): void => {}, setMidiVolume: (): void => {}, stopMidi: (): void => {} }));
 
 export const { Client } = await import('#/client/shell/Client.js');
 

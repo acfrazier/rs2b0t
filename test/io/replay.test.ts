@@ -20,11 +20,6 @@ mock.module('#/client/3rdparty/audio.js', () => ({
     playWave: async (): Promise<void> => {},
     setWaveVolume: (): void => {}
 }));
-mock.module('#/client/3rdparty/tinymidipcm.js', () => ({
-    playMidi: (): void => {},
-    setMidiVolume: (): void => {},
-    stopMidi: (): void => {}
-}));
 
 const protocol: Protocol = {
     revision: 289,

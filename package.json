@@ -48,7 +48,11 @@
         "e2e": "bun e2e/runner.ts"
     },
     "dependencies": {
-        "fflate": "^0.8.2"
+        "fflate": "^0.8.2",
+        "spessasynth_lib": "4.3.13"
+    },
+    "overrides": {
+        "spessasynth_core": "4.3.17"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.2",
@@ -66,7 +70,9 @@
         "terser": "^5.46.0",
         "typescript-eslint": "^8.53.0"
     },
-    "trustedDependencies": ["@vvago/vale"],
+    "trustedDependencies": [
+        "@vvago/vale"
+    ],
     "peerDependencies": {
         "typescript": "^5.0.0"
     }

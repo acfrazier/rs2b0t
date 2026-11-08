@@ -18,11 +18,10 @@ const CLIENT_RSA = {
 
 const define = buildDefines(resolveBuildIdentity(), TARGET_NAME, CLIENT_RSA);
 
-
 type BunOutput = {
     source: string;
     sourcemap: string;
-}
+};
 
 async function bunBuild(entry: string, external: string[] = [], minify = true, drop: string[] = []): Promise<BunOutput> {
     const build = await Bun.build({
@@ -31,7 +30,7 @@ async function bunBuild(entry: string, external: string[] = [], minify = true, d
         define,
         external,
         minify,
-        drop,
+        drop
     });
 
     if (!build.success) {
@@ -56,83 +55,8 @@ async function applyTerser(script: BunOutput): Promise<void> {
         },
         mangle: {
             nth_identifier: nth_identifier,
-            properties: {
-                reserved: [
-                    // stdlib
-                    'willReadFrequently',
-                    'usedJSHeapSize',
-
-                    // wasm
-                    // must be callable:
-                    '_abort_js',
-                    'emscripten_resize_heap',
-                    'fd_close',
-                    'fd_seek',
-                    'fd_write',
-                    // must be an object:
-                    'env',
-                    'wasi_snapshot_preview1',
-                    // is not an object:
-                    'instance',
-                    // is not a function:
-                    'emscripten_stack_init',
-                    'emscripten_stack_get_end',
-                    '__wasm_call_ctors',
-                    // imports:
-                    'HEAPU8',
-                    // exports:
-                    '_emscripten_stack_restore',
-                    '_emscripten_stack_alloc',
-                    'emscripten_stack_get_current',
-                    'memory',
-                    '_malloc',
-                    'malloc',
-                    '_free',
-                    'free',
-                    '_realloc',
-                    'realloc',
-                    '__indirect_function_table',
-                    '_tsf_load_memory',
-                    'tsf_load_memory',
-                    '_tsf_close',
-                    'tsf_close',
-                    '_tsf_reset',
-                    'tsf_reset',
-                    '_tsf_set_output',
-                    'tsf_set_output',
-                    '_tsf_channel_set_bank_preset',
-                    'tsf_channel_set_bank_preset',
-                    '_tml_load_memory',
-                    'tml_load_memory',
-                    '_midi_render',
-                    'midi_render',
-                    'setValue',
-                    'getValue',
-                    'calledRun',
-
-                    // dns-json response fields
-                    'Status',
-                    'Answer',
-
-                    // main thread <-> ondemand worker protocol
-                    'type',
-                    'versions',
-                    'crcs',
-                    'host',
-                    'secured',
-                    'ingame',
-                    'dbEnabled',
-                    'archive',
-                    'file',
-                    'priority',
-                    'urgent',
-                    'data',
-                    'message',
-                    'failCount',
-                    'error',
-                    'id'
-                ]
-            }
+            // Why: Spessa main-thread ↔ AudioWorklet talks in property names; mangling them mutes MIDI (pitfall 28).
+            properties: false
         }
     });
 
@@ -140,12 +64,16 @@ async function applyTerser(script: BunOutput): Promise<void> {
     script.sourcemap = mini.map?.toString() ?? '';
 }
 
-
 if (!fs.existsSync('out')) {
     fs.mkdirSync('out');
 }
 
-fs.copyFileSync('src/client/3rdparty/tinymidipcm/tinymidipcm.wasm', 'out/tinymidipcm.wasm');
+const SPESSA_PROCESSOR = 'node_modules/spessasynth_lib/dist/spessasynth_processor.min.js';
+if (!fs.existsSync(SPESSA_PROCESSOR)) {
+    console.error(`missing ${SPESSA_PROCESSOR} — bun install spessasynth_lib@4.3.13`);
+    process.exit(1);
+}
+fs.copyFileSync(SPESSA_PROCESSOR, 'out/spessasynth_processor.min.js');
 
 const args = process.argv.slice(2);
 const unknown = args.filter(arg => arg !== 'dev');
@@ -155,11 +83,7 @@ if (unknown.length > 0) {
 }
 const prod = !args.includes('dev');
 
-const entrypoints = [
-    'src/client/shell/Client.ts',
-    'src/client/mapview/MapView.ts',
-    'src/client/io/OnDemandWorker.ts'
-];
+const entrypoints = ['src/client/shell/Client.ts', 'src/client/mapview/MapView.ts', 'src/client/io/OnDemandWorker.ts'];
 
 for (const file of entrypoints) {
     const output = path.basename(file).replace('.ts', '.js').toLowerCase();

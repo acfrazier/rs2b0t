@@ -9,11 +9,6 @@ mock.module('#/client/3rdparty/audio.js', () => ({
     playWave: async (): Promise<void> => {},
     setWaveVolume: (): void => {}
 }));
-mock.module('#/client/3rdparty/tinymidipcm.js', () => ({
-    playMidi: (): void => {},
-    setMidiVolume: (): void => {},
-    stopMidi: (): void => {}
-}));
 
 const HANDLERS_TEST = 'test/client/shell/Client377Handlers.test.ts';
 const ZONE_TEST = 'test/client/shell/ZonePackets377.test.ts';

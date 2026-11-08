@@ -50,7 +50,7 @@ DEST="$ENGINE/public/rs2b0t"
 mkdir -p "$DEST/bot"
 cp out/botclient.js out/botclient.js.map out/ondemandworker.js out/ondemandworker.js.map \
    out/navworker.js out/navworker.js.map out/multibox.js out/multibox.js.map \
-   out/collision.lcnav.gz out/tinymidipcm.wasm "$DEST/bot/"
+   out/collision.lcnav.gz out/spessasynth_processor.min.js "$DEST/bot/"
 # deploy fingerprint: curl /rs2b0t/version.json (also under /rs2b0t/bot/)
 if [ -f out/version.json ]; then
     cp out/version.json "$DEST/version.json"
@@ -85,10 +85,7 @@ stamp "$DEST/index.html" "s#\./bot/botclient\.js#./bot/botclient.js?v=$V#g"
 stamp "$DEST/bot.html" "s#\./bot/botclient\.js#./bot/botclient.js?v=$V#g"
 stamp "$DEST/multibox.html" "s#\./bot/multibox\.js#./bot/multibox.js?v=$M#g"
 
-# soundfont lives in the engine repo; the bot bundle resolves it relative to itself
-if [ -f "$ENGINE/public/client/SCC1_Florestan.sf2" ]; then
-    cp "$ENGINE/public/client/SCC1_Florestan.sf2" "$DEST/bot/"
-fi
+# Pitfall 28: Florestan is origin-absolute /client/SCC1_Florestan.sf2 on the engine; do not copy it next to the bundle.
 
 GIT_LABEL=''
 if [ -f out/version.json ]; then
