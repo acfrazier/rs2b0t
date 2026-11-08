@@ -6,6 +6,7 @@ import { parseArgs } from 'node:util';
 import type { Browser, Page } from 'playwright-core';
 import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { cheatQuiet, deployIsolatedClient, launchBrowser, pageTemplatePath, type IsolatedClient } from './lib/harness.js';
+import { accountName } from './lib/accountName.js';
 import { action, cleanLogout, cycles, installObserver, login, observe, quiescent, readValue, walk, type Npc } from './tap-377/capture-page.js';
 import { startTap, type TapSession } from '../tools/tap-377/tap.js';
 import { loadEngineProtocol } from '../tools/tap-377/protocol.js';
@@ -222,7 +223,7 @@ async function live(): Promise<void> {
         content = required('content');
     const designAccept = readFileSync(join(content, 'pack/interface.pack'), 'utf8').match(/^(\d+)=player_kit:accept$/m);
     assert(designAccept, 'L1 fixture: missing player_kit:accept component');
-    const account = `${accountPrefix}${randomBytes(2).toString('hex').slice(0, 3)}`,
+    const account = accountName(accountPrefix),
         secret = randomBytes(8).toString('hex');
     const tag = account;
     const receipt: Record<string, unknown> = { status: 'FAIL', account, tag, clientCommit: revision(process.cwd()), contentCommit: revision(content), steps: [] };
