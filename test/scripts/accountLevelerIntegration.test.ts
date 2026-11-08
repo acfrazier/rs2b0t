@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import '#/bot/scripts/index.js';
 import { ScriptRegistry } from '#/bot/runtime/ScriptRegistry.js';
 import { emptyMemory, enabledSkills, planNext } from '#/bot/scripts/AccountLeveler/planner.js';
@@ -110,7 +111,7 @@ test('delegated AutoFighter uses the requested combat style instead of saved sta
         spyOn(SettingsStore,'displayString').mockReturnValue('melee'),spyOn(SettingsStore,'saved').mockReturnValue('strength')];
     const logs:string[]=[];const activity=new ScriptActivity(message=>logs.push(message));
     try {
-        await activity.start(ScriptRegistry.get('AutoFighter')!, {combatStyle:'mage',spell:'Wind Strike',solveClues:false});
+        await activity.start({ ...ScriptRegistry.get('AutoFighter')!, revision: CLIENT_VERSION }, {combatStyle:'mage',spell:'Wind Strike',solveClues:false});
         expect(logs.some(line=>line.includes('style mage (Wind Strike'))).toBe(true);
     } finally { activity.stop(); for(const patch of patches)patch.mockRestore(); }
 });

@@ -11,6 +11,7 @@ import { RecoveryHints } from './RecoveryHints.js';
 import { Scheduler } from './Scheduler.js';
 import { ScriptAborted, ScriptContext } from './ScriptContext.js';
 import type { ScriptMeta } from './ScriptRegistry.js';
+import { CLIENT_VERSION } from '../../client/io/ClientProt.js';
 import { RunManager } from './RunManager.js';
 import { SettingsBag, SettingsStore } from './Settings.js';
 import { Supervisor } from './Supervisor.js';
@@ -104,10 +105,24 @@ function endEpitaph(ctx: ScriptContext): string {
     return `ended (${ctx.state}) — ${ctx.stopReason ?? 'no reason recorded'}`;
 }
 
+export function scriptAdmissionReason(meta: Pick<ScriptMeta, 'name' | 'revision'>): string | null {
+    if (meta.revision === CLIENT_VERSION) {
+        return null;
+    }
+
+    const revision = meta.revision === undefined ? 'unknown' : meta.revision;
+    return `${meta.name} targets revision ${revision}, but this client is revision ${CLIENT_VERSION}; refusing to start an unqualified script.`;
+}
+
+interface ScriptStartOptions {
+    runUnqualified?: boolean;
+}
+
 class ScriptRunnerImpl {
     ctx: ScriptContext | null = null;
     bot: AbstractBot | null = null;
     meta: ScriptMeta | null = null;
+    private runUnqualified = false;
 
     private changeListeners = new Set<() => void>();
     /** onStart has returned and established any baselines consumed by onPaint. */
@@ -141,6 +156,12 @@ class ScriptRunnerImpl {
         return this.ctx?.state ?? 'idle';
     }
 
+    /** Whether this active run's explicit override may be inherited by child activities. */
+    get allowsUnqualifiedChildren(): boolean {
+        const state = this.ctx?.state;
+        return this.runUnqualified && (state === 'running' || state === 'paused');
+    }
+
     /** The bot that may safely paint this frame, or null while startup/state is incomplete. */
     get paintBot(): AbstractBot | null {
         const state = this.ctx?.state;
@@ -154,9 +175,15 @@ class ScriptRunnerImpl {
         return this.bot;
     }
 
-    start(meta: ScriptMeta): void {
+    start(meta: ScriptMeta, options?: ScriptStartOptions): void {
         if (this.ctx && (this.ctx.state === 'running' || this.ctx.state === 'paused' || this.ctx.state === 'stopping')) {
             throw new Error(`'${this.meta?.name}' is still ${this.ctx.state}`);
+        }
+        const admissionReason = scriptAdmissionReason(meta);
+        if (admissionReason && !options?.runUnqualified) {
+            RecoveryHints.clear();
+            console.warn(`[rs2b0t] ${admissionReason}`);
+            throw new Error(admissionReason);
         }
 
         // Why: a leftover RunManager.override from the previous bot (or a harness) must not apply to this start.
@@ -174,9 +201,13 @@ class ScriptRunnerImpl {
         this.ctx = ctx;
         this.bot = bot;
         this.meta = meta;
+        this.runUnqualified = options?.runUnqualified === true;
         this.startupComplete = false;
         Scheduler.active = ctx;
 
+        if (admissionReason) {
+            ctx.addLog('warn', `Warning: running unqualified. ${admissionReason}`);
+        }
 
         // Why: a restart (StallGuard) throws away the old context and its log, the only record of why the previous run ended, so carry it over.
         if (previous) {
@@ -408,6 +439,7 @@ class ScriptRunnerImpl {
         if (Scheduler.active === ctx) {
             Scheduler.active = null;
         }
+        if (this.ctx === ctx) this.runUnqualified = false;
         this.fireChange();
     }
 

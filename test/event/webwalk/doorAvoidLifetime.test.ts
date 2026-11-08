@@ -13,6 +13,7 @@ import transports from '#/bot/event/webwalk/data/transports.json';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import * as liveState from '#/bot/event/webwalk/worldStateLive.js';
 import { ScriptRunner } from '#/bot/runtime/ScriptRunner.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 const inside = { x: 2465, z: 3493, level: 0 };
 const outside = { x: 2465, z: 3491, level: 0 };
@@ -45,7 +46,7 @@ async function restart(): Promise<void> {
     ScriptRunner.stop('navigation test restart');
     await Promise.resolve();
     await Promise.resolve();
-    ScriptRunner.start({ name: 'Navigation probe', description: 'door recovery', create: () => new IdleBot() });
+    ScriptRunner.start({ name: 'Navigation probe', description: 'door recovery', revision: CLIENT_VERSION, create: () => new IdleBot() });
     await Promise.resolve();
     await Promise.resolve();
 }

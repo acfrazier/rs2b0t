@@ -2,6 +2,8 @@ import { LoopingBot, TaskBot, resolveLoopCadence } from '../api/bot/Bot.js';
 import { EventSignal } from '../api/execution/EventSignal.js';
 import { Sustain } from '../api/sustain/Sustain.js';
 import { BotHost } from './BotHost.js';
+import { ScriptRunner, scriptAdmissionReason } from './ScriptRunner.js';
+import { RecoveryHints } from './RecoveryHints.js';
 import { RunManager } from './RunManager.js';
 import { Scheduler } from './Scheduler.js';
 import { ScriptAborted } from './ScriptContext.js';
@@ -27,6 +29,15 @@ export class ScriptActivity {
 
     async start(meta: ScriptMeta, overrides: Record<string, unknown>): Promise<void> {
         if (this.child || this.inFlight) throw new Error('An activity is already running');
+        const admissionReason = scriptAdmissionReason(meta);
+        if (admissionReason && !ScriptRunner.allowsUnqualifiedChildren) {
+            const message = `[rs2b0t] ${admissionReason}`;
+            console.warn(message);
+            RecoveryHints.clear();
+            this.log(message);
+            throw new Error(admissionReason);
+        }
+        if (admissionReason) this.log(`[${meta.name}] Warning: running unqualified. ${admissionReason}`);
         const child = meta.create();
         if (!(child instanceof LoopingBot)) throw new Error(`${meta.name} cannot run as an activity`);
         this.child = child;

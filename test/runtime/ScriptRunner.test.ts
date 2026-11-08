@@ -6,6 +6,7 @@ import { Scheduler } from '#/bot/runtime/Scheduler.js';
 import { RandomEvents } from '#/bot/runtime/randomevents/RandomEvents.js';
 import { loopReadyOrDetached, ScriptRunner, stopReasonOf } from '#/bot/runtime/ScriptRunner.js';
 import type { ScriptMeta } from '#/bot/runtime/ScriptRegistry.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 class SelfStoppingBot extends LoopingBot {
     starts = 0;
@@ -82,6 +83,7 @@ test('a script can restart after stopping itself during onStart', async () => {
     const meta: ScriptMeta = {
         name: 'Self-stopping test bot',
         description: 'runner regression fixture',
+        revision: CLIENT_VERSION,
         create: () => {
             const bot = new SelfStoppingBot();
             instances.push(bot);
@@ -122,6 +124,7 @@ test('runner applies ignoredRandoms after onStart and clears them on stop (#597)
     ScriptRunner.start({
         name: 'Ignore swarm probe',
         description: 'runner ignoredRandoms wiring',
+        revision: CLIENT_VERSION,
         create: () => new IgnoreSwarmBot()
     });
     await settle();
@@ -134,6 +137,7 @@ test('runner applies ignoredRandoms after onStart and clears them on stop (#597)
 test('a stop with a blank reason still says so instead of reading as no reason', async () => {
     const meta: ScriptMeta = {
         name: 'Blank reason bot',
+        revision: CLIENT_VERSION,
         description: 'runner regression fixture',
         create: () => new (class extends LoopingBot {
             loop(): void {}
@@ -155,6 +159,7 @@ test('onPaint remains hidden until asynchronous onStart establishes its baseline
     ScriptRunner.start({
         name: 'Paint startup probe',
         description: 'runner paint readiness regression fixture',
+        revision: CLIENT_VERSION,
         create: () => instance
     });
     await settle();
@@ -228,6 +233,7 @@ test('onStart remains blocked until the stat snapshot is ready', async () => {
         ScriptRunner.start({
             name: 'XP baseline probe',
             description: 'runner readiness regression fixture',
+            revision: CLIENT_VERSION,
             create: () => instance
         });
         await settle();

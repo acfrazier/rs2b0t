@@ -7,6 +7,7 @@ import { ScriptRegistry, type ScriptMeta } from '#/bot/runtime/ScriptRegistry.js
 import { SettingsStore } from '#/bot/runtime/Settings.js';
 import { TARGET } from '#/client/config/target.js';
 import { attach, detach } from '#/bot/adapter/ClientAdapter.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 const previousTarget = { ...TARGET };
 
@@ -42,7 +43,7 @@ beforeEach(() => {
     localStorage.setItem('rs2b0t:selectedScript', 'RosterDemo');
     previousMetas = names.map(name => ScriptRegistry.get(name));
     for (const name of names) ScriptRegistry.register({
-        name, description: '', create: () => { throw new Error('runner boundary'); },
+        name, description: '', revision: CLIENT_VERSION, create: () => { throw new Error('runner boundary'); },
         settingsSchema: name === 'WalkTo' ? {
             destination: { type: 'string', default: 'Lumbridge' },
             customTile: { type: 'tile', default: { x: 0, z: 0, level: 0 } }

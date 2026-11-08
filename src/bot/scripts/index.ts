@@ -93,6 +93,7 @@ import WanderLooter, { SETTINGS as WANDER_LOOTER_SETTINGS } from './WanderLooter
 
 // First register = panel default when no script is remembered (BotPanel → list()[0]).
 ScriptRegistry.register({
+    revision: 289,
     name: 'AIO Teleport',
     description: 'Automated teleportation with intelligent banking and safety features',
     category: 'Magic',
@@ -102,6 +103,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'AIOQuester',
     description: 'All-in-one quest completer — queues the implemented quests (empty selection = all), provisions items bank-first, runs each to journal-complete',
     category: 'Quest',
@@ -111,6 +113,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ArravSupplier',
     description: 'Shield of Arrav certificate faucet — joins both gangs from one account, farms both shield halves and banks certificates for other bots; never redeems, so the chest and the curator keep working',
     category: 'Quest',
@@ -120,6 +123,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Barcrawl',
     description: "Alfred Grimhand's Barcrawl — banks for the drinks, gets the card from the outpost guard, tours all ten bars nearest-first and hands it back in (opens the Barbarian Outpost gate)",
     category: 'Quest',
@@ -128,6 +132,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ChickenKiller',
     description: 'Kills chickens, loots and buries bones (anchor = start tile)',
     category: 'Combat',
@@ -137,6 +142,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Duel Arena Combat Trainer',
     description: 'Walks to the Al Kharid Duel Arena, pairs with other players, accepts both no-stake screens, fights with melee, and trains Attack/Strength plus opt-in Defence toward configured target levels',
     category: 'Combat',
@@ -146,6 +152,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'CowKiller',
     description: 'Walks to the Lumbridge, north-west Lumbridge, south-Falador, or East Ardougne cow fields, loots cowhide, and banks each field at its pinned bank',
     category: 'Combat',
@@ -155,6 +162,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ChaosDruidKiller',
     description: 'Kills Chaos druids — Edgeville dungeon, the picklocked Chaos Druid Tower (46 Thieving), or Yanille dungeon Chaos druid warriors past the 40 Agility ledge — loots Herb/Law/Nature rune drops, banks them',
     category: 'Combat',
@@ -164,6 +172,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'RockCrab',
     description: 'Rellekka rock crabs: aggro-stack-kill-reset, loots key halves',
     category: 'Combat',
@@ -173,6 +182,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'RangingGuild',
     description: 'Plays the Ranging Guild archery competition for tickets and trades every 2000 for 50 rune arrows. Pays the judge 200 coins a round, shoots the ten arrows from behind the haystacks, banks at Seers for coins and the best bow',
     category: 'Money making',
@@ -182,6 +192,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'MossGiant',
     description: 'Moss giants N of Ardougne: range/mage safespot or melee, banks all loot',
     category: 'Combat',
@@ -191,6 +202,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'BrimhavenMossGiants',
     description: 'Brimhaven moss giant island: range/mage/melee walk-and-fight (multicombat, safespot disabled), banks all loot at Ardougne S and sails back via the boat',
     category: 'Combat',
@@ -200,6 +212,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'GreenDragon',
     description: 'Wilderness green dragons N of Edgeville: melee/mage w/ anti-dragon shield, banks bones + hides, sips super attack/strength mid-fight',
     category: 'Combat',
@@ -209,6 +222,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'FireGiant',
     description: 'Waterfall Dungeon fire giants: range/mage safespot or melee, enters by raft + rope + Glarial\'s amulet, rides the barrel out to bank',
     category: 'Combat',
@@ -218,6 +232,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveDragons',
     description: "Taverley Dungeon blue or black dragons, or the Heroes' Guild dragon fought through its fence: mage or range from a derived safespot, or melee with the Dragonfire shield. Opens the dusty-key gate, fetching the key off Velrak when the bank has none.",
     category: 'Combat',
@@ -227,6 +242,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveDemons',
     description: 'Taverley Dungeon black demons: mage or range from a derived safespot in the pocket past the blue dragons. Opens the dusty-key gate, fetching the key off Velrak when the bank has none.',
     category: 'Combat',
@@ -236,6 +252,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveKBD',
     description: 'King Black Dragon with magic from the alcove beside the lair exit lever, wearing the Dragonfire shield against the far fire. Walks the wilderness from Edgeville to the Lava Maze ladder, drinks a Superantipoison before the lever spiders, and teleports to Varrock to bank.',
     category: 'Combat',
@@ -245,6 +262,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveKQ',
     description: 'Four-player Kalphite Queen trips with a shared dragon mace and magic shortbow loadout, synchronized ropes, a four-point cross, repeated kills and group retreats.',
     category: 'Combat',
@@ -254,6 +272,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveCrafting',
     description: 'Crafts gold jewellery at the Al Kharid furnace, or strings unstrung amulets with balls of wool at the nearest bank. Banks finished items and stops when supplies run out.',
     category: 'Crafting',
@@ -263,6 +282,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveEnchanter',
     description: 'Stands at the nearest bank and enchants one jewel picked from the dropdown: wields a matching elemental staff when the bank has one, withdraws the jewels by id and the runes their casts need, casts one enchant every three ticks and banks the products. Stops honestly when the bank runs out of the jewel or a rune.',
     category: 'Magic',
@@ -272,6 +292,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveMarketDumper',
     description: 'Dumps a bank to a running MarketMaker: withdraws every tradeable item as notes, puts the pile up in one window and takes whatever the maker bids, banking the coins between trips. It needs no price book, since anything the maker will not pay for rides along with what it does. Stops when the bank is empty or the maker turns down all that is left.',
     category: 'Money making',
@@ -281,6 +302,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveChests',
     description: 'Opens the Taverley crystal chest with seven keys per trip from Falador West. Keeps food and low-priority rewards unless a full pack blocks valuable ground loot. Collects overflow in priority order: dragonstones, key halves, runite bars, diamonds, rubies, rune legs or skirts, then other rewards. Banks when full and returns for remaining loot before opening again. Walks to the chest and optionally teleports home from it, stocking up to ten Falador casts and accounting for equipped elemental staffs. Stops after the keys are exhausted and remaining loot is collected and banked. Optional bank-only mode withdraws 14 of each key half, combines up to five pairs at a time and deposits the crystal keys, repeating until either half runs out.',
     category: 'Money making',
@@ -290,6 +312,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveBalls',
     description: 'Shears sheep and banks raw wool, keeping shears. Select Lumbridge, Varrock south, Falador west, the Monastery or Ardougne north, or randomly choose a flock once per run, weighted by flock size. Retrieves shears from the bank or a free spawn. Waits for wool to regrow and repeats bank trips to the selected flock.',
     category: 'Money making',
@@ -299,6 +322,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ArdyFighter',
     description: 'Fights East Ardougne market guards, feeds itself from the Baker\'s stall, loots rares, banks them at the south bank, solves clue drops (needs melee stats that beat the 60s guard respawn — ~str 80 unarmed)',
     category: 'Combat',
@@ -308,6 +332,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Thiever',
     description: 'Pickpockets an NPC (Man by default), eats after failed steals, and optionally banks to restock food before returning to the start tile',
     category: 'Thieving',
@@ -317,6 +342,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'AutoFighter',
     description: 'Start-or-coordinate fighter — kills any named NPC in its leash, loots selected drops, auto-banks, solves clues, and returns to the killing spot',
     category: 'Combat',
@@ -326,6 +352,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ArdyThiever',
     description: 'Low-level East Ardougne pickpocket bot — steals cake for food, pickpockets Guard/Knight/Paladin/Hero, flees (kites) or fights the guard per the guardResponse setting, banks loot + junk, grabs ground coins, solves clue drops',
     category: 'Thieving',
@@ -335,6 +362,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ArdyCakes',
     description: 'Baker\'s-stall cake thiever — steals on the golden stand, resets nearby when watched, banks full packs, flees (kites) or fights a catching guard per guardResponse, solves clue drops',
     category: 'Thieving',
@@ -344,6 +372,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Woodcutter',
     description:
         'Chops the chosen tree type, then banks logs, drops them, or burns a full load (chop-then-burn). Needs an axe; burn mode also needs a tinderbox (both restock from the bank when Full inventory is Auto). Optional Buy/repair acquires axes from Bob or smiths mith+ from bars.',
@@ -354,6 +383,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'GnomeMagicChopper',
     description:
         'Locates every Magic tree in Tree Gnome Stronghold (west 2372,3425 / south-bank 2433,3410 / east 2491,3413), runs to the nearest one that is up, and chops it. If none are up it hops to the next pin. Banks at the upstairs gnome booths (stairs 2444,3416 and 2445,3443 only). If fletching is on: magic shortbows at 80 / longbows at 85. On death: Lumbridge knife spawn, 500gp, Steel axe from Bob, SneakyArdougne boats, then gnome restock.',
@@ -364,6 +394,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Miner',
     description:
         'Mines the selected rock types, then banks the ore or drops the whole haul in a batch when Bank=false. Power mode keeps food for healing and restocks when it runs out. Needs a pickaxe (best available is restocked from the bank when Full inventory is Auto). Optional Buy/repair acquires picks from Nurmof (and repairs broken picks).',
@@ -374,6 +405,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'EssMiner',
     description: 'Rune essence loop — Aubury teleport, one-click mine to a full pack, portal back, bank at Varrock East. Needs Rune Mysteries; uses your best pickaxe and buys the exact best usable tier from Nurmof when banked coins cover it',
     category: 'Mining',
@@ -383,6 +415,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'CoalTrucks',
     description: 'Mines coal at the Coal Trucks, buffers 120 in the trucks, then drains them into the Seers bank — needs Mining 30 and a pickaxe. No combat handling: the level-27 giant bats are aggressive below 55 combat.',
     category: 'Mining',
@@ -391,6 +424,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'RuneCrafter',
     description: 'AIO Runecrafting (Air/Earth) — Solo banks its own essence and crafts at the altar; a Runner needs its own talisman and carries a full 26-essence load into the altar; the Mule Recipient camps next to the altar, never leaves, and crafts between the deliveries runners bring it',
     category: 'Runecrafting',
@@ -400,6 +434,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveRC',
     description: 'Master/runner crafting for Nature, Air and Cosmic runes. Nature runners unnote at Jiminua, Air runners bank at Falador East, and Cosmic runners bank in Zanaris. Start Cosmic accounts in Zanaris or the cosmic altar.',
     category: 'Runecrafting',
@@ -409,6 +444,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Fisher',
     description:
         'Fishes a chosen method at the spot that offers it; banks the catch, optionally cooks at a nearby range, or drops it. Change Cook mode to reveal fish filter, burnt policy, and (for bank-raw-then-cook) the N quantity. Optional Buy/repair buys missing gear from the nearest fishing shop (Harry at Catherby, Gerrant for feathers/fly rod) and can buy bait/feathers up to Bait qty.',
@@ -557,6 +593,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'CookBot',
     description: 'Bank cook loop — withdraw raw fish, cook it one at a time on the range nearest the bank or on a fire you light outside, bank everything, repeat',
     category: 'Cooking',
@@ -566,6 +603,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'BankFletcher',
     description: 'Bank-standing fletcher — keeps the knife (or bow string), Make-X logs into shafts/unstrung bows, or spam-string unstrung bows and attach arrows',
     category: 'Fletching',
@@ -575,6 +613,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'BankSorter',
     description: 'Walks to a bank and rewrites the slot order into categories, coins first and junk last, then stops. Optionally reports, and drops, quest items a finished quest no longer needs',
     category: 'Utility',
@@ -584,6 +623,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'JiveCaskets',
     description: 'Opens ordinary loot caskets at the bank. Withdraws a full inventory, opens up to five caskets at a time, deposits all inventory items and repeats until the bank is out of caskets. Start at a bank. Clue and quest caskets are left banked.',
     category: 'Utility',
@@ -592,6 +632,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'DartFletcher',
     description: 'Spam-attaches feathers to stackable dart tips at the five-action-per-tick server ceiling; runs anywhere until either input stack is empty',
     category: 'Fletching',
@@ -601,6 +642,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'RoguesPurse',
     description: 'Infinite Herblore grind at the fungus-covered cavern wall under the Karamja jungle — searches, identifies, and drops Rogues purse on the tick. Walks itself there; needs Herblore 3 and Jungle Potion past the point where Trufitus asks for the purse',
     category: 'Herblore',
@@ -609,6 +651,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'HerbloreSecondaries',
     description:
         "Collects one herblore secondary — red spiders' eggs, snape grass, eye of newt, chocolate dust (buy+grind), white berries (dragonfire shield), toad's legs, or unicorn horn dust (grinds banked horns at the nearest bank) — with food on dangerous routes and a 5k coin cap for shops",
@@ -619,6 +662,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'HerbCleaner',
     description:
         'Banks at the nearest bank, withdraws unidentified herbs, cleans (identifies) every one your Herblore level allows — lowest-level first — deposits the cleaned herbs, and repeats. Leave all herbs unchecked to clean everything you can; check specific herbs to restrict the run to a subset. Each bank cycle deposits everything from your pack, so start with nothing valuable carried',
@@ -629,6 +673,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'PotionMaker',
     description:
         'Banks at the nearest bank, withdraws vials of water and a chosen herb, spam-makes 14 unfinished potions, then withdraws a chosen secondary to finish them and deposits the potions, repeating the cycle. Each leg picks an herb and a secondary from the dropdowns, or types one via Custom',
@@ -639,6 +684,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'BoneBurier',
     description: 'Bank-standing Prayer trainer — withdraws full loads of an exact bone name and buries them until the bank is empty',
     category: 'Prayer',
@@ -648,6 +694,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'FlourCollector',
     description: 'Fills banked empty pots at Sinclair Mansion and banks the flour at Seers. Requires Murder Mystery started.',
     category: 'Cooking',
@@ -656,6 +703,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'SmelterBot',
     description: 'Al Kharid smelter — withdraw ore, use it on the Furnace to smelt bars (all 8 bar types), bank, repeat',
     category: 'Smithing',
@@ -665,6 +713,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Superheater',
     description: 'Smelts bars with the Superheat Item spell instead of a furnace — withdraws ore, casts onto the primary ore, banks the bars, repeat',
     category: 'Smithing',
@@ -674,6 +723,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Alcher',
     description: 'Alchemy loop — tick the items to alch and the bot drains them richest first, withdrawing each as notes and casting High or Low Level Alchemy (fire staff + nature runes) until the bank is out, then moving to the next',
     category: 'Magic',
@@ -683,6 +733,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'SmithingBot',
     description: 'Varrock anvil smithing — withdraw bars + a hammer, make the chosen item at the anvil, bank the products, repeat',
     category: 'Smithing',
@@ -692,6 +743,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'FlaxPicker',
     description: 'Seers flax field picker — pick flax until full, bank it at Seers, repeat',
     category: 'Crafting',
@@ -701,6 +753,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'FlaxSpinner',
     description: 'Seers spinner: withdraw flax for bow strings or wool for balls of wool, spin upstairs, bank the output, and repeat',
     category: 'Crafting',
@@ -710,6 +763,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'FlaxAIO',
     description: 'Seers flax all-in-one — pick flax at the field and/or spin it at the wheel into bow strings, banking between. Pick and Spin are both optional toggles (at least one must be on); with both on it picks, spins on the way back, and banks the bow strings',
     category: 'Crafting',
@@ -719,6 +773,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'GemCutter',
     description:
         'Banks at the nearest bank, withdraws uncut gems and a chisel, cuts every gem your Crafting level allows — lowest-level first — deposits the cut gems (and crushed gems), and repeats. Leave all gems unchecked to cut everything you can; check specific gems to restrict the run to a subset. Each bank cycle deposits everything from your pack, so start with nothing valuable carried',
@@ -729,6 +784,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'GnomeCourse',
     description: 'Travels to and runs the Gnome Stronghold agility course',
     category: 'Agility',
@@ -738,6 +794,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'WildyAgility',
     description: 'Runs the Wilderness Agility Course, eats while running, and on death banks (food-only) then returns — needs Agility 52 + carried food (start at the entrance)',
     category: 'Agility',
@@ -747,6 +804,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'EdgevilleMonkeyBars',
     description: 'Edgeville dungeon monkey bars — restock via dungeon ladder or after death. NOT RECOMMENDED FOR 10HP ACCOUNTS.',
     category: 'Agility',
@@ -756,6 +814,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'BrimhavenAgility',
     description:
         'Brimhaven Agility Arena — banks food+coins at Ardougne south, ships to Brimhaven, pays Cap\'n Izzy, tags ticket pillars on the level-optimal path, and grinds centre spikes between tags. Optional steal restock (Thieving 20) takes cakes from the Baker\'s stall and coins from guards.',
@@ -766,6 +825,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'MuleCrafter',
     description: 'Crafter + mule runecrafting loop — meet at the altar temple or overworld ruins, and trade with any configured mule that is available. Crafter has the talisman; bankFill=false prevents all crafter bank visits and overrides Bank after trades but still trades with configured mules, while bankFill=true enables scheduled bank trips. Mule ferries essence and runes between the meeting point and bank.',
     category: 'Runecrafting',
@@ -775,6 +835,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'MuleDepot',
     description: 'Shared-bank depot for a group of accounts, in two modes. Dump: every mule withdraws a shared item list and trades the lot to one supermule, which banks each delivery and keeps going. Supply: one supplier hands a fixed loadout to each account once, delivering over as many trades as the loadout needs, then stops; if the bank cannot supply a line, the rest is still delivered and the shortfall is named when it stops. Four roles off two settings — Dump/Mule, Dump/Supermule, Supply/Supplier, Supply/Client — and a designation from the wrong mode is refused at startup. Default bank Seers; both sides use the same one.',
     category: 'Utility',
@@ -784,6 +845,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'MarketMaker',
     description: 'Player shop — stands at a bank, buys and sells the items in an order book, quotes in public chat ("buy 100 iron ore"), and declines any trade that does not match what it quoted',
     category: 'Money making',
@@ -793,6 +855,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ClimbingBoots',
     description:
         'Falador West to Tenzing climbing-boot buyer. Withdraws exact gp so the last pair replaces the coin stack. Optional Falador teleport runes for the walk back. Needs Death Plateau complete.',
@@ -803,6 +866,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ShopBuyout',
     description: "Parks at ONE shop and buys it out repeatedly on a total gp budget — no routing. Defaults to Lundail's Mage Arena rune shop (banks via Gundai's dialog); get the bot to the shop yourself.",
     category: 'Money making',
@@ -812,6 +876,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ShopRunner',
     description: 'World shop-run supply loop — cycles shop clusters buying Herblore supplies, feathers, runes, and arrows/arrowtips, banking between clusters with capped gp withdrawals; skips shops until stock regenerates',
     category: 'Money making',
@@ -821,6 +886,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'ClueSolver',
     description: 'Solves the easy clue scroll (or opens the casket) in your pack — banks everything except clue/food/spade at the nearest bank, walks the trail, opens the reward. Idles until you hand it a clue.',
     category: 'Treasure Trails',
@@ -830,6 +896,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'WalkTo',
     description: 'Walks to a chosen destination and stops — Lumbridge, Varrock, Falador, Ardougne, Rellekka, Taverley (centre); Draynor, Al Kharid, Edgeville, Seers, Catherby, Yanille (bank); or a custom tile',
     category: 'Navigation',
@@ -839,6 +906,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'DoorOpener',
     description: 'Walks to a chosen tile and opens the nearest shut door every tick',
     category: 'Navigation',
@@ -848,6 +916,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'TannerBot',
     description: 'Al Kharid tanning loop — banks hides, tans the full load in one click at the Tanner, and every Nth trip keeps a slot free to buy out Dommik\'s thread',
     category: 'Crafting',
@@ -857,6 +926,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'HillGiant',
     description: 'Edgeville dungeon hill giants — enters through the public trapdoor and banks limpwurt roots and big bones at Edgeville',
     category: 'Combat',
@@ -866,6 +936,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'VialFiller',
     description: 'Falador vial-filling loop — banks empty vials, fills them one by one at the fountain, and can restock from Jatix in Taverley every Nth trip',
     category: 'Herblore',
@@ -875,6 +946,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'LeatherCrafter',
     description: 'Crafts the best leather item your Crafting level allows at the nearest bank. Buys missing thread from Dommik, Rommik, or the Fancy dress shop owner and returns to the same bank.',
     category: 'Crafting',
@@ -884,6 +956,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'Firemaker',
     description: 'Banks logs and burns them along the longest clear lane next to the bank — Varrock east/west, Draynor or Seers',
     category: 'Firemaking',
@@ -893,6 +966,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'FlaxRunner',
     description: 'Two-player cooperative flax picking and spinning — Runner picks flax and delivers to Spinner; Spinner spins flax into bow strings and banks them',
     category: 'Crafting',
@@ -902,6 +976,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'AccountLeveler',
     description: 'Trains melee first, then remaining combat skills, then other enabled members skills to 60. Stocks essence in batches of 1,000 and uses Edgeville monkey bars from Agility 15. Buys supplies, runs required quests, and recovers from death. Wilderness training is optional and enabled by default.',
     category: 'General',
@@ -911,6 +986,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
+    revision: 289,
     name: 'WanderLooter',
     description: 'Wanders the overworld looting exact-name drops without fighting. Eats configured food, flees to the nearest bank when low on health without food, banks excess loot and food, and avoids tiles where it took damage.',
     category: 'Money making',

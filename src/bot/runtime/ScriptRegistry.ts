@@ -9,6 +9,7 @@ export interface ScriptMeta {
     tags?: string[];
     origin?: string;
     settingsSchema?: SettingsSchema;
+    revision?: number;
     create(): AbstractBot;
 }
 

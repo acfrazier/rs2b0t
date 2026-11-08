@@ -13,6 +13,7 @@ import { BotHost } from '#/bot/runtime/BotHost.js';
 import { ScriptRegistry } from '#/bot/runtime/ScriptRegistry.js';
 import { ScriptAborted, ScriptContext } from '#/bot/runtime/ScriptContext.js';
 import { ScriptRunner } from '#/bot/runtime/ScriptRunner.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 test('a pending bank operation reports its action and position without claiming progress', async () => {
     let now = 1000;
@@ -156,7 +157,7 @@ test('controller observes bank changes and training while a delegated loop is pe
         frame();
         bot['session'].start({ id: 'burn', label: 'burn logs', script: 'Firemaker', objective: 'firemaking', settings: {}, needs: [{ item: 'Logs', count: 28 }] }, now, () => 0);
         bot['phase'] = 'train';
-        await bot['activity'].start({ name: 'pending', description: '', create: () => new class extends LoopingBot {
+        await bot['activity'].start({ name: 'pending', description: '', revision: CLIENT_VERSION, create: () => new class extends LoopingBot {
             async loop() { entered = true; await pending; }
         }() }, {});
         frame();

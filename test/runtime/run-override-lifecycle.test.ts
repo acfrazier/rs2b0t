@@ -4,6 +4,7 @@ import { LoopingBot } from '#/bot/api/bot/Bot.js';
 import { RunManager, type RunPolicyOverride } from '#/bot/runtime/RunManager.js';
 import { ScriptRegistry } from '#/bot/runtime/ScriptRegistry.js';
 import { ScriptRunner } from '#/bot/runtime/ScriptRunner.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 
 const NAME = 'Run override lifecycle fixture';
 
@@ -19,6 +20,7 @@ test('ScriptRunner start and stop clear a leftover run override', async () => {
     ScriptRegistry.register({
         name: NAME,
         description: 'test fixture',
+        revision: CLIENT_VERSION,
         create: () =>
             new (class extends LoopingBot {
                 override loop(): void {}
