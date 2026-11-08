@@ -22,6 +22,7 @@ const complete: WorldStateData = {
     quests: { 'Plague City': 'complete', Biohazard: 'complete' }
 };
 
+
 // 377 map placements of the Ardougne wall door: ardougnedoor_l (8738) at 2557,3300 and 2558,3299, ardougnedoor_r (8739) at 2557,3299 and 2558,3300.
 // A crossing clicks the placement in line with its stand tiles, so each row names the loc beside the row's own z.
 for (const [x, toX, z, locX, locId] of [

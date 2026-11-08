@@ -26,17 +26,15 @@ edges across it.
 
 ## Clues the pack cannot reach
 
-The offline audit now carries four exceptions in
+The offline audit now carries three exceptions in
 [`PACK_UNREACHABLE`](../../src/bot/api/ai/clues/data/unreachable.ts): the
-Gnome ball field clue 2853 and the three Regicide clues below. Kharazi Jungle
-and Duel Arena helper behavior is documented here too, but those clue ids are
-absent from the current 377 clue database.
+three Regicide clues below. The S8 377 door bake includes the gnome-ball
+field gate in ordinary routing, so clue 2853 is no longer an exception.
+Kharazi Jungle and Duel Arena helper behavior is documented here too, but
+those clue ids are absent from the current 377 clue database.
 An entry describes a limitation of ordinary pack routing; it does not always
 mean the clue solver cannot get there.
 
-- **Gnome ball field, 2853.** The referee anchor is behind a gate whose
-  `Open` loc has no 377 category, so the derivation dropped it from the
-  ordinary route graph.
 - **Tirannwn, 3560, 3562 and 3564.** After Regicide is complete,
   `tirannwnTravel.ts` routes across `REGICIDE_SEAMS`, including the return to
   the mainland. Those seams are separate from the ordinary nav graph.

@@ -1,6 +1,8 @@
 /** Why: the manifest is the only record tying an artifact to its generator, engine and content commit, and verify enforces it everywhere; usage in docs/how-to/build-and-data.md. */
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 
 import {
     ARTIFACT_KINDS,
@@ -126,6 +128,9 @@ function artifactRow(spec: { path: string; kind: ArtifactKind; qualification: Qu
         sha256: sha256File(abs),
         kind: spec.kind,
         qualification: spec.qualification,
+        ...(path === 'out/collision.lcnav.gz' && spec.kind === 'out'
+            ? { uncompressedSha256: createHash('sha256').update(gunzipSync(readFileSync(abs))).digest('hex') }
+            : {}),
         ...(stagedOut ? { stagedPath: spec.path } : {})
     };
 }

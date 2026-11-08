@@ -42,10 +42,21 @@ export function walkPollMsFromEnv(fallback = DEFAULT_WALK_POLL_MS): number {
 
 export type NavTile = { x: number; z: number; level: number };
 
+export type NavHop = {
+    x: number;
+    z: number;
+    level: number;
+    kind: string | null;
+    action: string | null;
+    locName: string | null;
+    locId: number | null;
+};
+
 export type NavWalkResult = {
     walkOk: boolean;
     tile: NavTile | null;
     logs: string[];
+    hops: NavHop[];
 };
 
 export type NavPaintFlags = {
@@ -941,6 +952,7 @@ type WalkSlot = {
     walkOk: boolean;
     tile: NavTile | null;
     logs: string[];
+    hops: NavHop[];
 };
 
 type WalkMidSlot = {
@@ -992,7 +1004,9 @@ export async function ensureRunnerStopped(
 }
 
 /** Start a one-shot LoopingBot that calls Traversal.walkTo and poll until done; the result slot is configurable so concurrent harnesses stay isolated.
- *  Why: the runner is always stopped before return, including on poll timeout, or multi-leg suites cascade with `'Nav…' is still running`; {@link RunNavWalkOpts.stuckAbort} ends a leg whose wall time far exceeds the planner estimate with no movement (door thrash), failing that leg alone. */
+ *  Why: the runner is always stopped before return, including on poll timeout, or multi-leg suites cascade with `'Nav…' is still running`; {@link RunNavWalkOpts.stuckAbort} ends a leg whose wall time far exceeds the planner estimate with no movement (door thrash), failing that leg alone.
+ *  The injected Probe has no product manifest, so this harness uses ScriptRunner's explicit unqualified override; it does not change admission for registered product scripts.
+ */
 export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavWalkResult> {
     const resultKey = opts.resultKey ?? '__navLiveWalk';
     const midKey = `${resultKey}__mid`;
@@ -1025,6 +1039,7 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                 const g = globalThis as never as Record<string, unknown> & {
                     __rs2b0t: {
                         reader: { worldTile(): NavTile | null };
+                        PathPublish: { get(): { tiles: Array<NavHop & { transport?: boolean }> } | null };
                         LoopingBot: new () => { loop(): unknown; log(m: string): void };
                         Traversal: {
                             walkTo(
@@ -1044,7 +1059,7 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                         };
                         registerScript(m: { name: string; create(): unknown }): unknown;
                     };
-                    rs2b0t: { runner: { start(meta: unknown): void; stop(reason: string): void } };
+                    rs2b0t: { runner: { start(meta: unknown, options: { runUnqualified?: boolean }): void; stop(reason: string): void } };
                 };
                 (g as Record<string, unknown>)[resultKey] = undefined;
                 (g as Record<string, unknown>)[midKey] = {
@@ -1053,7 +1068,29 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                     logs: []
                 } satisfies WalkMidSlot;
 
+                const observedHops = new Map<string, NavHop>();
+                const capturePublishedHops = (): void => {
+                    const tiles = g.__rs2b0t.PathPublish.get()?.tiles ?? [];
+                    for (const t of tiles) {
+                        if (!t.transport) continue;
+                        const hop: NavHop = {
+                            x: t.x,
+                            z: t.z,
+                            level: t.level,
+                            kind: t.kind ?? null,
+                            action: t.action ?? null,
+                            locName: t.locName ?? null,
+                            locId: t.locId ?? null
+                        };
+                        observedHops.set(JSON.stringify(hop), hop);
+                    }
+                };
+                const captureKey = `${midKey}__captureTimer`;
+                const captureTimer = setInterval(capturePublishedHops, 50);
+                (g as Record<string, unknown>)[captureKey] = captureTimer;
+
                 const publishMid = (logs: string[], pathCost: number | null): void => {
+                    capturePublishedHops();
                     (g as Record<string, unknown>)[midKey] = {
                         tile: g.__rs2b0t.reader.worldTile(),
                         pathCost,
@@ -1085,18 +1122,26 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                                     publishMid(logs, pathCost);
                                 }
                             });
+                            capturePublishedHops();
+                            const hops = [...observedHops.values()];
                             (g as Record<string, unknown>)[resultKey] = {
                                 walkOk,
                                 tile: g.__rs2b0t.reader.worldTile(),
-                                logs
+                                logs,
+                                hops
                             } satisfies WalkSlot;
                         } catch (e) {
+                            capturePublishedHops();
                             (g as Record<string, unknown>)[resultKey] = {
                                 walkOk: false,
                                 tile: g.__rs2b0t.reader.worldTile(),
-                                logs: [...logs, String(e)]
+                                logs: [...logs, String(e)],
+                                hops: [...observedHops.values()]
                             } satisfies WalkSlot;
                         } finally {
+                            capturePublishedHops();
+                            clearInterval(captureTimer);
+                            delete (g as Record<string, unknown>)[captureKey];
                             publishMid(logs, pathCost);
                             g.rs2b0t.runner.stop('harness stop');
                         }
@@ -1106,7 +1151,8 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
                     g.__rs2b0t.registerScript({
                         name: `${prefix}${Date.now()}`,
                         create: () => new Probe()
-                    })
+                    }),
+                    { runUnqualified: true }
                 );
             },
             {
@@ -1226,6 +1272,10 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
         await page
             .evaluate(({ midKey }) => {
                 const g = globalThis as never as Record<string, unknown>;
+                const captureKey = `${midKey}__captureTimer`;
+                const timer = g[captureKey];
+                if (typeof timer === 'number') clearInterval(timer);
+                delete g[captureKey];
                 delete g[midKey];
             }, { midKey })
             .catch(() => undefined);
@@ -1245,13 +1295,14 @@ export async function runNavWalk(page: Page, opts: RunNavWalkOpts): Promise<NavW
         if (stuckReason) {
             logs.unshift(stuckReason);
         }
-        return { walkOk: false, tile: lastTile, logs };
+        return { walkOk: false, tile: lastTile, logs, hops: [] };
     }
     if (stuckReason && !result.logs.some(l => l.includes('harness stuck abort'))) {
         return {
             walkOk: false,
             tile: result.tile ?? lastTile,
-            logs: [...result.logs, stuckReason]
+            logs: [...result.logs, stuckReason],
+            hops: result.hops,
         };
     }
     return result;

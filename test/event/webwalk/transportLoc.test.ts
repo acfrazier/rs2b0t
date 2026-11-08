@@ -3,6 +3,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import { findTransportLoc, matchesTransportLoc, transportLocValid } from '#/bot/event/webwalk/exec/transportLoc.js';
 import { reader } from '#/bot/adapter/ClientAdapter.js';
 import type { TransportInfo } from '#/bot/event/webwalk/PathFinder.js';
+import { allTransportRows } from '#/bot/event/webwalk/loadTransportGraph.js';
 
 const gate: TransportInfo = {
     locName: 'Gate',
@@ -37,6 +38,28 @@ test.each([true, false])('Ice Queen ladder lookup cannot substitute a closer lad
     if (present) expect(found?.tile()).toMatchObject(intended.tile);
     else expect(found).toBeNull();
     expect(transportLocValid(iceLadder)).toBe(present);
+});
+
+test('finds the West Ardougne gate by its live scene name', () => {
+    const edge = allTransportRows().find(
+        candidate => candidate.locId === 8739 && candidate.locX === 2558 && candidate.locZ === 3300
+    );
+    if (!edge) throw new Error('missing West Ardougne gate transport');
+    spyOn(reader, 'locs').mockReturnValue([
+        {
+            typecode: 0,
+            id: 8739,
+            name: 'Ardougne Wall Door',
+            ops: ['Open'],
+            tile: { x: 2558, z: 3300, level: 0 },
+            distance: 0
+        }
+    ]);
+
+    if (edge.locX === undefined || edge.locZ === undefined) throw new Error('West gate transport has no loc tile');
+    const found = findTransportLoc({ ...edge, locX: edge.locX, locZ: edge.locZ });
+    expect(found?.id).toBe(8739);
+    expect(found?.tile()).toMatchObject({ x: 2558, z: 3300 });
 });
 
 describe('matchesTransportLoc', () => {

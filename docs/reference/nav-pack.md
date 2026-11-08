@@ -25,6 +25,12 @@ collision cannot express:
 | [`specialRequires.ts`](../../src/bot/event/webwalk/specialRequires.ts) | content scripts | plan-time skill/coin gates on doors and transport from-tiles |
 | [`teleportCatalog.ts`](../../src/bot/event/webwalk/teleportCatalog.ts) | content / kit | spell + jewellery tele edges injected into A* by default |
 
+Revision 377 manifests pin the gzip artifact and also the SHA-256 of its
+decompressed nav bytes. The raw hash records graph identity independently of gzip
+metadata; deployment checks both digests before writing its isolated client files.
+The door bake receipt lists every policy-refused `Open` loc type and a separate
+uncategorized subset. The Gnomeball gate's generic loc type remains refused; only
+the content-confirmed placement at `(2383,3488,0)` is added as a curated route edge.
 There is a **single** door/transport/travelCatalog graph and a **single** executor
 (`WalkExecutor` + `exec/`). Live walks snapshot WorldState so skill/quest/coin gates
 fail closed when the player cannot use them. Offline / no-state path finds **fail open**

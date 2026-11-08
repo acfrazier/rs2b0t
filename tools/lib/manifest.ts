@@ -4,6 +4,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 
 export const MANIFEST_PATH = 'data/manifest.json';
 export const STAGING_ROOT = 'data/377';
@@ -23,6 +24,8 @@ export interface ManifestArtifact {
     sha256: string;
     kind: ArtifactKind;
     qualification: Qualification;
+    /** Hash of the raw nav bytes inside the collision gzip; independent of gzip headers. */
+    uncompressedSha256?: string;
     /** For an `out` artifact staged before cutover, its temporary source path under `data/377/`. */
     stagedPath?: string;
 }
@@ -55,7 +58,7 @@ const ENGINE_KEYS = ['commit', 'archives'];
 const ARCHIVE_KEYS = ['config', 'interface'];
 const CONTENT_KEYS = ['commit'];
 const TOOLCHAIN_KEYS = ['node', 'bun'];
-const ARTIFACT_KEYS = ['path', 'sha256', 'kind', 'qualification', 'stagedPath'];
+const ARTIFACT_KEYS = ['path', 'sha256', 'kind', 'qualification', 'uncompressedSha256', 'stagedPath'];
 
 function fail(where: string, message: string): never {
     throw new ManifestError(`${MANIFEST_PATH}: ${where}: ${message}`);
@@ -134,6 +137,15 @@ function parseArtifact(value: unknown, index: number, cutover: boolean, seen: Se
     if (cutover && staged) fail(`${where}.path`, `'${path}' still points into ${STAGING_ROOT}/ after the cutover`);
 
     let stagedPath: string | undefined;
+    if (entry.uncompressedSha256 !== undefined) {
+        if (typeof entry.uncompressedSha256 !== 'string' || !SHA256_RE.test(entry.uncompressedSha256)) {
+            fail(`${where}.uncompressedSha256`, 'expected a lowercase sha256');
+        }
+        if (path !== 'out/collision.lcnav.gz' || kind !== 'out') {
+            fail(`${where}.uncompressedSha256`, 'is only valid for out/collision.lcnav.gz');
+        }
+    }
+
     if (entry.stagedPath !== undefined) {
         stagedPath = checkRepoPath(entry.stagedPath, `${where}.stagedPath`);
         if (kind !== 'out') fail(`${where}.stagedPath`, 'is only valid for an out artifact');
@@ -150,6 +162,7 @@ function parseArtifact(value: unknown, index: number, cutover: boolean, seen: Se
         sha256,
         kind: kind as ArtifactKind,
         qualification: qualification as Qualification,
+        ...(entry.uncompressedSha256 === undefined ? {} : { uncompressedSha256: entry.uncompressedSha256 as string }),
         ...(stagedPath === undefined ? {} : { stagedPath })
     };
 }
@@ -227,8 +240,42 @@ export function writeManifest(root: string, manifest: Manifest): void {
     writeFileSync(join(root, MANIFEST_PATH), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
+function sha256Bytes(bytes: Uint8Array): string {
+    return createHash('sha256').update(bytes).digest('hex');
+}
+
 export function sha256File(path: string): string {
-    return createHash('sha256').update(readFileSync(path)).digest('hex');
+    return sha256Bytes(readFileSync(path));
+}
+
+/** Fail closed when a revision-377 deployment lacks or differs from its raw collision-pack pin. */
+export function navPackProblems(root = process.cwd()): string[] {
+    const manifest = readManifest(root);
+    if (manifest.revision !== 377) return [];
+
+    const path = 'out/collision.lcnav.gz';
+    const artifact = manifest.artifacts.find(row => row.path === path);
+    if (!artifact || artifact.kind !== 'out') return [`manifest does not declare ${path} as an out artifact`];
+    if (!artifact.uncompressedSha256) return [`manifest does not pin the uncompressed sha256 for ${path}`];
+
+    const abs = join(root, path);
+    if (!existsSync(abs)) return [`${path} is missing`];
+
+    const compressed = readFileSync(abs);
+    const problems: string[] = [];
+    const compressedHash = sha256Bytes(compressed);
+    if (compressedHash !== artifact.sha256) {
+        problems.push(`${path} sha256 is ${compressedHash.slice(0, 12)}…, the manifest pins ${artifact.sha256.slice(0, 12)}…`);
+    }
+    try {
+        const rawHash = sha256Bytes(gunzipSync(compressed));
+        if (rawHash !== artifact.uncompressedSha256) {
+            problems.push(`${path} uncompressed nav pack sha256 is ${rawHash.slice(0, 12)}…, the manifest pins ${artifact.uncompressedSha256.slice(0, 12)}…`);
+        }
+    } catch (err) {
+        problems.push(`${path} is not a valid gzip stream (${err instanceof Error ? err.message : String(err)})`);
+    }
+    return problems;
 }
 
 /** Why: a client whose config decoder matches another engine's `config`/`interface` archives desyncs every later entry (pitfall 7); an unrecorded hash is not compared until P4a records both. */
@@ -276,6 +323,15 @@ export function verifyManifestReport(root = process.cwd()): VerifyReport {
         if (actual !== expected) problems.push(`generator '${path}' changed: manifest ${expected.slice(0, 12)}…, tree ${actual.slice(0, 12)}…`);
     }
 
+    if (manifest.revision === 377) {
+        const collision = manifest.artifacts.find(row => row.path === 'out/collision.lcnav.gz');
+        if (!collision || collision.kind !== 'out') {
+            problems.push('revision 377 manifest does not declare out/collision.lcnav.gz');
+        } else if (!collision.uncompressedSha256) {
+            problems.push('revision 377 manifest does not pin the uncompressed sha256 for out/collision.lcnav.gz');
+        }
+    }
+
     for (const artifact of manifest.artifacts) {
         const checkedPath = artifact.stagedPath ?? artifact.path;
         const abs = join(root, checkedPath);
@@ -290,9 +346,22 @@ export function verifyManifestReport(root = process.cwd()): VerifyReport {
             }
             continue;
         }
-        const actual = sha256File(abs);
+        const bytes = artifact.uncompressedSha256 === undefined ? undefined : readFileSync(abs);
+        const actual = bytes === undefined ? sha256File(abs) : sha256Bytes(bytes);
         if (actual !== artifact.sha256) {
             problems.push(`artifact '${artifact.path}' changed: manifest ${artifact.sha256.slice(0, 12)}…, tree ${actual.slice(0, 12)}…`);
+        }
+        if (bytes !== undefined && artifact.uncompressedSha256 !== undefined) {
+            try {
+                const rawHash = sha256Bytes(gunzipSync(bytes));
+                if (rawHash !== artifact.uncompressedSha256) {
+                    problems.push(
+                        `artifact '${artifact.path}' uncompressed bytes changed: manifest ${artifact.uncompressedSha256.slice(0, 12)}…, tree ${rawHash.slice(0, 12)}…`
+                    );
+                }
+            } catch (err) {
+                problems.push(`artifact '${artifact.path}' is not a valid gzip stream (${err instanceof Error ? err.message : String(err)})`);
+            }
         }
     }
 
