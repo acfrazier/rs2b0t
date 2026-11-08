@@ -1,17 +1,18 @@
 import { actions, reader } from '../../adapter/ClientAdapter.js';
+import { IF_IDS } from '../../data/ifIds.js';
 import { Execution } from '../execution/Execution.js';
 import { Bank } from './Bank.js';
 import { planBankSort, type BankSortMode } from './bankSortPlan.js';
 import type { BankCategory, SortableItem } from './bankSortRules.js';
 
-// bank_main:com_99/com_100 (8130/8131) = Swap/Insert. They sit late in interface.pack, so they are not root + 99.
-export const ARRANGE_SWAP_COM = 8130;
-export const ARRANGE_INSERT_COM = 8131;
-export const BANK_INSERT_VARP = 304;
+// bank_main:com_99/com_100 = Swap/Insert. They sit late in interface.pack, so they are not root + 99.
+export const ARRANGE_SWAP_COM = IF_IDS.BANK_MAIN_COM_99;
+export const ARRANGE_INSERT_COM = IF_IDS.BANK_MAIN_COM_100;
+export const BANK_INSERT_VARP = 304; // non-component: varp index
 
 const MOVES_PER_BATCH = 4;
 // Why: a full 240-slot bank is 239 moves, which is 60 rounds before any re-plan.
-const MAX_ROUNDS = 200;
+const MAX_ROUNDS = 200; // non-component: round limit
 const STALL_LIMIT = 3;
 
 export interface BankSortResult {
@@ -49,7 +50,7 @@ async function setArrangeMode(want: BankSortMode): Promise<boolean> {
     }
 
     actions.ifButton(wanted === 1 ? ARRANGE_INSERT_COM : ARRANGE_SWAP_COM);
-    return Execution.delayUntil(() => reader.varp(BANK_INSERT_VARP) === wanted, 2000);
+    return Execution.delayUntil(() => reader.varp(BANK_INSERT_VARP) === wanted, 2000); // non-component: wait budget
 }
 
 export async function sortBank(opts: SortBankOptions = {}): Promise<BankSortResult> {

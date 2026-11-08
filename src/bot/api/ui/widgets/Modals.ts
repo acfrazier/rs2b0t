@@ -4,7 +4,7 @@ import { Execution } from '../../execution/Execution.js';
 // Why: Closing is asynchronous; wait for the modal to clear so the next task cannot send a second close to a newer modal.
 
 /** One tick of server round-trip, plus room for a dropped action to be re-sent. */
-const CLOSE_TIMEOUT_MS = 3000;
+const CLOSE_TIMEOUT_MS = 3000; // non-component: wait budget
 
 export const Modals = {
     main(): number {

@@ -71,8 +71,8 @@ interface DrivePartnerTradeOpts {
 // Why: the Flax and Nature waits these replace were 3 to 4s wall-clock.
 
 /** Wall-clock waits for the multiplayer trade UI. */
-const TRADE_OFFER_WAIT_MS = 5_000;
-const TRADE_CONFIRM_WAIT_MS = 8_000;
+const TRADE_OFFER_WAIT_MS = 5_000; // non-component: wait budget
+const TRADE_CONFIRM_WAIT_MS = 8_000; // non-component: wait budget
 
 function tradeScreen(): string {
     if (Trade.onOfferScreen()) {
@@ -90,7 +90,7 @@ export function tradeScreenState(): string {
 }
 
 // Why: the offer-to-confirm swap reports neither screen for a stretch, so closure needs a full tick of continuous inactivity.
-export function stableClosedPoll(minMs = 600, nowFn?: () => number): () => boolean {
+export function stableClosedPoll(minMs = 600, nowFn?: () => number): () => boolean { // non-component: poll window
     let inactiveSince = -1;
     const now = nowFn ?? (() => performance.now());
     return () => {

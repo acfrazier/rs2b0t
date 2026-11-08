@@ -43,7 +43,7 @@ export const Equipment = {
         if (!(await item.interact(op))) {
             return false;
         }
-        return Execution.delayUntil(() => Equipment.contains(name), 3000);
+        return Execution.delayUntil(() => Equipment.contains(name), 3000); // non-component: wait budget
     },
 
     async unequip(name: string): Promise<boolean> {
@@ -59,6 +59,6 @@ export const Equipment = {
         }
 
         await Input.invButton(worn.id, worn.slot, worn.comId, opIndex + 1);
-        return Execution.delayUntil(() => !Equipment.contains(name), 3000);
+        return Execution.delayUntil(() => !Equipment.contains(name), 3000); // non-component: wait budget
     }
 };

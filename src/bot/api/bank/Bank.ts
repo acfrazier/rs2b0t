@@ -1,5 +1,6 @@
 import type { InvItemSnapshot, ModalCloseObservation, WorldTile } from '../../adapter/ClientAdapter.js';
 import { reader, actions } from '../../adapter/ClientAdapter.js';
+import { IF_IDS } from '../../data/ifIds.js';
 import { Input } from '../../input/Input.js';
 import { lockedBankAt, type BankNpcAccess, type BankObjectAccess } from './BankLocations.js';
 import { Execution } from '../execution/Execution.js';
@@ -42,7 +43,7 @@ async function bankBackpackReady(): Promise<boolean> {
     }
     const ready = (): boolean => reader.modals().side !== -1 && reader.bankSideSnapshotReady();
     if (!ready()) {
-        await Execution.delayUntil(() => ready() || reader.bankComId() === -1, 2000);
+        await Execution.delayUntil(() => ready() || reader.bankComId() === -1, 2000); // non-component: wait budget
     }
     return reader.bankComId() !== -1 && ready();
 }
@@ -52,7 +53,7 @@ async function continueObjectBankDialog(log?: (msg: string) => void): Promise<bo
         log?.('bank: failed to Continue the object dialogue');
         return false;
     }
-    if (!(await Execution.delayUntil(() => Bank.isOpen(), 4000))) {
+    if (!(await Execution.delayUntil(() => Bank.isOpen(), 4000))) { // non-component: wait budget
         log?.('bank: object dialogue completed without opening the bank');
         return false;
     }
@@ -80,7 +81,7 @@ export const Bank = {
     },
 
     /** Wait for the item list the open packet promises. */
-    async waitReady(timeoutMs = 4000, log?: (msg: string) => void): Promise<boolean> {
+    async waitReady(timeoutMs = 4000, log?: (msg: string) => void): Promise<boolean> { // non-component: wait budget
         if (!Bank.isOpen() || Bank.ready()) {
             return Bank.ready();
         }
@@ -99,7 +100,7 @@ export const Bank = {
         return reader.bankSnapshotGeneration();
     },
 
-    async waitSnapshotAfter(generation: number, timeoutMs = 4000): Promise<boolean> {
+    async waitSnapshotAfter(generation: number, timeoutMs = 4000): Promise<boolean> { // non-component: wait budget
         if (generation < 0) {
             return false;
         }
@@ -135,7 +136,7 @@ export const Bank = {
         await Execution.delayUntil(
             () => !Bank.isOpen()
                 || (reader.bankSideSnapshotReady() && sameBackpack(reader.bankSideItems(), expected)),
-            4000
+            4000 // non-component: wait budget
         );
         const ready = Bank.isOpen()
             && reader.bankSideSnapshotReady()
@@ -146,12 +147,12 @@ export const Bank = {
         return ready;
     },
 
-    // bank_main:com_93/94 (5386/5387) = Note/Item; opening the bank resets to Item, so set after opening
+    // bank_main:com_93/94 = Note/Item; opening the bank resets to Item, so set after opening
     async setNoteMode(on: boolean): Promise<void> {
         if (!Bank.isOpen()) {
             return;
         }
-        actions.ifButton(on ? 5386 : 5387);
+        actions.ifButton(on ? IF_IDS.BANK_MAIN_COM_93 : IF_IDS.BANK_MAIN_COM_94);
         await Execution.delayTicks(1);
     },
 
@@ -215,7 +216,7 @@ export const Bank = {
                 }
                 return Execution.delayUntil(
                     () => invCount() >= target || (invCount() > before && backpackFull()),
-                    4000
+                    4000 // non-component: wait budget
                 );
             }
         }
@@ -226,7 +227,7 @@ export const Bank = {
         if (!(await clickInvButton(reader.bankItems(), name, xOp))) {
             return false;
         }
-        if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 3000))) {
+        if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 3000))) { // non-component: wait budget
             return false;
         }
         if (!actions.answerCountDialog(take)) {
@@ -234,7 +235,7 @@ export const Bank = {
         }
         return Execution.delayUntil(
             () => invCount() >= target || (invCount() > before && backpackFull()),
-            4000
+            4000 // non-component: wait budget
         );
     },
 
@@ -266,7 +267,7 @@ export const Bank = {
             return false;
         }
         if (!fixedOp) {
-            if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 3000))) {
+            if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 3000))) { // non-component: wait budget
                 return false;
             }
             if (!actions.answerCountDialog(count)) {
@@ -275,7 +276,7 @@ export const Bank = {
         }
         return Execution.delayUntil(
             () => invCount() >= target || (invCount() > before && backpackFull()),
-            4000
+            4000 // non-component: wait budget
         );
     },
 
@@ -308,7 +309,7 @@ export const Bank = {
             }
             return Execution.delayUntil(
                 () => count() >= target || (count() > before && backpackFull()),
-                4000
+                4000 // non-component: wait budget
             );
         }
         return typeof name === 'number' ? Bank.withdrawXById(name, want) : Bank.withdrawX(name, want);
@@ -327,7 +328,7 @@ export const Bank = {
             let items = reader.bankSideItems();
             if (items.length === 0 && Bank.isOpen() && !reader.bankSideSnapshotReady()) {
                 log?.('deposit view not ready — waiting for the side backpack');
-                await Execution.delayUntil(() => reader.bankSideSnapshotReady() || reader.bankSideItems().length > 0 || !Bank.isOpen(), 1200);
+                await Execution.delayUntil(() => reader.bankSideSnapshotReady() || reader.bankSideItems().length > 0 || !Bank.isOpen(), 1200); // non-component: wait budget
                 items = reader.bankSideItems();
             }
             // a nameless obj (cache miss) is still an item taking a slot, let the matcher decide
@@ -343,7 +344,7 @@ export const Bank = {
             }
 
             Input.invButton(item.id, item.slot, item.comId, op);
-            await Execution.delayUntil(() => !reader.bankSideItems().some(i => i.slot === item.slot && i.id === item.id), 2000);
+            await Execution.delayUntil(() => !reader.bankSideItems().some(i => i.slot === item.slot && i.id === item.id), 2000); // non-component: wait budget
         }
     },
 
@@ -368,7 +369,7 @@ export const Bank = {
             const chosen = pick(booth.actions());
             if (chosen) {
                 await booth.interact(chosen);
-                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 8000)) {
+                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 8000)) { // non-component: wait budget
                     if (ChatDialog.canContinue() && await continueObjectBankDialog(log)) { return openedReady(log); }
                     if (Bank.isOpen()) { return openedReady(log); }
                 }
@@ -377,13 +378,13 @@ export const Bank = {
             log?.(`booth didn't open from here — stepping near (${stand.x}, ${stand.z}, ${stand.level})`);
             // radius 1: adjacent is enough to click the booth; an exact-tile pin looks robotic.
             // 90s: 15s was too short for long camp-to-bank legs (Rimmington to Fally E).
-            await Traversal.walkTo(stand, { radius: 1, timeoutMs: 90_000, log });
+            await Traversal.walkTo(stand, { radius: 1, timeoutMs: 90_000, log }); // non-component: wait budget
             await Execution.delayTicks(1);
             const adj = Locs.query().name(boothName).where(l => l.actions().length > 0 && l.distance() <= 1 && !lockedBankAt(l.tile())).nearest();
             const adjOp = adj ? pick(adj.actions()) : undefined;
             if (adj && adjOp) {
                 await adj.interact(adjOp);
-                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 4000)) {
+                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 4000)) { // non-component: wait budget
                     if (ChatDialog.canContinue() && await continueObjectBankDialog(log)) { return openedReady(log); }
                 }
             }
@@ -405,7 +406,7 @@ export const Bank = {
                     continue;
                 }
                 await banker.interact(access.op);
-                if (!(await Execution.delayUntil(() => ChatDialog.isOpen() || ChatDialog.canContinue() || Bank.isOpen(), 6000))) {
+                if (!(await Execution.delayUntil(() => ChatDialog.isOpen() || ChatDialog.canContinue() || Bank.isOpen(), 6000))) { // non-component: wait budget
                     log?.(`'${access.name}' never opened a dialogue`);
                     continue;
                 }
@@ -420,7 +421,7 @@ export const Bank = {
                     break;
                 }
             }
-            await Execution.delayUntil(() => Bank.isOpen(), 3000);
+            await Execution.delayUntil(() => Bank.isOpen(), 3000); // non-component: wait budget
         }
         if (!Bank.isOpen()) {
             log?.(`could not get ${access.name} to open the bank`);
@@ -450,7 +451,7 @@ export const Bank = {
                     continue;
                 }
 
-                if (await Execution.delayUntil(() => Bank.isOpen() || locWithAction(access.name, access.op) !== null, 8000)) {
+                if (await Execution.delayUntil(() => Bank.isOpen() || locWithAction(access.name, access.op) !== null, 8000)) { // non-component: wait budget
                     break;
                 }
             }
@@ -465,7 +466,7 @@ export const Bank = {
     },
 
     /** Close the bank modal so inventory ops (Wield, Use, Bury, ...) hit the backpack again. */
-    async close(timeoutMs = 3000): Promise<boolean> {
+    async close(timeoutMs = 3000): Promise<boolean> { // non-component: wait budget
         if (!pendingClose) {
             if (!Bank.isOpen()) {
                 return true;
@@ -521,7 +522,7 @@ export const Bank = {
             if (chosen) {
                 log?.(`bank: '${chosen}' '${boothName}' at ${booth.tile()} (attempt ${attempt + 1}/6)`);
                 await booth.interact(chosen);
-                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 8000)) {
+                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 8000)) { // non-component: wait budget
                     if (ChatDialog.canContinue() && await continueObjectBankDialog(log)) { return openedReady(log); }
                     if (Bank.isOpen()) { return openedReady(log); }
                 }
@@ -531,10 +532,10 @@ export const Bank = {
                 const stand = bankStand(booth.tile());
                 if (stand) {
                     log?.(`booth didn't open — stepping to the bank counter at (${stand.x}, ${stand.z})`);
-                    await Traversal.walkTo(stand, { radius: 1, timeoutMs: 15000, log });
+                    await Traversal.walkTo(stand, { radius: 1, timeoutMs: 15000, log }); // non-component: wait budget
                 } else {
                     log?.(`no reachable tile beside '${boothName}' yet — closing in`);
-                    await Traversal.walkTo(booth.tile(), { radius: 1, timeoutMs: 15000, log });
+                    await Traversal.walkTo(booth.tile(), { radius: 1, timeoutMs: 15000, log }); // non-component: wait budget
                 }
             }
 
@@ -542,7 +543,7 @@ export const Bank = {
             const adjOp = pick(adjacent.actions());
             if (adjOp) {
                 await adjacent.interact(adjOp);
-                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 4000)) {
+                if (await Execution.delayUntil(() => Bank.isOpen() || ChatDialog.canContinue(), 4000)) { // non-component: wait budget
                     if (ChatDialog.canContinue() && await continueObjectBankDialog(log)) { return openedReady(log); }
                 }
             }
@@ -556,7 +557,7 @@ async function openedReady(log?: (msg: string) => void): Promise<boolean> {
     if (!Bank.isOpen()) {
         return false;
     }
-    await Bank.waitReady(4000, log);
+    await Bank.waitReady(4000, log); // non-component: wait budget
     return Bank.isOpen();
 }
 

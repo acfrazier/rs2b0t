@@ -9,12 +9,12 @@ import { Traversal } from '../walking/Traversal.js';
 import type Tile from '../../geometry/Tile.js';
 
 // Why: partner accepts aren't tied to this client's tick rate, so these are wall-clock (7 ticks at 300ms is 2.1s, too short for a mutual Trade).
-const MEET_MS = 90_000;
-const SCREEN_MS = 8_000;
-const HANDOFF_MS = 120_000;
+const MEET_MS = 90_000; // non-component: wait budget
+const SCREEN_MS = 8_000; // non-component: wait budget
+const HANDOFF_MS = 120_000; // non-component: wait budget
 
 /** How often the mutual Trade-with click is re-sent while the partner stands in range. */
-export const OPEN_REQUEST_EVERY_MS = 3_000;
+export const OPEN_REQUEST_EVERY_MS = 3_000; // non-component: wait budget
 
 export type OpenTradeAction = 'done' | 'wait' | 'request' | 'give-up';
 
@@ -63,7 +63,7 @@ async function openTrade(partner: string, log: (m: string) => void): Promise<boo
             return true;
         }
         if (action === 'give-up') {
-            log(`trade with '${partner}' never opened within ${Math.round(MEET_MS / 1000)}s`);
+            log(`trade with '${partner}' never opened within ${Math.round(MEET_MS / 1000)}s`); // non-component: milliseconds per second
             return false;
         }
         if (action === 'request') {

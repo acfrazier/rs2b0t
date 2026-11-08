@@ -2,7 +2,7 @@
 
 import type { BankCategory, SortableItem } from './bankSortRules.js';
 
-export const UNRANKED = 9999;
+export const UNRANKED = 9999; // non-component: rank sentinel
 
 const METALS = ['dragon', 'rune', 'adamant', 'mithril', 'black', 'steel', 'iron', 'bronze'];
 const family = (suffix: string): string[] => METALS.map(metal => `${metal} ${suffix}`);
@@ -63,6 +63,7 @@ const HERBS = [
 ];
 
 // Why: every unidentified herb is named "Herb", so only the id says which. Karamja's 5 have no noted form.
+// non-component: herb obj ids
 const UNID_HERB_IDS: readonly (readonly [string, ...number[]])[] = [
     ['guam leaf', 199, 200], ['snake weed', 1525], ['ardrigal', 1527], ['sito foil', 1529],
     ['volencia moss', 1531], ['rogues purse', 1533], ['marrentill', 201, 202], ['tarromin', 203, 204],
@@ -76,6 +77,7 @@ const UNID_HERB_RANK = new Map<number, number>(
 );
 
 // Why: green, blue, red and black hide armour all read back as one name, so the colour is only in the id.
+// non-component: dragonhide obj ids
 const DHIDE_IDS: readonly (readonly number[])[] = [
     [2503, 2501, 2499, 1135],
     [2497, 2495, 2493, 1099],

@@ -42,6 +42,8 @@ shop_template:inv
 shop_template_side:inv
 # Magic autocast panel (ssb buttons are root + index, spelldb)
 staff_spells
+# Combat side tab while a staff is wielded
+combat_staff_2
 # Prayer
 prayer:prayer_thickskin
 prayer:prayer_strengthburst
