@@ -4,7 +4,7 @@ import Skill from '#/client/shell/Skill.js';
 import { ButtonType, ComponentType } from '#/client/config/IfType.js';
 import IfType from '#/client/config/IfType.js';
 import LocType from '#/client/config/LocType.js';
-import { resolveMultiloc } from '#/client/config/resolveMultiloc.js';
+import { resolveMultiloc, resolveMultiNpc } from '#/client/config/resolveMultiloc.js';
 import ObjType from '#/client/config/ObjType.js';
 import CollisionMap from '#/client/dash3d/CollisionMap.js';
 import Model from '#/client/dash3d/Model.js';
@@ -193,6 +193,34 @@ export function resolveLocModelExtents(
     return null;
 }
 
+/** Java REBUILD_REGION 26-bit template: srcLevel 24..25, srcZoneX 14..23, srcZoneZ 3..13, rotation 1..2. Absent is -1. */
+function unpackSceneTemplate(bits: number): { srcLevel: number; rotation: number; srcZoneX: number; srcZoneZ: number } | null {
+    if (bits === -1) {
+        return null;
+    }
+    return {
+        srcLevel: (bits >> 24) & 0x3,
+        rotation: (bits >> 1) & 0x3,
+        srcZoneX: (bits >> 14) & 0x3ff,
+        srcZoneZ: (bits >> 3) & 0x7ff
+    };
+}
+
+/** Inverse of WorldRegion.localX/localZ: source 0..7 tile from a destination 0..7 tile. */
+function sourceChunkLocal(rotation: number, destX: number, destZ: number): { x: number; z: number } {
+    const rot = rotation & 0x3;
+    if (rot === 0) {
+        return { x: destX, z: destZ };
+    }
+    if (rot === 1) {
+        return { x: 7 - destZ, z: destX };
+    }
+    if (rot === 2) {
+        return { x: 7 - destX, z: 7 - destZ };
+    }
+    return { x: destZ, z: 7 - destX };
+}
+
 function worldTileToScene(
     x: number,
     z: number,
@@ -219,6 +247,17 @@ export interface WorldTile {
     x: number;
     z: number;
     level: number;
+}
+
+/** Source cache chunk for one scene-local tile while the scene is instanced. */
+export interface TemplateSource {
+    srcLevel: number;
+    rotation: number;
+    srcZoneX: number;
+    srcZoneZ: number;
+    srcLx: number;
+    srcLz: number;
+    mapSquare: number;
 }
 
 export interface ChatLine {
@@ -402,6 +441,10 @@ export const reader = {
 
     sceneState(): number {
         return raw?.sceneState ?? 0;
+    },
+
+    sceneInstanced(): boolean {
+        return raw?.sceneInstanced === true;
     },
 
     worldTile(): WorldTile | null {
@@ -630,19 +673,23 @@ export const reader = {
                 return false;
             }
             const id = (tc >> 14) & 0x7fff;
-            if (opts.id !== undefined) {
-                return id === opts.id;
-            }
-            if (wantName) {
-                try {
-                    const n = LocType.list(id).name;
-                    return n !== null && n.toLowerCase() === wantName;
-                } catch {
+            try {
+                const form = resolveMultiloc(LocType.list(id), raw!.var ?? []);
+                if (!form) {
                     return false;
                 }
+                if (opts.id !== undefined) {
+                    return id === opts.id;
+                }
+                if (wantName) {
+                    const n = form.name;
+                    return n !== null && n.toLowerCase() === wantName;
+                }
+                // No id/name: accept any loc on the exact tile only (see search).
+                return true;
+            } catch {
+                return false;
             }
-            // No id/name: accept any loc on the exact tile only (see search).
-            return true;
         };
 
         type Hit = {
@@ -874,20 +921,33 @@ export const reader = {
             if (!npc) {
                 continue;
             }
+            const base = npc.type;
+            if (!base) {
+                continue;
+            }
+            const form = resolveMultiNpc(base, raw.var ?? []);
+            if (!form) {
+                continue;
+            }
+            const size = form.size ?? 1;
 
             const x = raw.mapBuildBaseX + (npc.x >> 7);
             const z = raw.mapBuildBaseZ + (npc.z >> 7);
             out.push({
                 index: raw.npcIds[i],
-                id: npc.type?.id ?? -1,
+                id: base.id,
                 anim: npc.primaryAnim,
-                name: npc.type?.name ?? null,
-                level: npc.type?.vislevel ?? -1,
-                size: npc.type?.size ?? 1,
+                name: form.name ?? null,
+                level: form.vislevel ?? -1,
+                size,
                 tile: { x, z, level: raw.minusedlevel },
-                networkTile: { x: raw.mapBuildBaseX + npc.routeX[0] + Math.floor((npc.type?.size ?? 1) / 2), z: raw.mapBuildBaseZ + npc.routeZ[0] + Math.floor((npc.type?.size ?? 1) / 2), level: raw.minusedlevel },
+                networkTile: {
+                    x: raw.mapBuildBaseX + npc.routeX[0] + Math.floor(size / 2),
+                    z: raw.mapBuildBaseZ + npc.routeZ[0] + Math.floor(size / 2),
+                    level: raw.minusedlevel
+                },
                 distance: Math.max(Math.abs(x - px), Math.abs(z - pz)),
-                ops: npc.type?.op ?? [],
+                ops: form.op ?? [],
                 inCombat: combatShowing(npc.combatCycle),
                 health: npc.health,
                 totalHealth: npc.totalHealth,
@@ -1324,6 +1384,35 @@ export const reader = {
         }
 
         return { lx, lz };
+    },
+
+    templateSource(lx: number, lz: number, level?: number): TemplateSource | null {
+        if (!raw || !raw.sceneInstanced || !raw.sceneMapRegion) {
+            return null;
+        }
+        if (lx < 0 || lz < 0 || lx >= SCENE_SIZE || lz >= SCENE_SIZE) {
+            return null;
+        }
+        const plane = level ?? raw.minusedlevel;
+        const region = raw.sceneMapRegion[plane];
+        const packed = region?.[lx >> 3]?.[lz >> 3];
+        if (packed === undefined) {
+            return null;
+        }
+        const unpacked = unpackSceneTemplate(packed);
+        if (!unpacked) {
+            return null;
+        }
+        const src = sourceChunkLocal(unpacked.rotation, lx & 7, lz & 7);
+        return {
+            srcLevel: unpacked.srcLevel,
+            rotation: unpacked.rotation,
+            srcZoneX: unpacked.srcZoneX,
+            srcZoneZ: unpacked.srcZoneZ,
+            srcLx: src.x,
+            srcLz: src.z,
+            mapSquare: (((unpacked.srcZoneX / 8) | 0) << 8) + ((unpacked.srcZoneZ / 8) | 0)
+        };
     },
 
     collisionFlags(lx: number, lz: number): number | null {
