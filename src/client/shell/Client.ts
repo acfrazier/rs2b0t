@@ -128,6 +128,7 @@ import {
 import { assertPacketConsumed } from '#/client/io/packetGuard.js';
 import { ServerProt, ServerProtSizes } from '#/client/io/ServerProt.js';
 import * as ServerProtTable from '#/client/io/ServerProt.js';
+import { knownServerOpcodes } from '#/client/io/serverOpcodes.js';
 
 import { reverseDnsLookup } from '#/client/util/WebDns.js';
 
@@ -150,24 +151,7 @@ const SCROLLBAR_GRIP_LOWLIGHT = 0x332d25;
 
 class StrictPacketError extends Error {}
 
-function isNumberList(value: unknown): value is readonly number[] {
-    return Array.isArray(value) && value.every(item => Number.isInteger(item));
-}
-
-// The preparation branch retains its sizes-only 289 table; cutover tables supply explicit membership.
-const KNOWN_SERVER_OPCODES: ReadonlySet<number> = (() => {
-    const known = new Set<number>();
-    if ('ServerProtKnown' in ServerProtTable) {
-        if (!isNumberList(ServerProtTable.ServerProtKnown)) throw new Error('invalid generated server opcode membership');
-        for (const opcode of ServerProtTable.ServerProtKnown) known.add(opcode);
-    } else {
-        for (let opcode = 0; opcode < 256; opcode++) {
-            if ((ServerProtSizes[opcode] ?? 0) !== 0) known.add(opcode);
-        }
-        for (const opcode of [ServerProt.IF_CLOSE, ServerProt.P_COUNTDIALOG, ServerProt.LOGOUT, ServerProt.CAM_RESET, ServerProt.UNSET_MAP_FLAG, ServerProt.VARP_SYNC, ServerProt.RESET_ANIMS]) known.add(opcode);
-    }
-    return known;
-})();
+const KNOWN_SERVER_OPCODES: ReadonlySet<number> = knownServerOpcodes(ServerProtTable);
 
 function isKnownServerOpcode(opcode: number): boolean {
     return KNOWN_SERVER_OPCODES.has(opcode);
@@ -197,21 +181,12 @@ export class Client extends GameShell {
     static cyclelogic4: number = 0;
     static cyclelogic5: number = 0;
     static cyclelogic6: number = 0;
-    static cyclelogic7: number = 0;
-    static cyclelogic8: number = 0;
-    static cyclelogic9: number = 0;
-    static cyclelogic10: number = 0;
 
     static oplogic1: number = 0;
     static oplogic2: number = 0;
     static oplogic3: number = 0;
     static oplogic4: number = 0;
     static oplogic5: number = 0;
-    static oplogic6: number = 0;
-    static oplogic7: number = 0;
-    static oplogic8: number = 0;
-    static oplogic9: number = 0;
-    static oplogic10: number = 0;
 
     static loopCycle: number = 0;
     static drawCycle: number = 0;
@@ -2193,11 +2168,6 @@ export class Client extends GameShell {
                 Client.oplogic3 = 0;
                 Client.oplogic4 = 0;
                 Client.oplogic5 = 0;
-                Client.oplogic6 = 0;
-                Client.oplogic7 = 0;
-                Client.oplogic8 = 0;
-                Client.oplogic9 = 0;
-                Client.oplogic10 = 0;
 
                 this.prepareGame();
             } else if (response === 3) {
@@ -2677,12 +2647,6 @@ export class Client extends GameShell {
                 this.selectedCycle = 10;
                 this.mouseClickButton = 0;
             }
-        }
-
-        // Java 377 has CYCLELOGIC1–6 only. Incrementing the unused counter keeps the field, but opcode 255 must not be sent.
-        Client.cyclelogic7++;
-        if (Client.cyclelogic7 > 62) {
-            Client.cyclelogic7 = 0;
         }
 
         if (World.groundX !== -1) {

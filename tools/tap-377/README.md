@@ -59,7 +59,7 @@ ENGINE_DIR="$ENGINE_DIR" RS2B0T_CACHE_BUNDLE="$CACHE_BUNDLE" \
   bun test test/io/replay.test.ts
 ```
 
-The runtime loads every indexed recording for `CLIENT_VERSION`. Before cutover, this selects the 289 reference recording. After cutover, this selects all three 377 recordings. Set `RS2B0T_CACHE_BUNDLE` to a directory containing `<cacheSha256>.json` for each required bundle. The existing single-file form remains valid when all selected recordings use that file's hash. Missing or mismatched bundles fail the test. Hosted CI checks every committed 377 recording against the index and P1 descriptors without any cache bundle.
+The runtime loads every indexed recording for `CLIENT_VERSION`. Before cutover, this selects the 289 reference recording. After cutover, this selects every committed 377 recording, including `377/l1.jsonl`, captured by the rs2b0t L1 cell (`e2e/rs2b0t-377-l1.ts`) from rs2b0t's own client. Set `RS2B0T_CACHE_BUNDLE` to a directory containing `<cacheSha256>.json` for each required bundle. The existing single-file form remains valid when all selected recordings use that file's hash. Missing or mismatched bundles fail the test. Hosted CI checks every committed 377 recording against the index and P1 descriptors without any cache bundle.
 
 Each checkpoint requires observed locations on the active level and non-default collision flags inside the player's eight-tile zone. Allocated maps and default boundary flags do not satisfy this check. The instance flag comes directly from the client, not from an absent reader field. Cache-free tests reject empty worlds, reset collision maps, wrong-level flags, and wrong-zone flags.
 

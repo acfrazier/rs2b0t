@@ -124,7 +124,7 @@ function payload(out: Packet): number[] {
 function frames(): { name: string; raw: number[] }[] {
     const byId = new Map(fixture.client.map(row => [row.id, row.name]));
     const rows: { name: string; raw: number[] }[] = [];
-    for (const file of ['tutorial', 'instance', 'mainland']) {
+    for (const file of ['tutorial', 'instance', 'mainland', 'l1']) {
         for (const line of readFileSync(`test/io/recordings/377/${file}.jsonl`, 'utf8').split('\n')) {
             if (!line) continue;
             const record = JSON.parse(line) as { type?: string; direction?: string; bytes?: string };
