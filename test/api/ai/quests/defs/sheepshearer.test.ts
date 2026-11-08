@@ -11,16 +11,19 @@ const snap = (journal: string, items: [string, number][] = []): QuestSnapshot =>
 });
 
 describe('sheepshearer gatherBalls', () => {
-    test('no shears and short of wool -> grab the free shears spawn', () => {
-        expect(gatherBalls(snap('inProgress'), 20).kind).toBe('grabGround');
+    test('no shears -> grab the free table spawn beside Fred (377 m49_51.jm2:7424)', () => {
+        const step = gatherBalls(snap('inProgress'), 20);
+        expect(step.kind).toBe('grabGround');
+        expect(step.kind === 'grabGround' && step.anchor.x).toBe(3192);
+        expect(step.kind === 'grabGround' && step.anchor.z).toBe(3272);
     });
     test('shears held, short of wool -> shear (custom)', () => {
         const s = gatherBalls(snap('inProgress', [['shears', 1], ['wool', 3]]), 20);
         expect(s.kind).toBe('custom');
     });
-    test('enough wool -> spin the batch (custom, Falador wheel)', () => {
+    test('enough wool -> spin at Lumbridge Castle (377 m50_50.jm2:9464)', () => {
         const s = gatherBalls(snap('inProgress', [['shears', 1], ['wool', 20]]), 20);
-        expect(s.kind === 'custom' && s.name).toBe('spin wool at Falador');
+        expect(s.kind === 'custom' && s.name).toBe('spin wool at Lumbridge');
     });
 });
 

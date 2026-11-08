@@ -46,10 +46,20 @@ export const CASES: readonly Case[] = [
         id: 'l2-cooksassistant-377-live',
         harness: 'l2-cooksassistant-377-live.ts',
         covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: '3e1a87ff',
         manual: true,
         budgetMin: 45,
         note: 'L2 377 quest cell: three fresh accounts finish Cook\'s Assistant through AIOQuester (runUnqualified) with no quest, item or position seed; watched cookquest/hopper_full/flour/qp getvar timeline, Cooking XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-sheepshearer-377-live',
+        harness: 'l2-sheepshearer-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 60,
+        note: 'L2 377 quest cell: three fresh accounts finish Sheep Shearer through AIOQuester (runUnqualified) with no quest, item, XP or position seed; shears pen sheep 43/1765, spins by using Wool on the Lumbridge castle wheel; watched sheep/qp getvar timeline, the_thing_sheared 0, Crafting XP, coins, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
         id: 'gnome-magic-north-stair-live',

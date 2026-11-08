@@ -6,15 +6,26 @@ import { QUESTS } from '../data/quests.js';
 
 const FRED: NpcStop = {
     npc: 'Fred the Farmer', anchor: new Tile(3189, 3273, 0), leash: 6,
-    prefer: ["I'm looking for a quest.", 'Yes okay. I can do that.']
+    prefer: [
+        "I'm looking for a quest.",
+        'Yes okay. I can do that.',
+        // 377 content: fred_the_farmer.rs2:86,93,140.
+        'Of course!',
+        "I'm something of an expert actually!"
+    ],
+    // 377 content: fred_the_farmer.rs2:211-234 has a 19-ball, one-per-tick hand-in loop.
+    gapMs: 25_000
 };
 const BALLS_NEEDED = 20;
 
 const SITES: WoolSites = {
     pen: new Tile(3197, 3266, 0),
-    wheelStand: new Tile(2982, 3315, 0),
-    shearsSpawn: new Tile(3152, 3306, 0),
-    spinLabel: 'spin wool at Falador'
+    // 377 content: M:m50_50.jm2:9464 places the wheel at (3209,3212,L1).
+    wheelStand: new Tile(3209, 3213, 1),
+    // 377 content: M:m49_51.jm2:7424 places shears at (3192,3272).
+    shearsSpawn: new Tile(3192, 3272, 0),
+    // 377 content: fred_the_farmer.rs2:152 directs the player to Lumbridge Castle.
+    spinLabel: 'spin wool at Lumbridge'
 };
 
 export function gatherBalls(snap: QuestSnapshot, need: number): QuestStep {
