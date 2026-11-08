@@ -9,7 +9,7 @@ export const USERNAME_LIMIT = 12;
 
 /**
  * A collision-safe account name: `prefix` plus lowercase hex up to the 12-character username
- * limit — eight hex characters (32 bits) under a one-to-four character prefix, seven (28 bits)
+ * limit: eight hex characters (32 bits) under a one-to-four character prefix, seven (28 bits)
  * under a five character one. The 12-bit suffix this replaces could load an earlier run's save.
  */
 export function accountName(prefix: string): string {
