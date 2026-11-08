@@ -122,6 +122,7 @@ class ScriptRunnerImpl {
     ctx: ScriptContext | null = null;
     bot: AbstractBot | null = null;
     meta: ScriptMeta | null = null;
+    private runUnqualified = false;
 
     private changeListeners = new Set<() => void>();
     /** onStart has returned and established any baselines consumed by onPaint. */
@@ -155,6 +156,12 @@ class ScriptRunnerImpl {
         return this.ctx?.state ?? 'idle';
     }
 
+    /** Whether this active run's explicit override may be inherited by child activities. */
+    get allowsUnqualifiedChildren(): boolean {
+        const state = this.ctx?.state;
+        return this.runUnqualified && (state === 'running' || state === 'paused');
+    }
+
     /** The bot that may safely paint this frame, or null while startup/state is incomplete. */
     get paintBot(): AbstractBot | null {
         const state = this.ctx?.state;
@@ -174,6 +181,7 @@ class ScriptRunnerImpl {
         }
         const admissionReason = scriptAdmissionReason(meta);
         if (admissionReason && !options?.runUnqualified) {
+            RecoveryHints.clear();
             console.warn(`[rs2b0t] ${admissionReason}`);
             throw new Error(admissionReason);
         }
@@ -193,6 +201,7 @@ class ScriptRunnerImpl {
         this.ctx = ctx;
         this.bot = bot;
         this.meta = meta;
+        this.runUnqualified = options?.runUnqualified === true;
         this.startupComplete = false;
         Scheduler.active = ctx;
 
@@ -430,6 +439,7 @@ class ScriptRunnerImpl {
         if (Scheduler.active === ctx) {
             Scheduler.active = null;
         }
+        if (this.ctx === ctx) this.runUnqualified = false;
         this.fireChange();
     }
 

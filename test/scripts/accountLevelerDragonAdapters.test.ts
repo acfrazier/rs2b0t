@@ -10,6 +10,7 @@ import { Execution } from '#/bot/api/execution/Execution.js';
 import { Loadouts } from '#/bot/api/loadout/loadoutStore.js';
 import { ScriptRegistry } from '#/bot/runtime/ScriptRegistry.js';
 import { ScriptActivity } from '#/bot/runtime/ScriptActivity.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import AccountLeveler from '#/bot/scripts/AccountLeveler/AccountLeveler.js';
 import { methodFor } from '#/bot/scripts/AccountLeveler/methods.js';
 import { emptyMemory, enabledSkills } from '#/bot/scripts/AccountLeveler/planner.js';
@@ -39,7 +40,7 @@ for (const roll of [0, 0.999]) test(`dragon adapter ${roll} uses supported setti
     const logs: string[] = [];
     const activity = new ScriptActivity(message => logs.push(message));
     try {
-        await activity.start(meta, plan.settings);
+        await activity.start({ ...meta, revision: CLIENT_VERSION }, plan.settings);
         expect(logs.some(line => /food '?Lobster/.test(line))).toBe(true);
         expect(logs.some(line => /food '?Shark/.test(line))).toBe(false);
     } finally { activity.stop(); }

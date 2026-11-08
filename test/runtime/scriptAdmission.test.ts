@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { LoopingBot } from '#/bot/api/bot/Bot.js';
+import { ScriptActivity } from '#/bot/runtime/ScriptActivity.js';
 import { attach, detach } from '#/bot/adapter/ClientAdapter.js';
 import { createRosterClient } from '#/bot/panel/RosterClient.js';
 import BotPanel from '#/bot/panel/BotPanel.js';
 import { BotHost } from '#/bot/runtime/BotHost.js';
+import { SettingsStore } from '#/bot/runtime/Settings.js';
 import { RecoveryHints } from '#/bot/runtime/RecoveryHints.js';
 import { RunManager } from '#/bot/runtime/RunManager.js';
 import { ScriptRegistry, type ScriptMeta } from '#/bot/runtime/ScriptRegistry.js';
@@ -11,6 +13,7 @@ import { ScriptRunner, scriptAdmissionReason } from '#/bot/runtime/ScriptRunner.
 import { StallGuard } from '#/bot/runtime/StallGuard.js';
 import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
 import { TARGET, resolveTarget } from '#/client/config/target.js';
+import Tile from '#/bot/geometry/Tile.js';
 import '#/bot/scripts/index.js';
 
 const FIXTURE_NAME = 'ScriptAdmissionFixture';
@@ -24,28 +27,31 @@ class AdmissionProbeBot extends LoopingBot {
     override loop(): void {}
 }
 
-let fixtureName: string | null = null;
-let previousMeta: ScriptMeta | undefined;
+let previousMetas = new Map<string, ScriptMeta | undefined>();
 let root: HTMLDivElement;
 
 function setURL(url: string): void {
     Reflect.get(window, 'happyDOM').setURL(url);
 }
 
-function registerFixture(name: string, revision: number): { meta: ScriptMeta; creations: { count: number } } {
-    fixtureName = name;
-    previousMeta = ScriptRegistry.get(name);
+function registerMeta(meta: ScriptMeta): void {
+    if (!previousMetas.has(meta.name)) previousMetas.set(meta.name, ScriptRegistry.get(meta.name));
+    ScriptRegistry.register(meta);
+}
+
+function registerFixture(name: string, revision: number, settingsSchema?: ScriptMeta['settingsSchema']): { meta: ScriptMeta; creations: { count: number } } {
     const creations = { count: 0 };
     const meta: ScriptMeta = {
         name,
         description: 'script admission test fixture',
         revision,
+        ...(settingsSchema ? { settingsSchema } : {}),
         create: () => {
             creations.count++;
             return new AdmissionProbeBot();
         }
     };
-    ScriptRegistry.register(meta);
+    registerMeta(meta);
     return { meta, creations };
 }
 
@@ -67,6 +73,7 @@ beforeEach(async () => {
     await settle();
     detach();
     RunManager.override(null);
+    RecoveryHints.clear();
     document.body.replaceChildren();
     localStorage.clear();
     sessionStorage.clear();
@@ -74,8 +81,7 @@ beforeEach(async () => {
     delete TARGET.httpPrefix;
     Object.assign(TARGET, resolveTarget('local', 'localhost:8081'));
     Reflect.get(window, 'happyDOM').setURL('http://localhost:8081/bot.html');
-    fixtureName = null;
-    previousMeta = undefined;
+    previousMetas = new Map();
 });
 
 afterEach(async () => {
@@ -84,11 +90,11 @@ afterEach(async () => {
     await settle();
     detach();
     RunManager.override(null);
-    RecoveryHints.pendingRecovery = false;
-    if (fixtureName) {
-        ScriptRegistry.unregister(fixtureName);
-        if (previousMeta) ScriptRegistry.register(previousMeta);
+    for (const [name, meta] of previousMetas) {
+        ScriptRegistry.unregister(name);
+        if (meta) ScriptRegistry.register(meta);
     }
+    previousMetas.clear();
     localStorage.clear();
     sessionStorage.clear();
     setURL(PLAIN_URL);
@@ -138,58 +144,138 @@ test('the harness roster API refuses an unqualified script', () => {
     expect(warning).toHaveBeenCalledWith(`[rs2b0t] ${scriptAdmissionReason(meta)}`);
 });
 
-test('saved-profile configuration cannot start an unqualified script', async () => {
-    const { meta, creations } = registerFixture('JiveRC', OLD_REVISION);
-    const panel = createPanel(meta.name);
-    const client = createRosterClient(panel);
+test('saved-profile admission refusal preserves the active run, selection, and settings', async () => {
+    const { meta, creations } = registerFixture('JiveRC', OLD_REVISION, {
+        mode: { type: 'string', default: 'Auto' }
+    });
+    const active = registerFixture(QUALIFIED_NAME, CLIENT_VERSION);
+    const panel = createPanel('WalkTo');
+    ScriptRunner.start(active.meta);
+    await settle();
     const context = ScriptRunner.ctx;
+    SettingsStore.save('JiveRC', 'mode', 'Existing');
+    SettingsStore.save('JiveRC', 'stale', 'Preserve');
+    const settingsBefore = {
+        mode: SettingsStore.saved('JiveRC', 'mode'),
+        stale: SettingsStore.saved('JiveRC', 'stale')
+    };
+    RunManager.override({ runAuto: false });
     const runOverride = spyOn(RunManager, 'override');
     const warning = spyOn(console, 'warn').mockImplementation(() => {});
+    const settingsSave = spyOn(SettingsStore, 'save');
+    RecoveryHints.pendingRecovery = true;
+    RecoveryHints.anchor = new Tile(12, 34);
 
-    await expect(client.configureScript(meta.name, null, true)).rejects.toThrow(scriptAdmissionReason(meta)!);
+    await expect(panel.configureScript(meta.name, { mode: 'New' }, true)).rejects.toThrow(scriptAdmissionReason(meta)!);
 
     expect(ScriptRunner.ctx).toBe(context);
+    expect(ScriptRunner.state).toBe('running');
+    expect(active.creations.count).toBe(1);
     expect(creations.count).toBe(0);
+    expect(panel.selectedScriptName()).toBe('WalkTo');
+    expect(localStorage.getItem('rs2b0t:selectedScript')).toBe('WalkTo');
+    expect(sessionStorage.getItem('rs2b0t:selectedScript')).toBeNull();
+    expect(SettingsStore.saved('JiveRC', 'mode')).toBe('Existing');
+    expect(SettingsStore.saved('JiveRC', 'stale')).toBe('Preserve');
+    expect(SettingsStore.saved('JiveRC', 'mode')).toBe(settingsBefore.mode);
+    expect(SettingsStore.saved('JiveRC', 'stale')).toBe(settingsBefore.stale);
+    expect(settingsSave).not.toHaveBeenCalled();
+    expect(RecoveryHints.pendingRecovery).toBe(false);
+    expect(RecoveryHints.anchor).toBeNull();
     expect(runOverride).not.toHaveBeenCalled();
     expect(warning).toHaveBeenCalledWith(`[rs2b0t] ${scriptAdmissionReason(meta)}`);
 });
 
-test('WalkTo refuses an unqualified script', async () => {
-    const original = ScriptRegistry.get('WalkTo')!;
-    const creations = { count: 0 };
-    const meta: ScriptMeta = {
-        ...original,
-        revision: OLD_REVISION,
-        create: () => {
-            creations.count++;
-            return new AdmissionProbeBot();
-        }
-    };
-    fixtureName = 'WalkTo';
-    previousMeta = original;
-    ScriptRegistry.register(meta);
-    const panel = createPanel(meta.name);
+test('WalkTo admission refusal preserves the active run, selection, and settings', async () => {
+    const { meta, creations } = registerFixture('WalkTo', OLD_REVISION);
+    const active = registerFixture(QUALIFIED_NAME, CLIENT_VERSION);
+    const panel = createPanel('JiveRC');
     attach({ ingame: true });
+    ScriptRunner.start(active.meta);
+    await settle();
     const context = ScriptRunner.ctx;
+    SettingsStore.save('WalkTo', 'destination', 'Existing destination');
+    SettingsStore.save('WalkTo', 'customTile', '4,5,0');
+    const settingsBefore = {
+        destination: SettingsStore.saved('WalkTo', 'destination'),
+        customTile: SettingsStore.saved('WalkTo', 'customTile')
+    };
+    RunManager.override({ runAuto: false });
     const runOverride = spyOn(RunManager, 'override');
     const warning = spyOn(console, 'warn').mockImplementation(() => {});
+    RecoveryHints.pendingRecovery = true;
+    RecoveryHints.anchor = new Tile(56, 78);
+    const settingsSave = spyOn(SettingsStore, 'save');
 
     await expect(panel.travelTo('Lumbridge')).rejects.toThrow(scriptAdmissionReason(meta)!);
 
     expect(ScriptRunner.ctx).toBe(context);
+    expect(ScriptRunner.state).toBe('running');
+    expect(active.creations.count).toBe(1);
     expect(creations.count).toBe(0);
+    expect(panel.selectedScriptName()).toBe('JiveRC');
+    expect(localStorage.getItem('rs2b0t:selectedScript')).toBe('JiveRC');
+    expect(sessionStorage.getItem('rs2b0t:selectedScript')).toBeNull();
+    expect(SettingsStore.saved('WalkTo', 'destination')).toBe(settingsBefore.destination);
+    expect(SettingsStore.saved('WalkTo', 'customTile')).toBe(settingsBefore.customTile);
+    expect(settingsSave).not.toHaveBeenCalled();
+    expect(RecoveryHints.pendingRecovery).toBe(false);
+    expect(RecoveryHints.anchor).toBeNull();
     expect(runOverride).not.toHaveBeenCalled();
     expect(warning).toHaveBeenCalledWith(`[rs2b0t] ${scriptAdmissionReason(meta)}`);
 });
 
-test('StallGuard refuses an unqualified recovery restart', async () => {
-    const { meta, creations } = registerFixture(FIXTURE_NAME, CLIENT_VERSION);
-    ScriptRunner.start(meta);
+test('an unqualified activity requires the active parent run override', async () => {
+    const { meta, creations } = registerFixture('AdmissionChild', OLD_REVISION);
+    const refusalLogs: string[] = [];
+    const warning = spyOn(console, 'warn').mockImplementation(() => {});
+    RecoveryHints.pendingRecovery = true;
+    RecoveryHints.anchor = new Tile(90, 12);
+    const refused = new ScriptActivity(message => refusalLogs.push(message));
+    const reason = scriptAdmissionReason(meta)!;
+
+    await expect(refused.start(meta, {})).rejects.toThrow(reason);
+
+    expect(creations.count).toBe(0);
+    expect(refused.child).toBeNull();
+    expect(refused.outcome).toBeNull();
+    expect(refusalLogs).toContain(`[rs2b0t] ${reason}`);
+    expect(RecoveryHints.pendingRecovery).toBe(false);
+    expect(RecoveryHints.anchor).toBeNull();
+    expect(warning).toHaveBeenCalledWith(`[rs2b0t] ${reason}`);
+
+    const parent = registerFixture('AdmissionParent', OLD_REVISION);
+    ScriptRunner.start(parent.meta, { runUnqualified: true });
+    await settle();
+    expect(ScriptRunner.allowsUnqualifiedChildren).toBe(true);
+    const inheritedLogs: string[] = [];
+    const inherited = new ScriptActivity(message => inheritedLogs.push(message));
+    await inherited.start(meta, {});
+    expect(creations.count).toBe(1);
+    expect(inheritedLogs.some(message => message.includes('Warning: running unqualified'))).toBe(true);
+    inherited.stop();
+
+    ScriptRunner.stop('end override parent');
+    await settle();
+    expect(ScriptRunner.allowsUnqualifiedChildren).toBe(false);
+    const laterLogs: string[] = [];
+    const later = new ScriptActivity(message => laterLogs.push(message));
+    await expect(later.start(meta, {})).rejects.toThrow(reason);
+    expect(creations.count).toBe(1);
+    expect(later.child).toBeNull();
+    expect(laterLogs).toContain(`[rs2b0t] ${reason}`);
+});
+
+test('StallGuard refuses an unqualified recovery restart without leaving recovery state armed', async () => {
+    const { meta, creations } = registerFixture(FIXTURE_NAME, OLD_REVISION);
+    ScriptRunner.start(meta, { runUnqualified: true });
     await settle();
     expect(ScriptRunner.state).toBe('running');
-    meta.revision = OLD_REVISION;
+    expect(ScriptRunner.allowsUnqualifiedChildren).toBe(true);
     ScriptRunner.stop('prepare recovery restart');
     expect(ScriptRunner.state).toBe('stopped');
+    expect(ScriptRunner.allowsUnqualifiedChildren).toBe(false);
+    RecoveryHints.anchor = new Tile(123, 456);
 
     RunManager.override({ runAuto: false });
     const runOverride = spyOn(RunManager, 'override');
@@ -203,9 +289,19 @@ test('StallGuard refuses an unqualified recovery restart', async () => {
     expect(ScriptRunner.ctx).toBe(context);
     expect(ScriptRunner.state).toBe('stopped');
     expect(creations.count).toBe(1);
+    expect(ScriptRunner.allowsUnqualifiedChildren).toBe(false);
+    expect(RecoveryHints.pendingRecovery).toBe(false);
+    expect(RecoveryHints.anchor).toBeNull();
     expect(runOverride).not.toHaveBeenCalled();
     expect(warning).toHaveBeenCalledWith(`[rs2b0t] ${scriptAdmissionReason(meta)}`);
+
+    const panel = createPanel(meta.name);
+    panel.startSelectedScript();
+    expect(ScriptRunner.state).toBe('stopped');
+    expect(creations.count).toBe(1);
+    expect(RecoveryHints.pendingRecovery).toBe(false);
 });
+
 
 test('the visible override starts an unqualified script and logs a warning', async () => {
     const { meta, creations } = registerFixture(FIXTURE_NAME, OLD_REVISION);

@@ -9,6 +9,7 @@ import { Credentials } from '../runtime/Credentials.js';
 import { ScriptRegistry, type ScriptMeta } from '../runtime/ScriptRegistry.js';
 import { resolveDestination } from '../api/map/WalkDestinations.js';
 import { ScriptRunner, scriptAdmissionReason } from '../runtime/ScriptRunner.js';
+import { RecoveryHints } from '../runtime/RecoveryHints.js';
 import { GLOBAL_SETTINGS_CORE, NAV_SETTINGS, SettingsStore } from '../runtime/Settings.js';
 import ScriptLibrary from './ScriptLibrary.js';
 import ParamsModal from './ParamsModal.js';
@@ -293,7 +294,9 @@ export default class BotPanel {
     }
 
     async configureScript(name: string, values: Record<string, string> | null, start: boolean): Promise<void> {
-        this.requireScript(name);
+        const meta = this.requireScript(name);
+        if (start) this.assertScriptAdmitted(meta);
+        name = meta.name;
         if (values) this.validateSettings(name, values);
         await this.changeScript(() => {
             if (values) this.copyScriptSettings(name, values);
@@ -324,8 +327,9 @@ export default class BotPanel {
         if (!reader.ingame()) throw new Error('Log in before travelling');
         const target = resolveDestination(destination);
         if (!target) throw new Error(`Unknown destination: ${destination}`);
-        this.requireScript('WalkTo');
+        const meta = this.requireScript('WalkTo');
         this.assertNoUrlOverrides('WalkTo', ['destination', 'customTile']);
+        this.assertScriptAdmitted(meta);
         await this.changeScript(() => {
             if (!reader.ingame()) throw new Error('Log in before travelling');
             this.requireScript('WalkTo');
@@ -373,6 +377,21 @@ export default class BotPanel {
         const meta = name === 'Global' ? undefined : ScriptRegistry.get(name);
         if (!meta) throw new Error(`Unknown script: ${name}`);
         return meta;
+    }
+
+    private assertScriptAdmitted(meta: ScriptMeta): void {
+        const admissionReason = scriptAdmissionReason(meta);
+        if (!admissionReason) return;
+        RecoveryHints.clear();
+        console.warn(`[rs2b0t] ${admissionReason}`);
+        this.showAdmissionWarning(meta, admissionReason);
+        throw new Error(admissionReason);
+    }
+
+    private showAdmissionWarning(meta: ScriptMeta, admissionReason: string): void {
+        if (meta.name !== this.selectedScript) return;
+        this.admissionWarning.textContent = `Warning: ${admissionReason} Use Run unqualified only if you accept this mismatch.`;
+        this.admissionWarning.hidden = false;
     }
 
     private assertNoUrlOverrides(name: string, keys: Iterable<string>): void {
@@ -538,15 +557,13 @@ export default class BotPanel {
             return;
         }
 
-        this.paramsModal.close();
         try {
+            if (!runUnqualified) this.assertScriptAdmitted(meta);
+            this.paramsModal.close();
             this.runner.start(meta, runUnqualified ? { runUnqualified: true } : undefined);
         } catch (err) {
             const admissionReason = scriptAdmissionReason(meta);
-            if (admissionReason) {
-                this.admissionWarning.textContent = `Warning: ${admissionReason} Use Run unqualified only if you accept this mismatch.`;
-                this.admissionWarning.hidden = false;
-            }
+            if (admissionReason) this.showAdmissionWarning(meta, admissionReason);
             if (rethrow) throw err;
             console.error('[rs2b0t] start failed', err);
             return;
