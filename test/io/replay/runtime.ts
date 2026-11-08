@@ -288,6 +288,23 @@ interface CheckpointReport {
     sceneBuild: { locCount: number; collisionZoneTiles: number };
 }
 
+/** Live adapter at a replay checkpoint; S7a snapshot tests inspect entity/template state here. */
+export type ReplayCheckpointObserver = (info: {
+    label: string;
+    inboundCount: number;
+    state: CheckpointState;
+    sceneBuild: { locCount: number; collisionZoneTiles: number };
+    adapter: {
+        locs(): { id: number }[];
+        npcs(): { id: number }[];
+        templateSource(lx: number, lz: number, level?: number): object | null;
+        sceneInstanced(): boolean;
+        serverTile(): CheckpointState['serverTile'] | null;
+        toLocal(x: number, z: number): { lx: number; lz: number } | null;
+        mapBuildBase(): { x: number; z: number } | null;
+    };
+}) => void;
+
 interface OpcodeCoverage {
     descriptors: string[];
     seen: string[];
@@ -444,7 +461,8 @@ function demandFiles(cache: CacheBundle): ReadonlyMap<string, Uint8Array> {
 export async function replayRecording(
     records: readonly RecordingRecord[],
     cacheBundle: CacheBundle,
-    protocol: Protocol
+    protocol: Protocol,
+    onCheckpoint?: ReplayCheckpointObserver
 ): Promise<ReplayReport> {
     const check = checkRecording(records, protocol, cacheBundle);
     if (!check.valid) {
@@ -679,6 +697,13 @@ export async function replayRecording(
                     frames,
                     state: actual,
                     sceneBuild
+                });
+                onCheckpoint?.({
+                    label: checkpoint.label,
+                    inboundCount: checkpoint.inboundCount,
+                    state: actual,
+                    sceneBuild,
+                    adapter: reader
                 });
             }
 

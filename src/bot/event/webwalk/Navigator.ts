@@ -1,3 +1,4 @@
+import { reader } from '../../adapter/ClientAdapter.js';
 import { navPackForWorker } from './navPack.js';
 import type { NavPoint, NavResponse, PathOutcome } from './PathFinder.js';
 import type { PathPolicy } from './types.js';
@@ -64,10 +65,18 @@ class NavigatorImpl {
     }
 
     async findPath(from: NavPoint, to: NavPoint, opts?: FindPathOpts): Promise<PathResult> {
+        // Why: the collision pack indexes overworld squares, so instance dynamic coordinates must not be submitted.
+        if (reader.sceneInstanced()) {
+            return { ok: false, reason: 'webwalk suspended in instanced scene', expanded: 0 };
+        }
         this.start();
 
         if (this.state === 'starting') {
             await new Promise<void>(resolve => this.readyWaiters.push(resolve));
+        }
+        // Why: scene transitions can occur while this call waits for the worker to become ready.
+        if (reader.sceneInstanced()) {
+            return { ok: false, reason: 'webwalk suspended in instanced scene', expanded: 0 };
         }
         if (this.state !== 'ready' || !this.worker) {
             return { ok: false, reason: `navigator unavailable: ${this.failReason || this.state}`, expanded: 0 };

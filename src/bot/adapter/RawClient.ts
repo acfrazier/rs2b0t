@@ -15,6 +15,10 @@ export interface RawClient {
     mapBuildBaseX: number;
     mapBuildBaseZ: number;
     minusedlevel: number;
+    /** True after REBUILD_REGION until the next REBUILD_NORMAL. */
+    sceneInstanced: boolean;
+    /** Per-level 13x13 instance templates (26 bits) or -1. */
+    sceneMapRegion: Int32Array[][];
 
     localPlayer: ClientPlayer | null;
     players: (ClientPlayer | null)[];
@@ -99,6 +103,8 @@ export const SELF_TEST = [
     'mapBuildBaseX',
     'mapBuildBaseZ',
     'minusedlevel',
+    'sceneInstanced',
+    'sceneMapRegion',
     'localPlayer',
     'players',
     'playerIds',

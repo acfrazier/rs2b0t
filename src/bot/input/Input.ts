@@ -26,6 +26,7 @@ export const Input = {
         return actions.menuAction(PLAYER_OPS[op - 1], index, 0, 0);
     },
 
+    /** Scene-local tile against mapBuildBase. `typecode` carries the placed loc id; a morph does not change it. */
     interactLoc(lx: number, lz: number, typecode: number, op: number): boolean {
         return actions.menuAction(LOC_OPS[op - 1], typecode, lx, lz);
     },
@@ -70,6 +71,7 @@ export const Input = {
         return actions.menuAction(MiniMenuAction.TGT_BUTTON, 0, 0, spellComId) && actions.menuAction(MiniMenuAction.TGT_HELD, itemId, itemSlot, itemComId);
     },
 
+    /** Scene-local destination against mapBuildBase. Instance templates do not replace these coordinates. */
     walk(lx: number, lz: number): boolean {
         return actions.walkTo(lx, lz);
     },
