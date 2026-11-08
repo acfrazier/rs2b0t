@@ -2,6 +2,7 @@ import { expect, mock, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
 import { ServerProtKnown, ServerProtSizes } from '#/client/io/ServerProt.js';
+import { knownServerOpcodes } from '#/client/io/serverOpcodes.js';
 import Packet from '#/client/io/Packet.js';
 
 mock.module('#/client/3rdparty/audio.js', () => ({
@@ -86,6 +87,15 @@ test('the built table knows exactly the 75 fixture descriptors, with the fixture
     expect(descriptorNames()).toHaveLength(75);
     expect([...ServerProtKnown].sort((a, b) => a - b)).toEqual(descriptorNames().map(([, id]) => id).sort((a, b) => a - b));
     for (const row of FIXTURE.server) expect(ServerProtSizes[row.id], row.name).toBe(row.length);
+});
+
+test('the generated membership is required: a table without it, or with a malformed one, throws instead of falling back to sizes', () => {
+    expect([...knownServerOpcodes({ ServerProtKnown })].sort((a, b) => a - b)).toEqual([...ServerProtKnown].sort((a, b) => a - b));
+    expect(() => knownServerOpcodes({})).toThrow('missing or invalid generated server opcode membership');
+    expect(() => knownServerOpcodes({ ServerProtSizes })).toThrow('missing or invalid generated server opcode membership');
+    expect(() => knownServerOpcodes({ ServerProtKnown: [1, 2.5] })).toThrow('missing or invalid generated server opcode membership');
+    expect(() => knownServerOpcodes({ ServerProtKnown: [300] })).toThrow('missing or invalid generated server opcode membership');
+    expect(() => knownServerOpcodes({ ServerProtKnown: 'nope' })).toThrow('missing or invalid generated server opcode membership');
 });
 
 for (const [name, id] of descriptorNames()) {

@@ -19,7 +19,7 @@ const HANDLERS_TEST = 'test/client/shell/Client377Handlers.test.ts';
 const ZONE_TEST = 'test/client/shell/ZonePackets377.test.ts';
 
 /**
- * Descriptors none of the three committed recordings carries, each with the semantic vector that drives its production decoder.
+ * Descriptors none of the committed recordings carries, each with the semantic vector that drives its production decoder.
  * Why: a descriptor that no recording or vector exercises would ship with an unread 377 wire layout, so the list is closed and a stale entry fails below.
  */
 const VECTORS: Record<string, { file: string; needle: string }> = {
