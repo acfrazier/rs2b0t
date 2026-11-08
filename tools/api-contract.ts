@@ -145,7 +145,7 @@ export const PUBLISHED_API_MEMBERS = {
     SettingsStore: ['saved', 'save', 'onChange', 'displayString', 'resolve', 'globalBag', 'isUrlOverride', 'clear']
 } as const;
 
-export function publicationDrifts(runtime: Surface, exports: readonly string[]): Drift[] {
+export function publishedRootDrifts(runtime: Surface, exports: readonly string[]): Drift[] {
     const drifts: Drift[] = [];
     for (const [name, expected] of Object.entries(PUBLISHED_API_MEMBERS)) {
         if (!exports.includes(name)) {
@@ -216,7 +216,7 @@ export function compare(runtime: Surface, declared: Surface, exports: readonly s
 
 export function checkContract(runtime: Surface, declared: Surface, exports: readonly string[], allow: ReadonlySet<string> = new Set()): Drift[] {
     const drifts = compare(runtime, declared, exports, allow);
-    for (const d of publicationDrifts(runtime, exports)) {
+    for (const d of publishedRootDrifts(runtime, exports)) {
         if (!drifts.some(existing => existing.export === d.export && existing.member === d.member)) {
             drifts.push(d);
         }

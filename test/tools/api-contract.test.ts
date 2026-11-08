@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { allowlist, checkContract, compare, declaredSurface, packageExports, publicationDrifts, report, runtimeSurface } from '../../tools/api-contract.js';
+import { allowlist, checkContract, compare, declaredSurface, packageExports, publishedRootDrifts, report, runtimeSurface } from '../../tools/api-contract.js';
 import type { Member, Surface } from '../../tools/api-contract.js';
 
 function members(names: string[], optional: string[] = []): Map<string, Member> {
@@ -48,7 +48,7 @@ describe('compare', () => {
 });
 
 test('publication ledger pins the roots and exact runtime member sets', () => {
-    expect(publicationDrifts(runtimeSurface(), packageExports())).toEqual([]);
+    expect(publishedRootDrifts(runtimeSurface(), packageExports())).toEqual([]);
 });
 
 test('publication ledger rejects missing roots and changed member sets', () => {
@@ -61,7 +61,7 @@ test('publication ledger rejects missing roots and changed member sets', () => {
     runtime.set('Prayer', changedPrayer);
 
     expect(
-        publicationDrifts(
+        publishedRootDrifts(
             runtime,
             packageExports().filter(name => name !== 'SettingsStore')
         )
