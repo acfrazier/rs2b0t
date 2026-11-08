@@ -195,7 +195,11 @@ type NavProbe = {
     state: string;
     worker: { postMessage: (message: { id: number }) => void } | null;
     failReason: string;
-    onMessage: (message: { type: string; id: number; ok: boolean; reason: string; expanded: number }) => void;
+    onMessage: (
+        message:
+            | { type: 'ready'; mapsquares: number; doorEdges: number; transportEdges: number }
+            | { type: 'path'; id: number; ok: boolean; reason: string; expanded: number }
+    ) => void;
 };
 
 describe('webwalk suspended in an instance', () => {
@@ -219,6 +223,36 @@ describe('webwalk suspended in an instance', () => {
                 }
             };
             const result = await Navigator.findPath({ x: 6680, z: 100, level: 0 }, { x: 6681, z: 100, level: 0 }, { state: {} as never });
+            expect(sent).toBe(0);
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                expect(result.reason).toBe('webwalk suspended in instanced scene');
+            }
+        } finally {
+            nav.state = previous.state;
+            nav.worker = previous.worker;
+            nav.failReason = previous.failReason;
+        }
+    });
+
+    test('Navigator.findPath refuses an instance entered while the worker becomes ready', async () => {
+        const nav = Navigator as unknown as NavProbe;
+        const previous = { state: nav.state, worker: nav.worker, failReason: nav.failReason };
+        let sent = 0;
+        const client = { sceneInstanced: false };
+        try {
+            attach(client as never);
+            nav.state = 'starting';
+            nav.worker = {
+                postMessage(message) {
+                    sent++;
+                    queueMicrotask(() => nav.onMessage({ type: 'path', id: message.id, ok: false, reason: 'intercepted', expanded: 0 }));
+                }
+            };
+            const pending = Navigator.findPath({ x: 6680, z: 100, level: 0 }, { x: 6681, z: 100, level: 0 }, { state: {} as never });
+            client.sceneInstanced = true;
+            nav.onMessage({ type: 'ready', mapsquares: 1, doorEdges: 0, transportEdges: 0 });
+            const result = await pending;
             expect(sent).toBe(0);
             expect(result.ok).toBe(false);
             if (!result.ok) {

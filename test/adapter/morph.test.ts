@@ -4,6 +4,8 @@ import { attach, detach, invalidateLocSnapshots, reader } from '#/bot/adapter/Cl
 import { Input } from '#/bot/input/Input.js';
 import { Loc as SceneLoc } from '#/bot/api/model/Loc.js';
 import LocType from '#/client/config/LocType.js';
+import Model from '#/client/dash3d/Model.js';
+import LruCache from '#/client/datastruct/LruCache.js';
 import NpcType from '#/client/config/NpcType.js';
 import VarBitType from '#/client/config/VarBitType.js';
 import ClientNpc from '#/client/dash3d/ClientNpc.js';
@@ -26,6 +28,7 @@ const locs = new Map<number, LocDef>();
 const origLocList = LocType.list;
 const origNpcList = NpcType.list;
 const origVarbits = VarBitType.list;
+const origLocModelCache = LocType.mc2;
 
 function loc(id: number, name: string, op: string, width = 1): LocDef {
     const result = Object.create(LocType.prototype) as LocDef;
@@ -106,6 +109,7 @@ afterEach(() => {
     detach();
     invalidateLocSnapshots();
     LocType.list = origLocList;
+    LocType.mc2 = origLocModelCache;
     NpcType.list = origNpcList;
     VarBitType.list = origVarbits;
 });
@@ -243,33 +247,47 @@ describe('locBox morph', () => {
         expect(dx).not.toBe(128);
     });
 
-    test('hull height and radius come from the base model, not the child', () => {
-        const base = loc(BASE_LOC, 'millbase', 'Search', 1);
-        base.multivarbit = -1;
-        base.multivar = 0;
-        base.multiloc = [CHILD_LOC];
-        base.getModel = (() => ({ minY: 64, maxY: 0, radius: 64 })) as unknown as LocDef['getModel'];
+    test('hull height and radius use the placed shape and angle on the production base model path', () => {
+        const shape = 22;
+        const angle = 2;
+        const base = Object.assign(new LocType(), {
+            id: BASE_LOC,
+            name: 'millbase',
+            op: ['Search'],
+            multivarbit: -1,
+            multivar: 0,
+            multiloc: [CHILD_LOC],
+            shape: new Int32Array([shape]),
+            model: new Int32Array([7])
+        });
+        const baseModel = Object.assign(new Model(), { minY: 64, maxY: 0, radius: 180 });
         const child = loc(CHILD_LOC, 'millbase_flour', 'Take', 1);
-        child.getModel = (() => ({ minY: 300, maxY: 0, radius: 180 })) as unknown as LocDef['getModel'];
         locs.set(BASE_LOC, base);
         locs.set(CHILD_LOC, child);
+        LocType.mc2 = new LruCache<Model>(30);
+        LocType.mc2.put(baseModel, (BigInt(base.id) << 6n) + BigInt(angle));
+        expect(base.getModel(shape, angle, 0, 0, 0, 0, -1)).toBe(baseModel);
+        expect(base.getModel(0, 0, 0, 0, 0, 0, -1)).toBeNull();
+
         const lx = 5;
         const lz = 6;
+        const childModel = Object.assign(new Model(), { minY: 300, maxY: 0, radius: 64 });
         attach({
             world: {
                 getWall: () => null,
-                getDecor: (_level: number, tz: number, tx: number) => {
+                getDecor: () => null,
+                getGd: (_level: number, tx: number, tz: number) => {
                     if (tx !== lx || tz !== lz) {
                         return null;
                     }
                     return {
                         typecode: TYPECODE,
+                        typecode2: (angle << 6) | shape,
                         x: (lx << 7) + 64,
                         z: (lz << 7) + 64,
-                        model: { getTempModel: () => ({ minY: 300, maxY: 0, radius: 180 }) }
+                        model: { getTempModel: () => childModel }
                     };
                 },
-                getGd: () => null,
                 getScene: () => null
             },
             minusedlevel: 0,
@@ -282,10 +300,8 @@ describe('locBox morph', () => {
         expect(hull).not.toBeNull();
         const width = Math.abs(hull![1]!.x - hull![0]!.x);
         const top = hull![4]!.y;
-        expect(width).toBe(128);
+        expect(width).toBe(360);
         expect(top).toBe(64);
-        expect(width).not.toBe(360);
-        expect(top).not.toBe(300);
     });
 });
 

@@ -197,9 +197,9 @@ export function resolveLocModelExtents(
  * Model extents from the placed (base) LocType.
  * Why: ClientLocAnim.getTempModel resolves the morph child, and plan §1.5 keeps hull height and radius on the base.
  */
-function locTypeModelExtents(lt: LocType): { minY: number; maxY: number; radius: number } | null {
+function locTypeModelExtents(lt: LocType, shape: number, angle: number): { minY: number; maxY: number; radius: number } | null {
     try {
-        const built = lt.getModel(0, 0, 0, 0, 0, 0, -1) as unknown;
+        const built = lt.getModel(shape, angle, 0, 0, 0, 0, -1) as unknown;
         if (!built || typeof built !== 'object') {
             return null;
         }
@@ -724,6 +724,7 @@ export const reader = {
             halfW: number;
             halfL: number;
             resolvedId: number | undefined;
+            info: number;
             modelSrc: ModelSource | null;
             usedSceneFootprint: boolean;
             /** Prefer exact-tile / wall over distant scenery. */
@@ -748,6 +749,7 @@ export const reader = {
                 halfL: 64,
                 resolvedId: id,
                 modelSrc: wall.model1 ?? wall.model2,
+                info: wall.typecode2,
                 usedSceneFootprint: false,
                 rank: 0,
                 dist: Math.abs(tx - lx) + Math.abs(tz - lz),
@@ -768,6 +770,7 @@ export const reader = {
                 halfL: 64,
                 resolvedId: id,
                 modelSrc: decor.model,
+                info: decor.typecode2,
                 usedSceneFootprint: false,
                 rank: 2,
                 dist: Math.abs(tx - lx) + Math.abs(tz - lz)
@@ -787,6 +790,7 @@ export const reader = {
                 halfL: 64,
                 resolvedId: id,
                 modelSrc: gd.model,
+                info: gd.typecode2,
                 usedSceneFootprint: false,
                 rank: 3,
                 dist: Math.abs(tx - lx) + Math.abs(tz - lz)
@@ -828,6 +832,7 @@ export const reader = {
                     halfL: (tilesZ * 128) / 2,
                     resolvedId: id,
                     modelSrc: scene.model,
+                    info: scene.typecode2,
                     usedSceneFootprint: true,
                     rank: 1,
                     dist: Math.abs(ox - lx) + Math.abs(oz - lz)
@@ -874,7 +879,9 @@ export const reader = {
                 }
                 // Why: name/ops come from the morph child; hull height and radius stay on the base LocType.
                 const morphing = lt.multiloc.length > 0;
-                const model = morphing ? locTypeModelExtents(lt) : (resolveLocModelExtents(modelSrc) ?? locTypeModelExtents(lt));
+                const shape = h0.info & 0x1f;
+                const angle = (h0.info >> 6) & 3;
+                const model = morphing ? locTypeModelExtents(lt, shape, angle) : (resolveLocModelExtents(modelSrc) ?? locTypeModelExtents(lt, shape, angle));
                 // resizey is a % scale (128 = 100%), not a height, never use it as topH.
                 topH = locHullHeight(model, 128);
                 if (
