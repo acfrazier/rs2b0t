@@ -2,13 +2,10 @@ import { deployIsolatedClient, launchBrowser, parseArgs, type IsolatedClient } f
 import fs from 'node:fs';
 import type { Browser } from 'playwright-core';
 
-const { base } = parseArgs(process.argv.slice(2), { base: 'http://localhost:8888' });
+const { base, rest } = parseArgs(process.argv.slice(2), { base: 'http://localhost:8888' });
 const origin = base.replace(/\/+$/, '');
-const prefix = process.env.BOT_LIVE_NAME_PREFIX ?? '';
-if (!/^frtap[a-z0-9]{1,3}$/.test(prefix)) {
-    throw new Error('BOT_LIVE_NAME_PREFIX must be frtap followed by 1-3 lowercase alphanumeric characters');
-}
-const username = `${prefix}${Date.now().toString(36).slice(-4)}`;
+const prefix = process.env.BOT_LIVE_NAME_PREFIX ?? 'ext';
+const username = rest[0] ?? `${prefix}${Date.now().toString(36).slice(-4)}`;
 const tag = `external-${username}`;
 const engineDir = process.env.ENGINE_DIR ?? `${process.env.HOME}/code/rs2b2t-engine`;
 const TELE = '::tele 0,50,50,20,20';
