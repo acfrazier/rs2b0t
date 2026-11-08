@@ -71,6 +71,15 @@ export const CASES: readonly Case[] = [
         note: 'L2 377 quest cell: three fresh accounts run The Restless Ghost through AIOQuester (quests=priest, runUnqualified) with no seed beyond the fresh account; watched prieststart 0 -> 1 -> 2 -> 3 -> 4 -> 5 and qp 0 -> 1 getvar timeline, Prayer +1,125 XP, quest skull 553, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
+        id: 'l2-hetty-377-live',
+        harness: 'l2-hetty-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 45,
+        note: 'L2 377 quest cell: three fresh accounts with 50 seeded coins run Witch\'s Potion through AIOQuester (quests=hetty, runUnqualified); watched hetty 0 -> 1 -> 2 -> 3 and qp 0 -> 1 getvar timeline, Magic +325 XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
         id: 'gnome-magic-north-stair-live',
         harness: 'gnome-magic-north-stair-live.ts',
         covers: { scripts: ['GnomeMagicChopper'] },

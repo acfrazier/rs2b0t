@@ -1,20 +1,31 @@
 import { Execution } from '../../../execution/Execution.js';
+import { actions, reader } from '../../../../adapter/ClientAdapter.js';
 import { Game } from '../../../game/Game.js';
 import { Inventory } from '../../../inventory/Inventory.js';
-import { ChatDialog } from '../../../ui/dialogue/ChatDialog.js';
 import { Locs } from '../../../locs/Locs.js';
 import { Npcs } from '../../../npcs/Npcs.js';
 import { GroundItems } from '../../../grounditems/GroundItems.js';
+import { Quests } from '../../../ui/questlog/Quests.js';
 import { Traversal } from '../../../walking/Traversal.js';
 import Tile from '../../../../geometry/Tile.js';
 import type { NpcStop } from '../exec/primitives.js';
 import { gotoNpc, talkThrough } from '../exec/primitives.js';
 import type { QuestModule, QuestSnapshot, QuestStep } from '../engine/types.js';
 import { QUESTS } from '../data/quests.js';
+import { normalizeJournal as journalText } from '../journalText.js';
+
+/** Server-side hetty values, read back from the journal (quest_hetty.varp 67; 1 and 2 share the yellow row colour). */
+export const HETTY_STAGE = {
+    NOT_STARTED: 0,
+    STARTED: 1,
+    OBJECTS_GIVEN: 2,
+    COMPLETE: 3
+} as const;
 
 const HETTY: NpcStop = {
     npc: 'Hetty',
-    anchor: new Tile(2970, 3207, 0),
+    // 377 (content cb6cc5ea1): Hetty spawns at (2968,3206,0), maps/m46_50.jm2:8521 `0 24 6: 307`.
+    anchor: new Tile(2968, 3206, 0),
     leash: 6,
     prefer: ['I am in search of a quest.', 'Yes help me become one with my darker side.']
 };
@@ -25,7 +36,7 @@ const ONION_FIELD = new Tile(2950, 3251, 0);
 const BETTY_SHOP = { npc: 'Betty', anchor: new Tile(3011, 3260, 0) };
 const WYDIN_SHOP = { npc: 'Wydin', anchor: new Tile(3014, 3204, 0) };
 const DRAYNOR_BANK = new Tile(3093, 3243, 0);
-// Why: Content @289 renamed the obj from "Rats tail" (274) to "Rat's tail"; name match is apostrophe-exact.
+// 377 (content cb6cc5ea1): the packed obj is "Rat's tail" (all.obj [rats_tail]); the pre-289 'Rats tail' spelling never matches.
 const RATS_TAIL = "Rat's tail";
 
 const INGREDIENTS = [RATS_TAIL.toLowerCase(), 'onion', 'eye of newt', 'burnt meat'];
@@ -60,7 +71,8 @@ export const gatherBurntMeat = (snap: QuestSnapshot): QuestStep =>
         ? { kind: 'custom', name: 'burn the meat on the range', run: burnMeat }
         : gpShort(snap, 20) > 0
             ? { kind: 'wait', reason: 'need ~20 gp for Raw beef' }
-            : { kind: 'buy', item: 'Raw beef', qty: 2, shop: WYDIN_SHOP, estGp: 20 });
+            // 377 (content cb6cc5ea1): Wydin's shop stocks exactly 1 Raw beef (_unpack/727/all.inv:1186 `stock2=raw_beef,1,100`), so buy 1 and keep the pack at one beef.
+            : { kind: 'buy', item: 'Raw beef', qty: 1, shop: WYDIN_SHOP, estGp: 20 });
 
 async function killRatGrabTail(log: (m: string) => void): Promise<boolean> {
     if (Inventory.contains(RATS_TAIL)) {
@@ -103,14 +115,9 @@ async function burnMeat(log: (m: string) => void): Promise<boolean> {
         return false;
     }
     const oven = () => Locs.query().name('Range').where(l => l.tile().distanceTo(RANGE) <= 6).nearest();
+    // 377 (cb6cc5ea1): cooking.rs2:127-130 cooks a lone item without the `cookx` menu, so one beef never opens it; Cooked meat then burns on
+    // the deliberate-burn path (cooking_generic.dbrow:52-60, successchance 1,1: "You deliberately burn the nicely cooked meat.").
     for (let n = 0; n < 12 && !Inventory.contains('Burnt meat'); n++) {
-        if (ChatDialog.isMakeMenu()) {
-            if (!(await ChatDialog.make('meat'))) {
-                await ChatDialog.make();
-            }
-            await Execution.delayTicks(2);
-            continue;
-        }
         const meat = Inventory.first('Cooked meat') ?? Inventory.first('Raw beef');
         if (!meat) {
             return false;
@@ -127,25 +134,20 @@ async function burnMeat(log: (m: string) => void): Promise<boolean> {
             continue;
         }
         await Execution.delayUntil(
-            () => ChatDialog.isMakeMenu() || Inventory.count('Burnt meat') > burntBefore || Inventory.count('Cooked meat') !== cookedBefore,
+            () => Inventory.count('Burnt meat') > burntBefore || Inventory.count('Cooked meat') !== cookedBefore,
             6000
         );
     }
     return Inventory.contains('Burnt meat');
 }
 
-async function handInAndDrink(log: (m: string) => void): Promise<boolean> {
-    if (!(await gotoNpc(HETTY, [], log))) {
-        return false;
-    }
-    log('handing the four ingredients to Hetty');
-    await talkThrough('Hetty', [], log);
+async function drinkFromCauldron(log: (m: string) => void): Promise<boolean> {
     if (!(await Traversal.walkResilient(CAULDRON, { radius: 2, attempts: 3, timeoutMs: 60_000, log }))) {
         return false;
     }
     const cauldron = Locs.query().name('Cauldron').action('Drink From').within(8).nearest();
     if (!cauldron) {
-        log('handInAndDrink: no Cauldron[Drink From] near Hetty — LIVE-VERIFY');
+        log('drinkFromCauldron: no Cauldron[Drink From] near Hetty — LIVE-VERIFY');
         return false;
     }
     log('drinking from the cauldron to finish the quest');
@@ -154,6 +156,40 @@ async function handInAndDrink(log: (m: string) => void): Promise<boolean> {
     }
     await Execution.delayTicks(3);
     return true;
+}
+
+async function handInAndDrink(log: (m: string) => void): Promise<boolean> {
+    if (!(await gotoNpc(HETTY, [], log))) {
+        return false;
+    }
+    log('handing the four ingredients to Hetty');
+    await talkThrough('Hetty', [], log);
+    return drinkFromCauldron(log);
+}
+
+/** 377 (content cb6cc5ea1): stage 2 reads "I should drink from the cauldron and improve my magic!" (hetty_journal.rs2:40-42);
+ *  stage 1 reads "Hetty needs me to bring her the following" (:13-14); 0 and 3 match the questlist texts (:10-11, :45). */
+export function parseHettyJournal(lines: readonly string[] | string): number | undefined {
+    const text = journalText(lines);
+    if (text.includes('quest complete!')) return HETTY_STAGE.COMPLETE;
+    if (text.includes('i should drink from the cauldron')) return HETTY_STAGE.OBJECTS_GIVEN;
+    if (text.includes('hetty needs me to bring her the following')) return HETTY_STAGE.STARTED;
+    if (text.includes('i can start this quest by talking to') && text.includes('hetty')) return HETTY_STAGE.NOT_STARTED;
+    return undefined;
+}
+
+async function readHettyStage(): Promise<number | undefined> {
+    const status = Quests.status("Witch's Potion");
+    if (status === 'complete') return HETTY_STAGE.COMPLETE;
+    if (status === 'notStarted') return HETTY_STAGE.NOT_STARTED;
+    if (status !== 'inProgress') return undefined;
+
+    const stage = parseHettyJournal(await Quests.journal("Witch's Potion"));
+    if (reader.modals().main !== -1) {
+        actions.closeModal();
+        await Execution.delayTicks(1);
+    }
+    return stage;
 }
 
 function gatherFor(name: string, snap: QuestSnapshot): QuestStep {
@@ -170,6 +206,12 @@ export function decide(snap: QuestSnapshot): QuestStep {
     if (snap.journal === 'complete') { return { kind: 'done' }; }
     if (snap.journal === 'unknown') { return { kind: 'wait', reason: 'quest journal not loaded' }; }
     if (snap.journal === 'notStarted') { return { kind: 'talk', stop: HETTY }; }
+    // 377: the hand-in deletes all four ingredients (hetty.rs2:20-23), so a bare pack cannot tell stage 1 from stage 2;
+    // the journal can (hetty_journal.rs2:40-42), and stage 2 goes straight to the cauldron.
+    if (snap.stage === HETTY_STAGE.OBJECTS_GIVEN) {
+        return { kind: 'custom', name: 'drink from the cauldron', run: drinkFromCauldron };
+    }
+    if (snap.stage === undefined) { return { kind: 'wait', reason: 'hetty journal stage unavailable' }; }
     const need = INGREDIENTS.filter(i => !snap.inv.has(i));
     if (need.length === 0) {
         return { kind: 'custom', name: 'hand in the ingredients and drink the potion', run: handInAndDrink };
@@ -188,5 +230,6 @@ export const hetty: QuestModule = {
         'eye of newt': gatherEyeOfNewt,
         'burnt meat': gatherBurntMeat
     },
-    decide
+    decide,
+    readStage: readHettyStage
 };
