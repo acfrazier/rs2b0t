@@ -62,6 +62,15 @@ export const CASES: readonly Case[] = [
         note: 'L2 377 quest cell: three fresh accounts finish Sheep Shearer through AIOQuester (runUnqualified) with no quest, item, XP or position seed; shears pen sheep 43/1765, spins by using Wool on the Lumbridge castle wheel; watched sheep/qp getvar timeline, the_thing_sheared 0, Crafting XP, coins, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
+        id: 'l2-priest-377-live',
+        harness: 'l2-priest-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 50,
+        note: 'L2 377 quest cell: three fresh accounts run The Restless Ghost through AIOQuester (quests=priest, runUnqualified) with no seed beyond the fresh account; watched prieststart 0 -> 1 -> 2 -> 3 -> 4 -> 5 and qp 0 -> 1 getvar timeline, Prayer +1,125 XP, quest skull 553, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
         id: 'gnome-magic-north-stair-live',
         harness: 'gnome-magic-north-stair-live.ts',
         covers: { scripts: ['GnomeMagicChopper'] },
