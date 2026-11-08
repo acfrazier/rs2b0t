@@ -1,4 +1,4 @@
-import { playWave, setWaveVolume } from '#/client/3rdparty/audio.js';
+import { playWave, replayWave, setWaveVolume } from '#/client/3rdparty/audio.js';
 // Decision 012: Jagex control plane + Spessa (Florestan bank) — single product backend
 import { playMidi, setMidiVolume, stopMidi } from '#/client/sound/MidiFacade.js';
 
@@ -3729,10 +3729,8 @@ export class Client extends GameShell {
                         }
                         // if gate fails: drop (failed stays false) — same as Java
                     } else {
-                        // Why: a static replayWave import fails when a test mock omits it; bun freezes that first export set.
-                        const { replayWave } = await import('#/client/3rdparty/audio.js');
                         // Java replayWave / wavereplay
-                        if (typeof replayWave === 'function' && !(await replayWave())) {
+                        if (!(await replayWave())) {
                             failed = true;
                         }
                     }
