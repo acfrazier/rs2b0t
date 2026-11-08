@@ -2,6 +2,12 @@
 # P4a: build the revision-377 data set from fresh clones at pinned engine/content commits, then
 # stage every generated module under data/377/ and write data/manifest.json (plan §3, pitfall 11).
 #
+# Post-cutover mode: once the manifest reads `cutover: true` the staging tree is gone, so the
+# same command regenerates the committed data — every module is written at its repo path, the
+# nav bake rewrites the tracked JSONs in place, and the manifest step re-hashes every row (the
+# manifest keeps `cutover: true`). Detection reads data/manifest.json; a pre-cutover tree keeps
+# the staged flow below.
+#
 # Why fresh clones: pack ids depend on build history (an inherited generated id map or map cache
 # produces different bytes), so the engine and content are cloned --no-checkout at the pinned
 # commits, the worldmap is packed explicitly (npm run build never calls packWorldmap), and only
@@ -28,9 +34,10 @@
 #   GEN377_BUN_VERSION   optional; expected `bun --version` (default: 1.4.4)
 #   GEN377_SOURCE_BRANCH optional; branch the pinned commits are on (default: rs2-r377)
 #
-# The script never touches anything outside the repository's data/377/, the chosen out dir, and
-# GEN377_WORK. The engine/content clones are disposable build inputs; their trees are never
-# committed anywhere.
+# The script never touches anything outside the repository's data/377/ (its repo-path write set
+# in post-cutover mode: the generated modules, the webwalk JSONs, out/ and data/manifest.json),
+# the chosen out dir, and GEN377_WORK. The engine/content clones are disposable build inputs;
+# their trees are never committed anywhere.
 set -euo pipefail
 
 ENGINE_COMMIT=724994b4a8f17a02666e87caf02a0fc6018fe5bd
@@ -46,11 +53,31 @@ WORK=${GEN377_WORK:?GEN377_WORK is required (workspace for the fresh clones)}
 ENGINE_REPO=${GEN377_ENGINE_REPO:?GEN377_ENGINE_REPO is required (engine clone source)}
 CONTENT_REPO=${GEN377_CONTENT_REPO:?GEN377_CONTENT_REPO is required (content clone source)}
 OUT_DIR=${GEN377_OUT_DIR:-out}
-STAGE=data/377
 REVISION=377
 
 cd "$(dirname "$0")/.."   # the rs2b0t repository root
 REPO=$PWD
+
+# Pre-cutover, every generated module stages under data/377/ (manifest kinds 'generated',
+# 'edition' and 'nav-input') and tools/cutover-377.ts later moves it into place. After the
+# cutover the manifest reads `cutover: true` and the staging tree is gone, so the same command
+# regenerates the committed data: STAGE becomes the repository itself, the generators write at
+# their repo paths, and the manifest step records the final paths (pitfall 10). The manifest is
+# the one file that knows which mode applies, so detection reads it.
+if [ -f data/manifest.json ] && grep -q '"cutover": true' data/manifest.json; then
+    STAGE=.
+else
+    STAGE=data/377
+fi
+# The repo path a generated file is recorded and staged under: `$STAGE/<path>` before the
+# cutover (also where it is written), `<path>` itself after it (written there directly).
+stage_path() {
+    if [ "$STAGE" = . ]; then
+        printf '%s\n' "$1"
+    else
+        printf '%s\n' "$STAGE/$1"
+    fi
+}
 ENGINE=$WORK/source/engine
 mkdir -p "$WORK/source" "$WORK/logs"
 
@@ -150,7 +177,7 @@ do
 done
 echo "worldmap.jag $(wc -c < "$ENGINE/data/pack/mapview/worldmap.jag") bytes"
 
-echo "== generators (REVISION=$REVISION, staged under $STAGE/) =="
+echo "== generators (REVISION=$REVISION, $(if [ "$STAGE" = . ]; then echo 'writing at repo paths (post-cutover)'; else echo "staged under $STAGE/"; fi)) =="
 GENERATORS=(
     "tools/items/gen-itemdb.ts"
     "tools/shops/gen-shopdb.ts"
@@ -183,7 +210,7 @@ test -n "$(ls "$OUT_DIR"/worldmap-basemap.*.png 2>/dev/null)" || {
     echo "no basemap files under $OUT_DIR" >&2
     exit 1
 }
-echo "== navigation bake (REVISION=$REVISION, staged under $STAGE/) =="
+echo "== navigation bake (REVISION=$REVISION, $(if [ "$STAGE" = . ]; then echo 'in place (post-cutover)'; else echo "staged under $STAGE/"; fi)) =="
 NAV_DATA_ROOT="$STAGE"
 NAV_DATA_DIR="$NAV_DATA_ROOT/src/bot/event/webwalk/data"
 NAV_WORK="$WORK/nav"
@@ -191,9 +218,12 @@ mkdir -p "$NAV_DATA_DIR" "$NAV_DATA_ROOT/tools/nav" "$NAV_DATA_ROOT/out" "$NAV_W
 # Preserve reviewed 377 inputs on regeneration.
 test -f "$NAV_DATA_ROOT/tools/nav/door-categories.json" || cp tools/nav/door-categories.json "$NAV_DATA_ROOT/tools/nav/door-categories.json"
 test -f "$NAV_DATA_ROOT/tools/nav/stair-prices.json" || cp tools/nav/stair-prices.json "$NAV_DATA_ROOT/tools/nav/stair-prices.json"
-# The 377 bake starts from the checked-in 289 transport seed, then regenerates both graphs.
-cp src/bot/event/webwalk/data/transports.json "$NAV_DATA_DIR/transports.json"
-cp src/bot/event/webwalk/data/stairEdges.json "$NAV_DATA_DIR/stairEdges.json"
+# The 377 bake starts from the checked-in transport seed, then regenerates both graphs. In
+# post-cutover mode the seed files are the bake's own outputs already, so the copies are no-ops.
+test src/bot/event/webwalk/data/transports.json -ef "$NAV_DATA_DIR/transports.json" || \
+    cp src/bot/event/webwalk/data/transports.json "$NAV_DATA_DIR/transports.json"
+test src/bot/event/webwalk/data/stairEdges.json -ef "$NAV_DATA_DIR/stairEdges.json" || \
+    cp src/bot/event/webwalk/data/stairEdges.json "$NAV_DATA_DIR/stairEdges.json"
 rm -f "$NAV_DATA_ROOT/out/collision.lcnav" "$NAV_DATA_ROOT/out/collision.lcnav.gz"
 REVISION=$REVISION ENGINE_DIR="$ENGINE" "$BUN_BIN" tools/nav/build-collision.ts \
     --engine "$ENGINE" \
@@ -227,11 +257,11 @@ for path in \
     src/bot/event/webwalk/data/stairEdges.json \
     src/bot/event/webwalk/data/transports.json
 do
-    ARTIFACT_ARGS+=(--artifact "$STAGE/$path=generated")
+    ARTIFACT_ARGS+=(--artifact "$(stage_path "$path")=generated")
 done
-ARTIFACT_ARGS+=(--artifact "$STAGE/tools/nav/door-categories.json=nav-input")
-ARTIFACT_ARGS+=(--artifact "$STAGE/tools/nav/stair-prices.json=nav-input")
-ARTIFACT_ARGS+=(--artifact "$STAGE/out/collision.lcnav.gz=out")
+ARTIFACT_ARGS+=(--artifact "$(stage_path tools/nav/door-categories.json)=nav-input")
+ARTIFACT_ARGS+=(--artifact "$(stage_path tools/nav/stair-prices.json)=nav-input")
+ARTIFACT_ARGS+=(--artifact "$(stage_path out/collision.lcnav.gz)=out")
 
 GEN_ARGS=()
 for gen in \

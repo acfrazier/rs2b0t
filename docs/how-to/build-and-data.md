@@ -45,6 +45,14 @@ cutover validates and moves that source. `build-collision.ts` defaults to
 `out/collision.lcnav` for every revision, and deploy/pack callers name that path explicitly,
 so a revision-specific build cannot overwrite a staged pack.
 
+After the cutover the manifest reads `cutover: true` and the staging tree is gone, and the
+same command regenerates the committed data: `tools/gen-377-data.sh` detects that flag in
+`data/manifest.json`, runs the generators with `--stage .` so every module is written at its
+repo path, bakes the navigation JSONs in place (the transport seed copies become no-ops),
+and records the manifest rows at their final paths with no `stagedPath`. The manifest keeps
+`cutover: true`, so `bun tools/lib/manifest.ts verify` passes on the regenerated tree and a
+byte-identical run leaves `git status` clean.
+
 The stair and transport files are composed. `tools/nav/derive-transports.sh` runs
 `derive-stairs.ts`, which writes `stairEdges.json`. Then `derive-ladders.py` and
 `enrich-transports.py` rewrite `stairEdges.json` and `transports.json` in place. So the stair
