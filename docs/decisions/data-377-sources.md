@@ -4,14 +4,12 @@
 
 Pitfall 16 of the 377 plan: no constant ships without a 377 source line. The evidence for each
 hand-authored edition lives here so the modules keep one-line comments. Content commit
-`a15d0faa8`; `all.obj`, `all.loc` and `all.npc` are `scripts/_unpack/377/`.
+`cb6cc5ea1`; `all.obj`, `all.loc` and `all.npc` are `scripts/_unpack/377/`.
 
 ## Clue gates
 
-The 289 rows (3560, 3562, 3564: the Isafdar dig and elf-camp clues) have no 377 clue items. The
-377 trail content (`all.obj`, 367 `trail_clue*` objs) carries no Isafdar clue, and the staged
-cluedb (2677-2858) has no such ids. A row for a clue the content does not sell would be a stale
-gate that the audit reports, so the table is empty.
+The canon 1108 trail adds three hard clues absent from the earlier 377 pack: Isafdar sextant digs 3560 and 3562, plus Lord Iorwerth's elf-camp riddle 3564 (`scripts/minigames/game_trail/configs/trail_hard.enum`, `all.obj`). `regicide_dense_forest.rs2:13-16` seals the crossings until Regicide's spoken tracker; the quest-list gate therefore holds all three until Regicide is complete.
+The ordinary nav graph has no edges across those seams, so these three rows also remain in `PACK_UNREACHABLE`; the solver's `tirannwnTravel.ts` path handles them after the gate opens. The gate data keeps unfinished accounts from reaching a destination the quest still seals.
 
 ## Kill anchors
 
@@ -61,16 +59,16 @@ the 377 content names every member distinctly, so those groups no longer exist.
 
 ## Mining locations and rocks
 
-Rocks per camp are the 377 placements of the ids in `miningRocks.ts`: the classic 2090-2111 rocks plus the `rocks_97xx/111xxx/119xxx` series
-(`pack/loc.pack`, `scripts/skill_mining/configs/mine.dbrow:12-183`); decode in `RS2B0T-377-S9-1106/placements-rocks.txt`.
+Rocks per camp are the 377 placements of the ids in `miningRocks.ts`: the classic 2090-2111 rocks plus the `rocks_97xx/111xxx/119xxx/148xx` series (`pack/loc.pack`, `scripts/skill_mining/configs/mine.dbrow:12-198`); decode in `RS2B0T-377-S9-1106/placements-rocks.txt`.
 Rimmington also carries the new-series field (clay 9713 at (2986,3239), copper 9708-9710 at (2976-2979,3245-3248), tin 9714/9716, iron 9717-9719, gold 9720/9722).
 
-`mine.dbrow` names every rock per ore table: clay :12-20, copper :30-36, tin :46-54, iron :64-70, coal :80-86, gold :96-104, silver :114-120, mithril :130-133, adamantite :143-146, runite :156-159, blurite :171-172, gem :182-183.
+`mine.dbrow` names every rock per ore table: clay :12-20, copper :30-36, tin :46-54, iron :64-73, coal :83-92, gold :102-110, silver :120-126, mithril :136-142, adamantite :152-158, runite :168-174.
 `pack/loc.pack` maps each debugname to its id (`2091:2090=copperrock1`, `9709:9708=rocks_9708`). The new-series placements are the Rimmington, Crafting Guild and Barbarian Village fields (decoded from engine `data/pack/.cache/maps-server.zip`).
+The 377 pack and `mine.dbrow:174` define `rocks_14861` as a runite rock, but no canon-1108 map places it; keep the table entry distinct from placed camp fields.
 289 had only the classic block, so a camp's ore list can no longer assume two ids per ore.
 
-Gas rocks: `mine.dbrow` lists each `macro_*rock` beside its ore: :32-33 copper, :48-49 tin, :66-67 iron, :82-83 coal, :98-99 gold, :119-120 silver, :132-133 mithril, :145-146 adamantite, :158-159 runite, :14-15 clay, :172 blurite, :183 gem.
-`pack/loc.pack` assigns the 2119-2140 block (`2120:2119=macro_copperrock1` to `2141:2140=macro_gemrock`). 289 omitted 2140; the 377 gem table names it (`mine.dbrow:183`) and the maps place gemrocks (Shilo Village).
+Gas rocks: `mine.dbrow` lists each `macro_*rock` beside its ore: :32-33 copper, :48-49 tin, :66-67 iron, :85-86 coal, :104-105 gold, :125-126 silver, :138-139 mithril, :154-155 adamantite, :170-171 runite, :14-15 clay, :186-187 blurite, :197-198 gem.
+`pack/loc.pack` assigns the 2119-2140 block (`2120:2119=macro_copperrock1` to `2141:2140=macro_gemrock`). 289 omitted 2140; the 377 gem table names it (`mine.dbrow:197-198`) and the maps place gemrocks (Shilo Village).
 
 ## Rune craft locations
 

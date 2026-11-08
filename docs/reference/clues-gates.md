@@ -26,18 +26,24 @@ edges across it.
 
 ## Clues the pack cannot reach
 
-The offline audit currently carries seven exceptions in
-[`PACK_UNREACHABLE`](../../src/bot/api/ai/clues/data/unreachable.ts).
+The offline audit now carries four exceptions in
+[`PACK_UNREACHABLE`](../../src/bot/api/ai/clues/data/unreachable.ts): the
+Gnome ball field clue 2853 and the three Regicide clues below. Kharazi Jungle
+and Duel Arena helper behavior is documented here too, but those clue ids are
+absent from the current 377 clue database.
 An entry describes a limitation of ordinary pack routing; it does not always
 mean the clue solver cannot get there.
 
-- **Kharazi Jungle, 3532, 3534 and 3536.** `kharaziTravel.ts` cuts through the
-  jungle band on entry and exit. It needs a machete, an axe, and Radimus notes
-  unless Legends Quest is complete. Ordinary A* cannot perform the cutting.
+- **Gnome ball field, 2853.** The referee anchor is behind a gate whose
+  `Open` loc has no 377 category, so the derivation dropped it from the
+  ordinary route graph.
 - **Tirannwn, 3560, 3562 and 3564.** After Regicide is complete,
   `tirannwnTravel.ts` routes across `REGICIDE_SEAMS`, including the return to
   the mainland. Those seams are separate from the ordinary nav graph.
-- **Duel Arena, 3554.** The dig at `(3374,3250,0)` is inside the obstacle arena
+- **Kharazi Jungle helper (3532, 3534 and 3536).** `kharaziTravel.ts` cuts through the
+  jungle band on entry and exit. It needs a machete, an axe, and Radimus notes
+  unless Legends Quest is complete. Ordinary A* cannot perform the cutting.
+- **Duel Arena helper (3554).** The dig at `(3374,3250,0)` is inside the obstacle arena
   bounded by `(3364,3244)` and `(3388,3258)`. Entry requires an accepted duel
   with another player and obstacles enabled. With **Global > Clue duel partner**
   empty, the solver tries available lobby players, moves on after 30 seconds

@@ -94,7 +94,7 @@ test('the next clue leg receives its own reset allowance', async () => {
 });
 
 test('an unmet quest requirement does not trigger navigation recovery', async () => {
-    // 377 seals no clue behind a quest (CLUE_GATES is empty), so the gate is injected on a real talk riddle row (Gerrant).
+    // Inject a gate on Gerrant's talk riddle to isolate that unmet quest requirements bypass navigation recovery.
     CLUE_GATES[2778] = { quest: 'Regicide', reason: 'the destination is sealed' };
     try {
         pack = [item(2778)];

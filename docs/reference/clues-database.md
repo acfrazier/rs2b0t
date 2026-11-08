@@ -60,13 +60,15 @@ position within the server's accepted dig area. Hard `sextant012` (2745) uses
 that tile before spawning the wizard and returns there for the post-fight dig.
 Other clues retain their usual arrival radius.
 
-## Step kinds
+## Step kinds in the 377 pack
 
 | Type | Count | What the solver does |
 |---|---|---|
-| `search` | 68 | walk to the coordinate and search the named object |
-| `dig` | 71 | walk to the coordinate and dig, needs a spade |
-| `talk` | 47 | find the named NPC and talk to them |
+| `search` | 34 | walk to the coordinate and search the named object |
+| `dig` | 39 | walk to the coordinate and dig, needs a spade |
+| `talk` | 31 | find the named NPC and talk to them |
+
+The 289 baseline had 68 search, 71 dig, and 47 talk rows (186 total).
 
 A trail step is either a `ClueRow` or the terminal `open-casket`:
 

@@ -40,8 +40,8 @@ describe.skipIf(!present)('clue audit (pack-gated)', () => {
         const { total, findings, expectedAbandon, clean } = runClueAudit({ engine: process.env.ENGINE_DIR });
         expect(findings.map(f => `${f.obj} [${f.id}] ${f.type}: ${f.problem}`)).toEqual([]);
         expect(expectedAbandon).toEqual(EXPECTED_ABANDON);
-        // 377: the generated cluedb carries 101 clues (2677-2858); the 289 total was 186.
-        expect(total).toBe(101);
+        // 377: the generated cluedb carries 104 clues: 101 earlier rows plus hard clues 3560/3562/3564; the 289 total was 186.
+        expect(total).toBe(104);
         expect(clean).toBe(total - EXPECTED_ABANDON.length);
     }, 240_000);
 });

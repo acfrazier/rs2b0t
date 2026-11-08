@@ -66,7 +66,7 @@ test('resolveRockIds maps selected names to their ids (case-insensitive)', () =>
     expect(iron.size).toBeGreaterThan(0);
     expect(coal.size).toBeGreaterThan(0);
     // 377 migration pin: the selector must reach the new-series rocks, not only the 289 classic block;
-    // iron 9717 and coal 11930 come from the 377 tables (mine.dbrow:68-70 and :84-86 via loc.pack).
+    // iron 9717 and coal 11930 come from the 377 tables (mine.dbrow:68-73 and :87-92 via loc.pack).
     expect([...iron]).toContain(9717);
     expect([...coal]).toContain(11930);
 });
@@ -81,7 +81,7 @@ describe.skipIf(skipUnless('content'))('377 pack-backed rocks (content-gated)', 
         expect(is377Content, 'CONTENT_DIR must point at the 377 content (scripts/_unpack/377 and pack/loc.pack expected)').toBe(true);
     });
 
-    test('every rock id is a Mine-op "Rocks" loc in the 377 pack, and every ore keeps a placed field', () => {
+    test('all rock ids are Rocks locs, with a placed field for every ore', () => {
         const names = locPackNames();
         const idByName = new Map([...names].map(([name, id]) => [id, name]));
         const placed = placedRockIds();
@@ -91,9 +91,45 @@ describe.skipIf(skipUnless('content'))('377 pack-backed rocks (content-gated)', 
                 expect(debugname, `${name} id ${id} is not in the 377 loc.pack`).toBeDefined();
                 // All ore rocks render as "Rocks" (all.loc `[rocks_9708] name=Rocks`, `[copperrock1] name=Rocks`).
                 expect(debugname, `id ${id} (${debugname}) is not a Rocks loc`).toMatch(/^(rocks(_\d+)?|[a-z]*rock\d*)$/);
-                expect(placed.has(id), `377 maps never place ${name} rock ${id} (${debugname})`).toBe(true);
+            }
+            // The pack and mine table define 14861 as a runite rock, but no canon-1108 map places it.
+            const unplaced = ids.filter(id => !placed.has(id));
+            expect(unplaced, `${name} unplaced rock ids`).toEqual(name === 'Runite' ? [14861] : []);
+            expect(ids.some(id => placed.has(id)), `${name} has no placed map field`).toBe(true);
+        }
+    });
+
+    test('ore selectors include every non-gas loc from their 377 mine table', () => {
+        const names = locPackNames();
+        const selectedByOre = new Map(Object.entries(ROCK_TYPES).map(([ore, ids]) => [ore.toLowerCase(), new Set(ids)]));
+        const lines = readFileSync(join(CONTENT, 'scripts/skill_mining/configs/mine.dbrow'), 'ascii').split('\n');
+        let ore: string | null = null;
+        let rockNames: string[] = [];
+        const checkTable = () => {
+            if (ore === null) return;
+            const selected = selectedByOre.get(ore.toLowerCase());
+            if (!selected) return;
+            for (const name of rockNames) {
+                if (name.startsWith('macro_')) continue;
+                const id = names.get(name);
+                expect(id, `${ore} table references unmapped loc ${name}`).toBeDefined();
+                if (id !== undefined) {
+                    expect(selected, `${ore} table loc ${id} is not selectable`).toContain(id);
+                }
+            }
+        };
+        for (const line of lines) {
+            if (line.startsWith('[')) {
+                checkTable();
+                ore = null;
+                rockNames = [];
+            } else if (line.startsWith('data=rock,')) {
+                rockNames.push(line.slice('data=rock,'.length).trim());
+            } else if (line.startsWith('data=ore_name,')) {
+                ore = line.slice('data=ore_name,'.length).trim();
             }
         }
+        checkTable();
     });
 
     test('the Rimmington field the Doric quest mines is inside the resolved ore sets', () => {
@@ -146,7 +182,7 @@ describe('GAS_ROCK_IDS', () => {
     });
 
     test('the gemrock gas form is guarded (it is a listed 377 gem-table rock)', () => {
-        // mine.dbrow:180-187 `[gem_rock]` lists gemrock and macro_gemrock; the 377 maps place gemrocks at Shilo.
+        // mine.dbrow:195-198 `[gem_rock]` lists gemrock and macro_gemrock; the 377 maps place gemrocks at Shilo.
         expect(GAS_ROCK_IDS.has(2140)).toBe(true);
     });
 });
