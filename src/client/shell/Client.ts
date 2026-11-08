@@ -3706,6 +3706,7 @@ export class Client extends GameShell {
     async soundsDoQueue() {
         for (let wave: number = 0; wave < this.waveCount; wave++) {
             if (this.waveDelay[wave] <= 0) {
+                let failed: boolean = false;
                 try {
                     // Java Client.java:3826 generates only when the id or loops differ; a repeat calls replayWave and does not throw.
                     // signlink.reporterror is true (signlink.java:49) and is never cleared, so the reachable catch is Client.java:3842-3845.
@@ -3718,23 +3719,39 @@ export class Client extends GameShell {
                         if (performance.now() + ((buf.pos / 22) | 0) > this.lastWaveStartTime + ((this.lastWaveLength / 22) | 0)) {
                             this.lastWaveLength = buf.pos;
                             this.lastWaveStartTime = performance.now();
-                            // playWave swallows decode errors and returns void, matching Java saveWave-failure: no EVENT_SYNTH_ERROR.
-                            await playWave(buf.data.slice(0, buf.pos));
-                            this.lastWaveId = this.waveIds[wave];
-                            this.lastWaveLoops = this.waveLoops[wave];
+                            // Java saveWave — false when signlink is busy; do not record the wave as played.
+                            if (await playWave(buf.data.slice(0, buf.pos))) {
+                                this.lastWaveId = this.waveIds[wave];
+                                this.lastWaveLoops = this.waveLoops[wave];
+                            } else {
+                                failed = true;
+                            }
+                        }
+                        // if gate fails: drop (failed stays false) — same as Java
+                    } else {
+                        // Why: a static replayWave import fails when a test mock omits it; bun freezes that first export set.
+                        const { replayWave } = await import('#/client/3rdparty/audio.js');
+                        // Java replayWave / wavereplay
+                        if (typeof replayWave === 'function' && !(await replayWave())) {
+                            failed = true;
                         }
                     }
                 } catch {
                     writeEventSynthError(this.out, ClientProt.EVENT_SYNTH_ERROR, this.waveIds[wave] & 0x7fff);
                 }
 
-                this.waveCount--;
-                for (let i: number = wave; i < this.waveCount; i++) {
-                    this.waveIds[i] = this.waveIds[i + 1];
-                    this.waveLoops[i] = this.waveLoops[i + 1];
-                    this.waveDelay[i] = this.waveDelay[i + 1];
+                if (failed && this.waveDelay[wave] !== -5) {
+                    // Java: retry next frames
+                    this.waveDelay[wave] = -5;
+                } else {
+                    this.waveCount--;
+                    for (let i: number = wave; i < this.waveCount; i++) {
+                        this.waveIds[i] = this.waveIds[i + 1];
+                        this.waveLoops[i] = this.waveLoops[i + 1];
+                        this.waveDelay[i] = this.waveDelay[i + 1];
+                    }
+                    wave--;
                 }
-                wave--;
             } else {
                 this.waveDelay[wave]--;
             }
