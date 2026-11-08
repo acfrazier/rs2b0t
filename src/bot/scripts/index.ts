@@ -684,7 +684,7 @@ ScriptRegistry.register({
 });
 
 ScriptRegistry.register({
-    revision: 289,
+    revision: 377,
     name: 'BoneBurier',
     description: 'Bank-standing Prayer trainer — withdraws full loads of an exact bone name and buries them until the bank is empty',
     category: 'Prayer',

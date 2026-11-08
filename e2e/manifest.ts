@@ -13,6 +13,15 @@ export const CASES: readonly Case[] = [
         note: 'Four 377 webwalk routes, three fresh accounts each, with serverTile readback; requires canon-1108 ENGINE_DIR, CONTENT_DIR and S8_LIVE_EVIDENCE_DIR.'
     },
     {
+        id: 'l2-boneburier-377-live',
+        harness: 'l2-boneburier-377-live.ts',
+        covers: { scripts: ['BoneBurier'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 15,
+        note: 'L2 377 template: three fresh accounts bury ten banked Bones through BoneBurier with bank, inventory and Prayer experience readbacks before, after and after a relog; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
         id: 'gnome-magic-north-stair-live',
         harness: 'gnome-magic-north-stair-live.ts',
         covers: { scripts: ['GnomeMagicChopper'] },
