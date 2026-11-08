@@ -212,7 +212,7 @@ const recordingIndex = resolve('test/io/recordings/index.json');
 const missingIndex = !existsSync(recordingIndex);
 if (missingIndex) console.info('SKIP: test/io/replay.test.ts: recording index is not present');
 const missingCacheBundle = skipUnless('cache-bundle');
-// Why: each case below boots the production client from the recorded cache bundle and runs its mainloop; the full replay takes 5.3 s on Bun 1.4.4 and 6.5 s on CI's pinned 1.3.14, past bun's 5 s default, and bunfig has no test-timeout key, so the budget is per test here (as `inboundCoverage377.test.ts` does).
+// Why: each case below boots the production client from the recorded cache bundle and runs its mainloop; replay took 5.3 s on Bun 1.4.4 and 6.5 s on Bun 1.3.14, both past bun's 5 s default, and bunfig has no test-timeout key, so the budget is per test here (as `inboundCoverage377.test.ts` does).
 // A timed-out replay keeps running into the later tests: under the 5 s default the login-key and login-block tests after it failed as well.
 const REPLAY_BUDGET_MS = 120_000;
 

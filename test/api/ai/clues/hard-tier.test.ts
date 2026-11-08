@@ -10,11 +10,11 @@ const rows = Object.values(CLUE_DB);
 const hard = rows.filter(row => row.obj.includes('_hard_'));
 
 describe('hard tier in CLUE_DB', () => {
-    // 377: the trail_hard.enum carries 31 rows (`minigames/game_trail/configs/trail_hard.enum`, 31 `val=`
-    // lines) and the generated cluedb covers all of them plus the easy/medium tiers: 101 rows.
-    test('all 31 hard clues from trail_hard.enum are present', () => {
-        expect(hard.length).toBe(31);
-        expect(rows.length).toBe(101);
+    // 377: the trail_hard.enum carries 34 rows (`minigames/game_trail/configs/trail_hard.enum`, 34 `val=`
+    // lines) and the generated cluedb covers all of them plus the easy/medium tiers: 104 rows.
+    test('all 34 hard clues from trail_hard.enum are present', () => {
+        expect(hard.length).toBe(34);
+        expect(rows.length).toBe(104);
     });
 
     test('the tiers share one table without colliding on an obj id', () => {
@@ -33,11 +33,10 @@ describe('hard tier in CLUE_DB', () => {
 describe('dig guardians', () => {
     const guarded = hard.filter(row => row.guardian !== undefined);
 
-    // 377: the 13 guarded sextant digs all name the Zamorak Wizard (the staged cluedb guardian fields,
-    // generated from the 377 trail content); the Saradomin Wizard no longer guards any 377 dig.
-    test('13 coordinate digs are guarded, all by the Zamorak Wizard', () => {
-        expect(guarded.length).toBe(13);
-        expect([...new Set(guarded.map(r => r.guardian))].sort()).toEqual(['Zamorak Wizard']);
+    // 377: 13 hard digs are guarded by Zamorak Wizard and two new Isafdar digs by Saradomin Wizard.
+    test('15 coordinate digs are guarded by the two wizard types', () => {
+        expect(guarded.length).toBe(15);
+        expect([...new Set(guarded.map(r => r.guardian))].sort()).toEqual(['Saradomin Wizard', 'Zamorak Wizard']);
     });
 
     test('a guardian only ever sits on a sextant dig', () => {
@@ -53,10 +52,9 @@ describe('dig guardians', () => {
 describe('puzzle boxes', () => {
     const puzzles = hard.filter(row => row.puzzle !== undefined);
 
-    // 377: three hard talk clues hand over a puzzle box (cluedb rows 2794/2797/2799, the riddle014/016/017
-    // puzzleboxes); the 289 trail had nine.
-    test('3 talk clues hand over a puzzle box, each with a resolved obj id', () => {
-        expect(puzzles.length).toBe(3);
+    // 377: four hard talk clues hand over puzzle boxes (cluedb rows 2794/2797/2799/3564, riddles014/016/017/018); the 289 trail had nine.
+    test('4 talk clues hand over a puzzle box, each with a resolved obj id', () => {
+        expect(puzzles.length).toBe(4);
         expect(puzzles.filter(r => r.type !== 'talk')).toEqual([]);
         expect(puzzles.filter(r => !Number.isInteger(r.puzzle!.id) || r.puzzle!.id <= 0)).toEqual([]);
     });
@@ -72,12 +70,6 @@ describe('puzzle boxes', () => {
 });
 
 describe('gated clues', () => {
-    // 377: the table is empty (clueGates.ts; the 289 Isafdar/Regicide rows have no 377 clue items), so the
-    // two loop guards below hold vacuously until a 377 clue gains a quest gate; this pins the state itself.
-    test('no 377 clue is quest-gated', () => {
-        expect(Object.keys(CLUE_GATES)).toEqual([]);
-    });
-
     test('every gate names a real clue and gives a reason', () => {
         for (const [idStr, gate] of Object.entries(CLUE_GATES)) {
             expect(CLUE_DB[Number(idStr)], `gate ${idStr} is not a clue`).toBeDefined();

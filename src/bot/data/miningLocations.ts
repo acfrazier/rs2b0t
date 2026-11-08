@@ -1,4 +1,4 @@
-/** 377 rocks per camp are the map placements of the ids in `miningRocks.ts` (content a15d0faa8); source lines in docs/decisions/data-377-sources.md#mining-locations-and-rocks. */
+/** 377 rocks per camp are the map placements of the ids in `miningRocks.ts` (content cb6cc5ea1); source lines in docs/decisions/data-377-sources.md#mining-locations-and-rocks. */
 import type { WorldTile } from '../adapter/ClientAdapter.js';
 import Tile from '../geometry/Tile.js';
 import { locationOptions, resolveGatheringLocation, type GatheringLocation } from './gatheringLocations.js';

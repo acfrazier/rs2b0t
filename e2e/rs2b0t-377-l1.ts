@@ -49,7 +49,7 @@ async function sceneReady(page: Page): Promise<void> {
     );
 }
 
-// Content a15d0faa8: tutorial.rs2:301-312 and pack/varp.pack:407. Private tutorial 281 is server-only.
+// Content cb6cc5ea1: tutorial.rs2:301-312 and pack/varp.pack:407. Private tutorial 281 is server-only.
 const TUTORIAL_OVERLAY = 406;
 const { values } = parseArgs({
     options: {
@@ -70,7 +70,7 @@ const required = (name: 'engine' | 'content' | 'out'): string => {
 };
 const output = required('out');
 const accountPrefix = values['account-prefix']!;
-assert.match(accountPrefix, /^[a-z0-9]{1,4}$/, 'L1 account prefix must contain one to four lowercase letters or digits');
+assert.match(accountPrefix, /^[a-z0-9]{1,5}$/, 'L1 account prefix must contain one to five lowercase letters or digits');
 
 function revision(directory: string): string {
     const result = Bun.spawnSync(['git', '-C', directory, 'rev-parse', 'HEAD']);
@@ -222,7 +222,7 @@ async function live(): Promise<void> {
         content = required('content');
     const designAccept = readFileSync(join(content, 'pack/interface.pack'), 'utf8').match(/^(\d+)=player_kit:accept$/m);
     assert(designAccept, 'L1 fixture: missing player_kit:accept component');
-    const account = `${accountPrefix}${randomBytes(4).toString('hex')}`,
+    const account = `${accountPrefix}${randomBytes(2).toString('hex').slice(0, 3)}`,
         secret = randomBytes(8).toString('hex');
     const tag = account;
     const receipt: Record<string, unknown> = { status: 'FAIL', account, tag, clientCommit: revision(process.cwd()), contentCommit: revision(content), steps: [] };

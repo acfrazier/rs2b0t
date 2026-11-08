@@ -14,7 +14,7 @@ import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
 import { skip377 } from '../lib/skip377.js';
 import { skipUnless } from '../lib/skipUnless.js';
 
-const skipped = skip377('test/scripts/accountLevelerZanaris.test.ts', '377 data gap: loc 2411 (zanarismarketdoor) and npc 33 (doorman) are declared in the 377 pack but placed in no 377 map file, so the Zanaris market gate this test crosses does not exist in the 377 world (grep of canon-1105 content/maps for ": 2411" and ": 33" finds none; Jakut spawns in m38_69)');
+const skipped = skip377('test/scripts/accountLevelerZanaris.test.ts', '377 data gap: loc 2411 (zanarismarketdoor) is declared in the 377 pack but placed in no canon-1108 map file, so the Zanaris market gate this test crosses does not exist in the 377 world (canon-1108 content/maps has no ": 2411" placement; Jakut spawns in m38_69)');
 
 const snapshot = (): LevelerSnapshot => ({
     levels: Object.fromEntries(enabledSkills.map(skill => [skill, 60])), target: 60, now: 1000,

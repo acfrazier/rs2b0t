@@ -14,8 +14,12 @@ export interface ClueGate {
 }
 
 /** Clues whose destination a quest seals off. */
-// 377: empty; the 377 trail content carries no Isafdar clue item (see docs/decisions/data-377-sources.md#clue-gates).
-export const CLUE_GATES: Record<number, ClueGate> = {};
+// 377 content adds Isafdar digs 3560/3562 and Lord Iorwerth's elf-camp riddle 3564; all require Regicide.
+export const CLUE_GATES: Record<number, ClueGate> = {
+    3560: { quest: 'Regicide', reason: 'Isafdar is sealed until Regicide is complete' },
+    3562: { quest: 'Regicide', reason: 'Isafdar is sealed until Regicide is complete' },
+    3564: { quest: 'Regicide', reason: 'Lord Iorwerth is in the elf camp' }
+};
 
 // Why: `unknown` is the quest tab not loaded yet, so only `complete` opens the gate.
 export function clueGate(id: number, status: (quest: string) => QuestStatus): string | null {

@@ -6,13 +6,13 @@ export const ROCK_TYPES: Record<string, number[]> = {
     Clay: [2108, 2109, 9711, 9713, 11189, 11190, 11191],
     Copper: [2090, 2091, 9708, 9709, 9710],
     Tin: [2094, 2095, 9714, 9716, 11933, 11934, 11935],
-    Iron: [2092, 2093, 9717, 9718, 9719],
+    Iron: [2092, 2093, 9717, 9718, 9719, 14856, 14857, 14858],
     Silver: [2100, 2101, 11186, 11187, 11188],
-    Coal: [2096, 2097, 11930, 11931, 11932],
+    Coal: [2096, 2097, 11930, 11931, 11932, 14850, 14851, 14852],
     Gold: [2098, 2099, 9720, 9722, 11183, 11184, 11185],
-    Mithril: [2102, 2103],
-    Adamantite: [2104, 2105],
-    Runite: [2106, 2107]
+    Mithril: [2102, 2103, 14853, 14854, 14855],
+    Adamantite: [2104, 2105, 14862, 14863, 14864],
+    Runite: [2106, 2107, 14859, 14860, 14861]
 };
 
 /**
@@ -20,7 +20,7 @@ export const ROCK_TYPES: Record<string, number[]> = {
  * Why: an empty GatheringBot ore selection falls back to every option in `ROCK_OPTIONS`, and a mining bot should never target blurite.
  */
 export const QUEST_ROCK_TYPES: Record<string, number[]> = {
-    // mine.dbrow:169-178 `[blurite_rock]` names bluriterock (loc.pack:2111:2110) and macro_bluriterock; the macro form is the gas event state, not a target.
+    // mine.dbrow:184-193 `[blurite_rock]` names bluriterock (loc.pack:2111:2110) and macro_bluriterock; the macro form is the gas event state, not a target.
     Blurite: [2110]
     // The 289 edition also listed Limestone [4027, 4028, 4029]; the 377 mine tables have no limestone row, so no 377 source line backs it and it is dropped (pitfall 16).
 };

@@ -7,10 +7,10 @@
 # commits, the worldmap is packed explicitly (npm run build never calls packWorldmap), and only
 # then do the generators run with REVISION=377 and --stage data/377/.
 #
-# Pinned toolchain: Node 26.12.0 is the version the clean-checkout 377 pack build was proven with
-# (GAMEDATA-377-1105/clean-build.md); Bun 1.3.14 is the version hosted CI runs
-# (.github/workflows/test.yml). Both are checked exactly and recorded in the manifest. Override
-# only for a deliberate toolchain change, and then the recorded provenance changes with it.
+# Toolchain pins: Node 26.13.0 and Bun 1.4.4 are installed here; the prior exact pins
+# (Node 26.12.0 and Bun 1.3.14) are unavailable. Bun 1.4.4 is also the current CI version.
+# Both versions are checked exactly and recorded in the manifest. Override them only for a
+# deliberate toolchain change, and then record the new versions in the manifest.
 #
 # Inputs (environment):
 #   GEN377_WORK          required; workspace for the fresh clones, build and logs (keep it off the
@@ -24,8 +24,8 @@
 #                        the recorded repo-relative paths stay out/… either way)
 #   GEN377_NODE          optional; node binary (default: node on PATH)
 #   GEN377_BUN           optional; bun binary (default: bun on PATH)
-#   GEN377_NODE_VERSION  optional; expected `node --version` without the leading v (default: 26.12.0)
-#   GEN377_BUN_VERSION   optional; expected `bun --version` (default: 1.3.14)
+#   GEN377_NODE_VERSION  optional; expected `node --version` without the leading v (default: 26.13.0)
+#   GEN377_BUN_VERSION   optional; expected `bun --version` (default: 1.4.4)
 #   GEN377_SOURCE_BRANCH optional; branch the pinned commits are on (default: rs2-r377)
 #
 # The script never touches anything outside the repository's data/377/, the chosen out dir, and
@@ -33,12 +33,12 @@
 # committed anywhere.
 set -euo pipefail
 
-ENGINE_COMMIT=bc47497ee8cf6148dbfb7239714ddd5045c40194
-CONTENT_COMMIT=a15d0faa809f5f8455ef43e1ae4edfdd22512bb2
+ENGINE_COMMIT=724994b4a8f17a02666e87caf02a0fc6018fe5bd
+CONTENT_COMMIT=cb6cc5ea1c9bbe13b9680bb2ddd4ccaeab2b5f40
 SOURCE_BRANCH=${GEN377_SOURCE_BRANCH:-rs2-r377}
 
-PINNED_NODE=${GEN377_NODE_VERSION:-26.12.0}
-PINNED_BUN=${GEN377_BUN_VERSION:-1.3.14}
+PINNED_NODE=${GEN377_NODE_VERSION:-26.13.0}
+PINNED_BUN=${GEN377_BUN_VERSION:-1.4.4}
 NODE_BIN=${GEN377_NODE:-node}
 BUN_BIN=${GEN377_BUN:-bun}
 
@@ -106,7 +106,7 @@ test -z "$(git -C "$WORK/source/content" status --porcelain --untracked-files=al
 test -z "$(git -C "$WORK/source/content" ls-files --others --ignored --exclude-standard -- pack)"
 echo "clones clean; no inherited pack state"
 
-# Why this patch: `packWorldmap` at bc47497e is the 289-era packer. 377 content has 174 floors
+# Why this patch: `packWorldmap` at 724994b4 is the 289-era packer. 377 content has 174 floors
 # where its reference table has 103 (the loop reads past the table) and 377 moved fonts to
 # PNG + .opt, so the eight legacy .fm loads throw. The disposable clone gets a compatibility
 # patch that fills a missing floor colour from the floor's own `colour` and omits absent fonts
