@@ -6,8 +6,8 @@ import type { ClueRow } from '#/bot/api/ai/clues/types.js';
 
 export const CLUE_DB: Record<number, ClueRow> = {
     2677: {"obj":"trail_clue_easy_simple001","id":2677,"type":"search","coord":{"x":3209,"z":3218,"level":1}},
-    2678: {"obj":"trail_clue_easy_simple002","id":2678,"type":"search","coord":{"x":3228,"z":3216,"level":1}},
-    2679: {"obj":"trail_clue_easy_simple003","id":2679,"type":"search","coord":{"x":3248,"z":3246,"level":0}},
+    2678: {"obj":"trail_clue_easy_simple002","id":2678,"type":"search","coord":{"x":3228,"z":3212,"level":1}},
+    2679: {"obj":"trail_clue_easy_simple003","id":2679,"type":"search","coord":{"x":3245,"z":3245,"level":0}},
     2680: {"obj":"trail_clue_easy_simple004","id":2680,"type":"search","coord":{"x":3301,"z":3169,"level":1}},
     2681: {"obj":"trail_clue_easy_simple005","id":2681,"type":"talk","npc":"Hans"},
     2682: {"obj":"trail_clue_easy_simple006","id":2682,"type":"search","coord":{"x":3289,"z":3202,"level":0}},
@@ -22,7 +22,7 @@ export const CLUE_DB: Record<number, ClueRow> = {
     2691: {"obj":"trail_clue_easy_simple015","id":2691,"type":"search","coord":{"x":2971,"z":3386,"level":1}},
     2692: {"obj":"trail_clue_easy_simple016","id":2692,"type":"search","coord":{"x":2955,"z":3390,"level":0}},
     2693: {"obj":"trail_clue_easy_simple017","id":2693,"type":"talk","npc":"Squire"},
-    2694: {"obj":"trail_clue_easy_simple018","id":2694,"type":"search","coord":{"x":2969,"z":3310,"level":0}},
+    2694: {"obj":"trail_clue_easy_simple018","id":2694,"type":"search","coord":{"x":2969,"z":3311,"level":0}},
     2695: {"obj":"trail_clue_easy_simple019","id":2695,"type":"search","coord":{"x":3012,"z":3222,"level":0}},
     2696: {"obj":"trail_clue_easy_simple020","id":2696,"type":"talk","npc":"Bartender"},
     2697: {"obj":"trail_clue_easy_simple021","id":2697,"type":"talk","npc":"Ned"},
@@ -39,7 +39,7 @@ export const CLUE_DB: Record<number, ClueRow> = {
     2708: {"obj":"trail_clue_easy_vague001","id":2708,"type":"search","coord":{"x":3206,"z":3419,"level":1}},
     2709: {"obj":"trail_clue_easy_vague002","id":2709,"type":"search","coord":{"x":3226,"z":3452,"level":0}},
     2710: {"obj":"trail_clue_easy_vague003","id":2710,"type":"search","coord":{"x":2574,"z":3326,"level":1}},
-    2711: {"obj":"trail_clue_easy_vague004","id":2711,"type":"search","coord":{"x":2609,"z":3304,"level":0}},
+    2711: {"obj":"trail_clue_easy_vague004","id":2711,"type":"search","coord":{"x":2612,"z":3304,"level":1}},
     2712: {"obj":"trail_clue_easy_vague005","id":2712,"type":"search","coord":{"x":3029,"z":3355,"level":0}},
     2713: {"obj":"trail_clue_easy_map001","id":2713,"type":"dig","casketObj":"trail_clue_easy_map001_casket","casketId":2714,"coord":{"x":3177,"z":3360,"level":0}},
     2716: {"obj":"trail_clue_easy_map002","id":2716,"type":"dig","casketObj":"trail_clue_easy_map002_casket","casketId":2717,"coord":{"x":3290,"z":3374,"level":0}},
@@ -105,7 +105,10 @@ export const CLUE_DB: Record<number, ClueRow> = {
     2855: {"obj":"trail_clue_medium_anagram009","id":2855,"type":"talk","npc":"Donovan the Family Handyman"},
     2856: {"obj":"trail_clue_medium_anagram010","id":2856,"type":"talk","npc":"Party Pete"},
     2857: {"obj":"trail_clue_medium_anagram011","id":2857,"type":"talk","npc":"King Bolren"},
-    2858: {"obj":"trail_clue_medium_anagram012","id":2858,"type":"talk","npc":"Luthas"}
+    2858: {"obj":"trail_clue_medium_anagram012","id":2858,"type":"talk","npc":"Luthas"},
+    3560: {"obj":"trail_clue_hard_sextant031","id":3560,"type":"dig","casketObj":"trail_clue_hard_sextant031_casket","casketId":3561,"coord":{"x":2209,"z":3161,"level":0},"needsSextant":true,"guardian":"Saradomin Wizard"},
+    3562: {"obj":"trail_clue_hard_sextant032","id":3562,"type":"dig","casketObj":"trail_clue_hard_sextant032_casket","casketId":3563,"coord":{"x":2181,"z":3206,"level":0},"needsSextant":true,"guardian":"Saradomin Wizard"},
+    3564: {"obj":"trail_clue_hard_riddle018","id":3564,"type":"talk","npc":"Lord Iorwerth","puzzle":{"obj":"trail_clue_hard_riddle018_puzzlebox","id":3565}}
 };
 
 // casket obj id to casket obj name; lets the solver recognise a held casket.
@@ -146,5 +149,7 @@ export const CASKET_IDS: Record<number, string> = {
     2822: "trail_clue_medium_sextant011_casket",
     2824: "trail_clue_medium_sextant012_casket",
     2826: "trail_clue_medium_sextant013_casket",
-    2828: "trail_clue_medium_map001_casket"
+    2828: "trail_clue_medium_map001_casket",
+    3561: "trail_clue_hard_sextant031_casket",
+    3563: "trail_clue_hard_sextant032_casket"
 };

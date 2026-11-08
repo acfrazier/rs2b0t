@@ -1,4 +1,4 @@
-/** 377 fishing spots are the map placements of the "Fishing spot" npcs (content a15d0faa8); source lines in docs/decisions/data-377-sources.md#fishing-locations. */
+/** 377 fishing spots are the map placements of the "Fishing spot" npcs (content cb6cc5ea1); source lines in docs/decisions/data-377-sources.md#fishing-locations. */
 import type { WorldTile } from '../adapter/ClientAdapter.js';
 import Tile from '../geometry/Tile.js';
 
