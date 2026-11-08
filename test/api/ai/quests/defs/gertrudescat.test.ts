@@ -161,15 +161,14 @@ describe("Gertrude's Cat decide", () => {
         expect(step.kind === 'grabGround' && step.item).toBe('Bucket');
     });
 
-    test('milks a cow once it carries a bucket', () => {
+    test('milks the Dairy Cow loc once it carries a bucket (shared Cook milk step, 377 cow_milking.rs2)', () => {
         const step = decide(snap({
             stage: FLUFFS_STAGE.PAID_BOY,
             invIds: [FLUFFS_OBJ.seasonedSardine],
             inv: ['Bucket']
         }));
 
-        expect(step.kind).toBe('useOn');
-        expect(step.kind === 'useOn' && step.target).toBe('Cow');
+        expect(step).toMatchObject({ kind: 'useOn', targetKind: 'loc', target: 'Dairy Cow' });
     });
 
     test('climbs to Fluffs with the milk once both are ready', () => {

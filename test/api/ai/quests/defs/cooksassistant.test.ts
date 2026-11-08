@@ -11,15 +11,14 @@ const snap = (journal: string, items: [string, number][] = []): QuestSnapshot =>
 });
 
 describe('cooksassistant gathers', () => {
-    test('flour: pot first, then grain, then the mill custom', () => {
-        expect(gatherFlour(snap('inProgress')).kind).toBe('grabGround');
-        expect(gatherFlour(snap('inProgress', [['pot', 1]])).kind).toBe('pickLoc');
-        expect(gatherFlour(snap('inProgress', [['pot', 1], ['grain', 1]])).kind).toBe('custom');
+    test('flour: pot first, then grain from pickable wheat only, then the mill custom', () => {
+        expect(gatherFlour(snap('inProgress'))).toMatchObject({ kind: 'grabGround', item: 'Pot' });
+        expect(gatherFlour(snap('inProgress', [['pot', 1]]))).toMatchObject({ kind: 'custom', name: 'pick grain' });
+        expect(gatherFlour(snap('inProgress', [['pot', 1], ['grain', 1]]))).toMatchObject({ kind: 'custom', name: 'mill flour' });
     });
-    test('milk: bucket first, then use it on a cow', () => {
+    test('milk: bucket first, then use it on the Dairy Cow loc (377 cow_milking.rs2), not the Cow NPC', () => {
         expect(gatherMilk(snap('inProgress')).kind).toBe('grabGround');
-        const s = gatherMilk(snap('inProgress', [['bucket', 1]]));
-        expect(s.kind === 'useOn' && s.target).toBe('Cow');
+        expect(gatherMilk(snap('inProgress', [['bucket', 1]]))).toMatchObject({ kind: 'useOn', targetKind: 'loc', target: 'Dairy Cow', product: 'Bucket of milk' });
     });
 });
 

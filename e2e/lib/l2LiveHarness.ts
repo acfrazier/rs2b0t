@@ -202,10 +202,6 @@ async function readSnapshot(page: Page, label: string, spec: L2SnapshotSpec): Pr
     return { label, at: new Date().toISOString(), vars, ...state };
 }
 
-async function runnerState(page: Page): Promise<string> {
-    return page.evaluate(() => (globalThis as never as Abi).rs2b0t.runner.state);
-}
-
 async function runScript(page: Page, name: string, settings: Record<string, string | number | boolean>, timeoutMs: number, options: L2RunOptions = {}): Promise<L2ScriptResult> {
     if (Object.keys(settings).length > 0) await setSettings(page, name, settings);
     await page.evaluate(
@@ -220,13 +216,22 @@ async function runScript(page: Page, name: string, settings: Record<string, stri
     );
     const timeline: L2VarChange[] = [];
     const last = new Map<string, number | null>();
-    const deadline = Date.now() + timeoutMs;
+    const startedAt = Date.now();
+    const deadline = startedAt + timeoutMs;
     let timedOut = true;
     let started = false;
+    let printed = 0;
     while (Date.now() < deadline) {
-        const state = await runnerState(page);
+        const { state, log } = await page.evaluate(() => {
+            const runner = (globalThis as never as Abi).rs2b0t.runner;
+            return { state: runner.state, log: runner.ctx?.log.map(row => row.msg) ?? [] };
+        });
+        // Why: the run log is the only live view of a long quest; print it as it grows so a stall is visible before the deadline.
+        for (const line of log.slice(printed)) console.log(`    [${Math.round((Date.now() - startedAt) / 1000)}s] ${line}`);
+        printed = Math.max(printed, log.length);
         if (state === 'running' || state === 'paused' || state === 'stopping') started = true;
-        if (started && (state === 'stopped' || state === 'crashed' || state === 'idle')) {
+        const ended = state === 'stopped' || state === 'crashed' || state === 'idle';
+        if (ended && (started || Date.now() - startedAt > 5000)) {
             timedOut = false;
             break;
         }
@@ -251,9 +256,9 @@ async function runScript(page: Page, name: string, settings: Record<string, stri
     return { ...out, timedOut, timeline };
 }
 
-/** Walker stall lines (known nav issue: phantom stair landings stall six ticks before a repath). */
+/** Walker stall lines: idle repaths and walk timeouts (known nav issue: phantom stair landings stall six ticks before a repath). */
 export function stallLines(lines: readonly string[]): string[] {
-    return lines.filter(line => /stuck at \(|stalled with no path-corridor/i.test(line));
+    return lines.filter(line => /stuck at \(|stalled with no path-corridor|walk timed out/i.test(line));
 }
 
 /** Run `cell` L2_LIVE_RUNS times (default 3) on fresh accounts and write its receipt. Sets the exit code. */

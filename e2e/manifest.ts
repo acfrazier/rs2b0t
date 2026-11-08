@@ -36,10 +36,20 @@ export const CASES: readonly Case[] = [
         id: 'l2-dialogue-377-live',
         harness: 'l2-dialogue-377-live.ts',
         covers: { subsystems: ['world'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: '1180ad10',
         manual: true,
         budgetMin: 10,
         note: 'L2 377 template: three fresh accounts buy and sell back a Bear fur through Baraek\'s option menus (ChatDialog), checking the offered option text against content, with server pack and coin readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-cooksassistant-377-live',
+        harness: 'l2-cooksassistant-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 45,
+        note: 'L2 377 quest cell: three fresh accounts finish Cook\'s Assistant through AIOQuester (runUnqualified) with no quest, item or position seed; watched cookquest/hopper_full/flour/qp getvar timeline, Cooking XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
         id: 'gnome-magic-north-stair-live',
