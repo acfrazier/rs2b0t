@@ -9,7 +9,7 @@ import type { Browser, BrowserContext, Page } from 'playwright-core';
 import { pressCleanLogout } from './cleanLogout.js';
 import { deployIsolatedClient, launchBrowser, parseArgs, setSettings, type IsolatedClient } from './harness.js';
 import { runNavWalk, teleArrive, type NavTile, type NavWalkResult } from './navLiveHarness.js';
-import { cheatQuiet, getServerVarQuiet, mainlandAccount, relog } from '../tutorial/harness.js';
+import { cheatQuiet, mainlandAccount, relog } from '../tutorial/harness.js';
 
 /** The L2 account prefix (Q10); the random part keeps the name at most nine characters. */
 export const L2_ACCOUNT_PREFIX = 'frl2';
@@ -32,7 +32,17 @@ export type L2SnapshotSpec = { vars?: readonly string[]; xp?: readonly string[];
 
 export type L2Check = { name: string; pass: boolean; detail: string };
 
-export type L2ScriptResult = { state: string; stopReason: string | null; log: string[]; timedOut: boolean };
+/** One observed value change of a watched server var while a script ran (fresh `::getvar` replies). */
+export type L2VarChange = { at: string; name: string; value: number | null };
+
+export type L2ScriptResult = { state: string; stopReason: string | null; log: string[]; timedOut: boolean; timeline: L2VarChange[] };
+
+export type L2RunOptions = {
+    /** Start through ScriptRunner's explicit unqualified override; the receipt says so. */
+    runUnqualified?: boolean;
+    /** Server vars read while the script runs; every value change lands in the timeline. */
+    watch?: readonly string[];
+};
 
 export type L2RunReceipt = {
     cell: string;
@@ -46,6 +56,7 @@ export type L2RunReceipt = {
     checks: L2Check[];
     scriptLog: string[];
     walkLogs: string[];
+    timeline: L2VarChange[];
     stalls: string[];
     consoleTail: string[];
     pass: boolean;
@@ -66,7 +77,9 @@ export interface L2RunContext {
     /** Engine cheat that seeds this account's own state; the label lands in the receipt. */
     cheat(command: string, label: string): Promise<void>;
     tele(tile: NavTile, label: string): Promise<void>;
-    runScript(name: string, settings: Record<string, string | number | boolean>, timeoutMs: number): Promise<L2ScriptResult>;
+    runScript(name: string, settings: Record<string, string | number | boolean>, timeoutMs: number, options?: L2RunOptions): Promise<L2ScriptResult>;
+    /** A fresh `::getvar` reply from the server, or null when none arrives. */
+    serverVar(name: string): Promise<number | null>;
     /** Product webwalk (`Traversal.walkTo`, walker teleports off); its log lands in the receipt. */
     walk(dest: NavTile, radius: number, label: string): Promise<NavWalkResult>;
 }
@@ -83,11 +96,13 @@ type Abi = {
         runner: {
             state: string;
             ctx: { log: { msg: string }[]; stopReason?: string | null; state: string } | null;
-            start(meta: unknown): void;
+            start(meta: unknown, options?: { runUnqualified?: boolean }): void;
             stop(reason: string): void;
         };
         registry: { get(name: string): unknown };
-        reader: { serverTile(): NavTile | null };
+        reader: { serverTile(): NavTile | null; chat(n: number): { text: string }[] };
+        client: { ingame: boolean; out: { p1Enc(op: number): void; p1(v: number): void; pjstr(s: string): void } };
+        protocol?: { clientCheat: number };
     };
     __rs2b0t: {
         Inventory: { items(): { name: string | null; count: number }[] };
@@ -121,11 +136,45 @@ export function countOf(items: readonly L2Item[] | null, name: string): number {
     return items.filter(item => item.name.toLowerCase() === wanted).reduce((sum, item) => sum + item.count, 0);
 }
 
+/** Send `::getvar name` and wait for a reply line that arrived after the send.
+ *  Why: `getServerVarQuiet` reads the newest matching chat line, which is a stale reply when the new one is late; a stage proof needs the fresh one. */
+export async function serverVar(page: Page, name: string): Promise<number | null> {
+    return page.evaluate(async varName => {
+        const g = globalThis as never as Abi;
+        if (!g.rs2b0t.client.ingame) return null;
+        const lines = (): string[] => g.rs2b0t.reader.chat(100).map(line => line.text);
+        const before = lines();
+        const command = `getvar ${varName}`;
+        g.rs2b0t.client.out.p1Enc(g.rs2b0t.protocol?.clientCheat ?? 224);
+        g.rs2b0t.client.out.p1(command.length + 1);
+        g.rs2b0t.client.out.pjstr(command);
+        const prefix = `get ${varName.toLowerCase()}:`;
+        const deadline = Date.now() + 4000;
+        while (Date.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const now = lines();
+            // Index 0 is the newest line: the new lines are the shortest prefix whose removal leaves the old history.
+            let added = 0;
+            for (; added < now.length; added++) {
+                let same = true;
+                for (let i = added; i < now.length && same; i++) same = now[i] === before[i - added];
+                if (same) break;
+            }
+            const reply = now.slice(0, added).find(text => text.toLowerCase().startsWith(prefix));
+            if (reply !== undefined) {
+                const value = parseInt(reply.slice(prefix.length).trim(), 10);
+                return Number.isNaN(value) ? null : value;
+            }
+        }
+        return null;
+    }, name);
+}
+
 async function readSnapshot(page: Page, label: string, spec: L2SnapshotSpec): Promise<L2Snapshot> {
     const vars: Record<string, number | null> = {};
     for (const name of spec.vars ?? []) {
         let value: number | null = null;
-        for (let attempt = 0; attempt < 3 && value === null; attempt++) value = await getServerVarQuiet(page, name);
+        for (let attempt = 0; attempt < 3 && value === null; attempt++) value = await serverVar(page, name);
         vars[name] = value;
     }
     const state = await page.evaluate(
@@ -153,42 +202,53 @@ async function readSnapshot(page: Page, label: string, spec: L2SnapshotSpec): Pr
     return { label, at: new Date().toISOString(), vars, ...state };
 }
 
-async function runScript(page: Page, name: string, settings: Record<string, string | number | boolean>, timeoutMs: number): Promise<L2ScriptResult> {
+async function runnerState(page: Page): Promise<string> {
+    return page.evaluate(() => (globalThis as never as Abi).rs2b0t.runner.state);
+}
+
+async function runScript(page: Page, name: string, settings: Record<string, string | number | boolean>, timeoutMs: number, options: L2RunOptions = {}): Promise<L2ScriptResult> {
     if (Object.keys(settings).length > 0) await setSettings(page, name, settings);
-    await page.evaluate(script => {
-        const g = globalThis as never as Abi;
-        const meta = g.rs2b0t.registry.get(script);
-        if (!meta) throw new Error(`script '${script}' is not registered`);
-        // Why: no runUnqualified override; an L2 cell proves the registry admits the script on this revision.
-        g.rs2b0t.runner.start(meta);
-    }, name);
-    let timedOut = false;
-    try {
-        await page.waitForFunction(
-            () => {
-                const state = (globalThis as never as Abi).rs2b0t.runner.state;
-                return state === 'stopped' || state === 'crashed' || state === 'idle';
-            },
-            undefined,
-            { timeout: timeoutMs, polling: 1000 }
-        );
-    } catch {
-        timedOut = true;
+    await page.evaluate(
+        ({ script, runUnqualified }) => {
+            const g = globalThis as never as Abi;
+            const meta = g.rs2b0t.registry.get(script);
+            if (!meta) throw new Error(`script '${script}' is not registered`);
+            // Why: a qualified script starts without the override, which proves the registry admits it on this revision.
+            g.rs2b0t.runner.start(meta, runUnqualified ? { runUnqualified: true } : undefined);
+        },
+        { script: name, runUnqualified: options.runUnqualified === true }
+    );
+    const timeline: L2VarChange[] = [];
+    const last = new Map<string, number | null>();
+    const deadline = Date.now() + timeoutMs;
+    let timedOut = true;
+    let started = false;
+    while (Date.now() < deadline) {
+        const state = await runnerState(page);
+        if (state === 'running' || state === 'paused' || state === 'stopping') started = true;
+        if (started && (state === 'stopped' || state === 'crashed' || state === 'idle')) {
+            timedOut = false;
+            break;
+        }
+        for (const varName of options.watch ?? []) {
+            const value = await serverVar(page, varName);
+            if (value !== null && last.get(varName) !== value) {
+                last.set(varName, value);
+                timeline.push({ at: new Date().toISOString(), name: varName, value });
+                console.log(`  WATCH ${varName}=${value}`);
+            }
+        }
+        await page.waitForTimeout(options.watch?.length ? 250 : 1000);
+    }
+    if (timedOut) {
         await page.evaluate(() => (globalThis as never as Abi).rs2b0t.runner.stop('L2 cell timeout')).catch(() => undefined);
         await page.waitForTimeout(1500);
     }
-    return page.evaluate(
-        out => {
-            const runner = (globalThis as never as Abi).rs2b0t.runner;
-            return {
-                state: runner.state,
-                stopReason: runner.ctx?.stopReason ?? null,
-                log: runner.ctx?.log.map(row => row.msg) ?? [],
-                timedOut: out
-            };
-        },
-        timedOut
-    );
+    const out = await page.evaluate(() => {
+        const runner = (globalThis as never as Abi).rs2b0t.runner;
+        return { state: runner.state, stopReason: runner.ctx?.stopReason ?? null, log: runner.ctx?.log.map(row => row.msg) ?? [] };
+    });
+    return { ...out, timedOut, timeline };
 }
 
 /** Walker stall lines (known nav issue: phantom stair landings stall six ticks before a repath). */
@@ -240,6 +300,7 @@ export async function runL2Cell(cell: L2Cell): Promise<void> {
                 checks: [],
                 scriptLog: [],
                 walkLogs: [],
+                timeline: [],
                 stalls: [],
                 consoleTail: [],
                 pass: false,
@@ -277,11 +338,14 @@ export async function runL2Cell(cell: L2Cell): Promise<void> {
                     await teleArrive(page, tile, 3);
                     ctx.seed(`${label}: position tele-seeded to ${tile.x},${tile.z},L${tile.level}`);
                 },
-                runScript: async (name, settings, timeoutMs) => {
-                    const result = await runScript(page, name, settings, timeoutMs);
+                runScript: async (name, settings, timeoutMs, options) => {
+                    if (options?.runUnqualified) ctx.step(`start ${name} through the explicit runUnqualified override: its registry revision is not this client's`);
+                    const result = await runScript(page, name, settings, timeoutMs, options);
                     receipt.scriptLog.push(...result.log);
+                    receipt.timeline.push(...result.timeline);
                     return result;
                 },
+                serverVar: name => serverVar(page, name),
                 walk: async (dest, radius, label) => {
                     ctx.step(`walk ${label} to ${dest.x},${dest.z},L${dest.level} (radius ${radius}, walker teleports off)`);
                     const result = await runNavWalk(page, {

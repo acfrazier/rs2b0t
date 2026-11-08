@@ -26,10 +26,20 @@ export const CASES: readonly Case[] = [
         id: 'l2-bankshop-377-live',
         harness: 'l2-bankshop-377-live.ts',
         covers: { subsystems: ['world'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: '1f6de12b',
         manual: true,
         budgetMin: 15,
         note: 'L2 377 template: three fresh accounts buy a Cake tin at the Varrock general store, bank it at Varrock east bank across a relog, withdraw it and sell it back, with server pack, coin and bank readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-dialogue-377-live',
+        harness: 'l2-dialogue-377-live.ts',
+        covers: { subsystems: ['world'] },
+        status: 'unvetted',
+        manual: true,
+        budgetMin: 10,
+        note: 'L2 377 template: three fresh accounts buy and sell back a Bear fur through Baraek\'s option menus (ChatDialog), checking the offered option text against content, with server pack and coin readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
         id: 'gnome-magic-north-stair-live',
