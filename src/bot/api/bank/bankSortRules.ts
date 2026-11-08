@@ -24,8 +24,8 @@ interface CategoryRule {
     match?: (name: string) => boolean;
 }
 
-const COINS = 995;
-const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 1436] as const;
+const COINS = 995; // non-component: obj id
+const RUNE_IDS = [554, 555, 556, 557, 558, 559, 560, 561, 562, 563, 564, 565, 566, 1436] as const; // non-component: rune obj ids
 
 const any = (...parts: string[]) => (name: string): boolean => parts.some(p => name.includes(p));
 
@@ -33,6 +33,7 @@ const any = (...parts: string[]) => (name: string): boolean => parts.some(p => n
 const word = (...parts: string[]) => (name: string): boolean =>
     parts.some(p => new RegExp(`\\b${p}\\b`).test(name));
 
+// non-component: rule obj ids
 const RULES: readonly CategoryRule[] = [
     { category: 'coins', ids: [COINS] },
     { category: 'runes', ids: RUNE_IDS },

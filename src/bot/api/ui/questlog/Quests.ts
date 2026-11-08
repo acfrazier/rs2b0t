@@ -47,12 +47,12 @@ export const Quests = {
         const opened = await Execution.delayUntil(() => {
             const main = reader.modals().main;
             return main !== -1 && main !== before;
-        }, 5000);
+        }, 5000); // non-component: wait budget
         return opened ? reader.mainModalTexts() : [];
     },
     /** Total quest points, transmitted varp `qp` (index 101). */
     points(): number {
-        return reader.varp(101);
+        return reader.varp(101); // non-component: varp index
     }
 };
 

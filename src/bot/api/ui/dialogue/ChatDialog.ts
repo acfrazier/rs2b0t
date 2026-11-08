@@ -57,7 +57,7 @@ export const ChatDialog = {
         return Execution.delayUntil(() => {
             const m = reader.modals();
             return (usingChat ? m.chat : m.main) !== before;
-        }, 3000);
+        }, 3000); // non-component: wait budget
     },
 
     /** Pick Make-1 for the product whose name contains `match` (or the first); knife-delay tick manip uses it and it never touches Make-X or the count dialog. */
@@ -84,7 +84,7 @@ export const ChatDialog = {
         return Execution.delayUntil(() => {
             const m = reader.modals();
             return (usingChat ? m.chat : m.main) !== before;
-        }, 3000);
+        }, 3000); // non-component: wait budget
     },
 
     /** Click Make-X, enter `count`, and wait for the amount dialog to close (#177). */
@@ -100,13 +100,13 @@ export const ChatDialog = {
             return false;
         }
         // Count dialog can lag a tick behind the Make-X click on this client.
-        if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 5000))) {
+        if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 5000))) { // non-component: wait budget
             return false;
         }
         if (!actions.answerCountDialog(count)) {
             return false;
         }
-        await Execution.delayUntil(() => !reader.countDialogOpen(), 3000);
+        await Execution.delayUntil(() => !reader.countDialogOpen(), 3000); // non-component: wait budget
         return true;
     },
 
@@ -137,7 +137,7 @@ export const ChatDialog = {
             return false;
         }
 
-        return Execution.delayUntil(() => reader.modals().main !== before, 5000);
+        return Execution.delayUntil(() => reader.modals().main !== before, 5000); // non-component: wait budget
     },
 
     async makeFromPanelMax(match: string): Promise<boolean> {
@@ -169,7 +169,7 @@ export const ChatDialog = {
             return false;
         }
 
-        return Execution.delayUntil(() => reader.modals().main !== before, 5000);
+        return Execution.delayUntil(() => reader.modals().main !== before, 5000); // non-component: wait budget
     },
 
     async continue(): Promise<boolean> {
@@ -178,7 +178,7 @@ export const ChatDialog = {
             return false;
         }
 
-        return Execution.delayUntil(() => reader.modals().chat !== before || reader.chatContinueComId() !== -1, 3000);
+        return Execution.delayUntil(() => reader.modals().chat !== before || reader.chatContinueComId() !== -1, 3000); // non-component: wait budget
     },
 
     async chooseOption(match?: string): Promise<boolean> {
@@ -198,6 +198,6 @@ export const ChatDialog = {
             return false;
         }
 
-        return Execution.delayUntil(() => reader.modals().chat !== before || reader.chatContinueComId() !== -1, 3000);
+        return Execution.delayUntil(() => reader.modals().chat !== before || reader.chatContinueComId() !== -1, 3000); // non-component: wait budget
     }
 };

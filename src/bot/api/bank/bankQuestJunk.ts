@@ -12,6 +12,7 @@ function junk(quest: string, items: readonly (readonly [id: number, name: string
 
 // Why: https://oldschool.runescape.wiki/w/Wise_Old_Man/Recycling_Centre, kept to objs and quest-tab names at rev 289.
 // Why: drop and questObsolete filing stay gated on Quests.status === complete.
+// Why: non-component: quest obj ids.
 export const QUEST_JUNK: readonly QuestJunkEntry[] = [
     ...junk('Demon Slayer', [
         [2399, 'Key'],

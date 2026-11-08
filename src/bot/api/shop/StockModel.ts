@@ -1,6 +1,6 @@
 import type { BuyPolicy, Seen, ShopItemDef } from '#/bot/api/shop/types.js';
 
-export const TICK_MS = 600;
+export const TICK_MS = 600; // non-component: tick length
 
 export function expectedStock(item: ShopItemDef, seen: Seen | undefined, nowMs: number): number {
     if (!seen) {
@@ -15,15 +15,15 @@ export function expectedStock(item: ShopItemDef, seen: Seen | undefined, nowMs: 
 
 export function unitPrice(item: ShopItemDef, shop: { sell: number; delta: number }, stock: number): number {
     const d = stock - item.baseline;
-    const haggle = Math.min(1000, Math.max(-5000, d * shop.delta));
-    const pct = Math.max(100, shop.sell - haggle);
-    return Math.max(1, Math.floor((pct * item.cost) / 1000));
+    const haggle = Math.min(1000, Math.max(-5000, d * shop.delta)); // non-component: price curve limits
+    const pct = Math.max(100, shop.sell - haggle); // non-component: price curve floor
+    return Math.max(1, Math.floor((pct * item.cost) / 1000)); // non-component: percent scale
 }
 
 export function unitsUnderPolicy(policy: BuyPolicy, stock: number, baseline: number): number {
     if (policy.kind === 'buyout') {
         return Math.max(0, stock);
     }
-    const floorCount = Math.ceil((policy.pct / 100) * baseline);
+    const floorCount = Math.ceil((policy.pct / 100) * baseline); // non-component: percent scale
     return Math.max(0, stock - floorCount);
 }

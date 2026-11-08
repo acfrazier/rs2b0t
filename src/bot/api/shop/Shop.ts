@@ -1,12 +1,13 @@
 import { actions, reader } from '../../adapter/ClientAdapter.js';
+import { IF_IDS } from '../../data/ifIds.js';
 import { Input } from '../../input/Input.js';
 import { Execution } from '../execution/Execution.js';
 import { Npcs } from '../npcs/Npcs.js';
 import { Inventory } from '../inventory/Inventory.js';
 
-const SHOP_ROOT = 3824;
-const SHOP_STOCK_COM = 3900;
-const SHOP_PLAYER_COM = 3823;
+const SHOP_ROOT = IF_IDS.SHOP_TEMPLATE;
+const SHOP_STOCK_COM = IF_IDS.SHOP_TEMPLATE_INV;
+const SHOP_PLAYER_COM = IF_IDS.SHOP_TEMPLATE_SIDE_INV;
 
 /**
  * A shop interface. Nothing here walks; be near the keeper first.
@@ -29,7 +30,7 @@ export const Shop = {
             }
 
             await npc.interact('Trade');
-            if (await Execution.delayUntil(() => Shop.isOpen(), 3000)) {
+            if (await Execution.delayUntil(() => Shop.isOpen(), 3000)) { // non-component: wait budget
                 return true;
             }
         }
@@ -69,7 +70,7 @@ export const Shop = {
             for (const opIndex of batch) {
                 await Input.invButton(it.id, it.slot, it.comId, opIndex + 1);
             }
-            await Execution.delayUntil(() => countHeld(name) !== before, 3000);
+            await Execution.delayUntil(() => countHeld(name) !== before, 3000); // non-component: wait budget
             // the batch lands in one server tick, settle so the recount sees all of it
             await Execution.delayTicks(1);
             const got = countHeld(name) - before;
@@ -103,7 +104,7 @@ export const Shop = {
             for (const opIndex of batch) {
                 await Input.invButton(it.id, it.slot, it.comId, opIndex + 1);
             }
-            await Execution.delayUntil(() => heldById(id) !== before, 3000);
+            await Execution.delayUntil(() => heldById(id) !== before, 3000); // non-component: wait budget
             await Execution.delayTicks(1);
             const got = heldById(id) - before;
             if (got <= 0) {
@@ -135,7 +136,7 @@ export const Shop = {
             for (const opIndex of batch) {
                 await Input.invButton(it.id, it.slot, it.comId, opIndex + 1);
             }
-            await Execution.delayUntil(() => countHeld(name) !== before, 3000);
+            await Execution.delayUntil(() => countHeld(name) !== before, 3000); // non-component: wait budget
             await Execution.delayTicks(1);
             const gone = before - countHeld(name);
             if (gone <= 0) {
@@ -165,7 +166,7 @@ export const Shop = {
             for (const opIndex of batch) {
                 await Input.invButton(it.id, it.slot, it.comId, opIndex + 1);
             }
-            await Execution.delayUntil(() => countHeld(name) !== before, 3000);
+            await Execution.delayUntil(() => countHeld(name) !== before, 3000); // non-component: wait budget
             await Execution.delayTicks(1);
             const gone = before - countHeld(name);
             if (gone <= 0) {
@@ -182,7 +183,7 @@ export const Shop = {
         }
 
         actions.closeModal();
-        await Execution.delayUntil(() => !Shop.isOpen(), 3000);
+        await Execution.delayUntil(() => !Shop.isOpen(), 3000); // non-component: wait budget
     }
 };
 

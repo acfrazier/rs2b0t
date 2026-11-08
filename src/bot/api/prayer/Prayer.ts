@@ -1,8 +1,9 @@
 import { actions, reader } from '#/bot/adapter/ClientAdapter.js';
 import { Execution } from '#/bot/api/execution/Execution.js';
 import { Skills } from '#/bot/api/skills/Skills.js';
+import { IF_IDS } from '#/bot/data/ifIds.js';
 
-const TOGGLE_MS = 2000;
+const TOGGLE_MS = 2000; // non-component: wait budget
 
 interface PrayerDef {
     com: number;
@@ -16,21 +17,21 @@ interface PrayerDef {
  * @see docs/reference/api-skills.md#prayer
  */
 const PRAYERS: Record<string, PrayerDef> = {
-    'thick skin': { com: 5609, varp: 83, level: 1 },
-    'burst of strength': { com: 5610, varp: 84, level: 4 },
-    'clarity of thought': { com: 5611, varp: 85, level: 7 },
-    'rock skin': { com: 5612, varp: 86, level: 10 },
-    'superhuman strength': { com: 5613, varp: 87, level: 13 },
-    'improved reflexes': { com: 5614, varp: 88, level: 16 },
-    'rapid restore': { com: 5615, varp: 89, level: 19 },
-    'rapid heal': { com: 5616, varp: 90, level: 22 },
-    'protect item': { com: 5617, varp: 91, level: 25 },
-    'steel skin': { com: 5618, varp: 92, level: 28 },
-    'ultimate strength': { com: 5619, varp: 93, level: 31 },
-    'incredible reflexes': { com: 5620, varp: 94, level: 34 },
-    'protect from magic': { com: 5621, varp: 95, level: 37 },
-    'protect from missiles': { com: 5622, varp: 96, level: 40 },
-    'protect from melee': { com: 5623, varp: 97, level: 43 }
+    'thick skin': { com: IF_IDS.PRAYER_PRAYER_THICKSKIN, varp: 83, level: 1 },
+    'burst of strength': { com: IF_IDS.PRAYER_PRAYER_STRENGTHBURST, varp: 84, level: 4 },
+    'clarity of thought': { com: IF_IDS.PRAYER_PRAYER_CLARITY, varp: 85, level: 7 },
+    'rock skin': { com: IF_IDS.PRAYER_PRAYER_ROCKSKIN, varp: 86, level: 10 },
+    'superhuman strength': { com: IF_IDS.PRAYER_PRAYER_SUPERHUMANSTRENGTH, varp: 87, level: 13 },
+    'improved reflexes': { com: IF_IDS.PRAYER_PRAYER_IMPROVEDREFLEXES, varp: 88, level: 16 },
+    'rapid restore': { com: IF_IDS.PRAYER_PRAYER_RAPIDRESTORE, varp: 89, level: 19 },
+    'rapid heal': { com: IF_IDS.PRAYER_PRAYER_RAPIDHEAL, varp: 90, level: 22 },
+    'protect item': { com: IF_IDS.PRAYER_PRAYER_PROTECTITEMS, varp: 91, level: 25 },
+    'steel skin': { com: IF_IDS.PRAYER_PRAYER_STEELSKIN, varp: 92, level: 28 },
+    'ultimate strength': { com: IF_IDS.PRAYER_PRAYER_ULTIMATESTRENGTH, varp: 93, level: 31 },
+    'incredible reflexes': { com: IF_IDS.PRAYER_PRAYER_INCREDIBLEREFLEXES, varp: 94, level: 34 },
+    'protect from magic': { com: IF_IDS.PRAYER_PRAYER_PROTECTFROMMAGIC, varp: 95, level: 37 },
+    'protect from missiles': { com: IF_IDS.PRAYER_PRAYER_PROTECTFROMMISSILES, varp: 96, level: 40 },
+    'protect from melee': { com: IF_IDS.PRAYER_PRAYER_PROTECTFROMMELEE, varp: 97, level: 43 }
 };
 
 export const PROTECT_FROM_MAGIC = 'Protect from Magic';

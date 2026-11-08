@@ -56,6 +56,7 @@ export const USE_ZANARIS_BANK = 'useZanarisBank';
  * Every known bank. Some stands are sealed collision islands, so reaching one is a data problem.
  * @see docs/reference/nav-walker.md#arrival
  */
+// non-component: tile coordinates and distances
 export const BANK_LOCATIONS: BankLocation[] = [
     { name: 'Varrock East', tile: new Tile(3253, 3420, 0) },
     { name: 'Varrock West', tile: new Tile(3185, 3440, 0) },
@@ -276,7 +277,7 @@ export async function nearestBankReachable(here: WorldTile, navigator: Navigator
         return near;
     }
     // Why: a 5s/500k budget per candidate both caps a worker batch and matches the offline pack budget the fail-closed scenarios were measured with.
-    const cost = bankCostForNavigator(navigator, { maxExpansions: 500_000, timeoutMs: 5_000 });
+    const cost = bankCostForNavigator(navigator, { maxExpansions: 500_000, timeoutMs: 5_000 }); // non-component: search budgets
     const picked = await nearestWalkableBankAsync(here, cost).catch(() => null);
     return picked ?? near;
 }

@@ -56,7 +56,7 @@ export function parseBankStrategy(label: string): BankStrategy {
 export const PERIODIC_BANK_SETTINGS: SettingsSchema = {
     bankStrategy: { type: 'string', default: 'Off', options: BANK_STRATEGY_OPTIONS, label: 'Periodic bank', help: 'save accumulated loot so a death does not lose it all' },
     bankEveryItems: { type: 'number', default: 15, min: 1, max: 27, label: 'Bank at N loot items' },
-    bankEveryMinutes: { type: 'number', default: 10, min: 1, max: 120, label: 'Bank every N minutes' },
+    bankEveryMinutes: { type: 'number', default: 10, min: 1, max: 120, label: 'Bank every N minutes' }, // non-component: minutes cap
     bankCommonJunk: { type: 'boolean', default: true, label: 'Also bank gems/fruit/beer/kebabs/caskets' }
 };
 
@@ -65,7 +65,7 @@ export const COMMON_BANK_LOOT: string[] = [
     'strange fruit', 'beer', 'kebab'
 ];
 
-export const RANDOM_EVENT_CASKET_ID = 405;
+export const RANDOM_EVENT_CASKET_ID = 405; // non-component: obj id
 
 export function matchesCommonBankLoot(name: string, id: number = -1): boolean {
     if (id === RANDOM_EVENT_CASKET_ID) {

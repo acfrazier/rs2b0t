@@ -1,19 +1,20 @@
 import { actions, reader } from '../../adapter/ClientAdapter.js';
+import { IF_IDS } from '../../data/ifIds.js';
 import { Input } from '../../input/Input.js';
 import { Execution } from '../execution/Execution.js';
 import { Players } from '../players/Players.js';
 
 const TRADE_OP = 4; // OP_PLAYER4 = "Trade with" (login.rs2: set_player_op("Trade with", 4))
-const OFFER_INV = 3322; // tradeside:inv, your pack while trading; option4 = "Offer All"
+const OFFER_INV = IF_IDS.TRADESIDE_INV; // tradeside:inv, your pack while trading; option4 = "Offer All"
 const OFFER_ALL = 4;
 const OFFER_X = 5; // tradeside option5 = "Offer X" -> count dialog
-const MY_OFFER_INV = 3415; // trademain:inv, your side of the offer
+const MY_OFFER_INV = IF_IDS.TRADEMAIN_INV; // trademain:inv, your side of the offer
 const REMOVE_ALL = 4; // inv_button4 = @removefromtrade(slot, max)
-const ACCEPT_OFFER = 3420; // trademain:accept (first screen)
-const ACCEPT_CONFIRM = 3546; // tradeconfirm:accept (second screen)
-const DECLINE = 3422; // trademain:decline
+const ACCEPT_OFFER = IF_IDS.TRADEMAIN_ACCEPT; // trademain:accept (first screen)
+const ACCEPT_CONFIRM = IF_IDS.TRADECONFIRM_ACCEPT; // tradeconfirm:accept (second screen)
+const DECLINE = IF_IDS.TRADEMAIN_DECLINE; // trademain:decline
 /** Short, since on content without the trigger this wait is pure latency before the close. */
-const DECLINE_BUTTON_WAIT_MS = 1200;
+const DECLINE_BUTTON_WAIT_MS = 1200; // non-component: wait budget
 
 export interface TradeItem {
     id: number;
@@ -120,12 +121,12 @@ export const Trade = {
             return false;
         }
 
-        if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 3000))) {
+        if (!(await Execution.delayUntil(() => reader.countDialogOpen(), 3000))) { // non-component: wait budget
             return false;
         }
 
         actions.answerCountDialog(n);
-        return Execution.delayUntil(() => Trade.myOffer().reduce((s, o) => s + Math.max(1, o.count), 0) >= n, 4000);
+        return Execution.delayUntil(() => Trade.myOffer().reduce((s, o) => s + Math.max(1, o.count), 0) >= n, 4000); // non-component: wait budget
     },
 
     /** Take everything back off your own side. */
@@ -158,7 +159,7 @@ export const Trade = {
         return false;
     },
 
-    // Why: Decline is wired to `if_close`; component 3422 has no `if_button` trigger and leaves the trade open.
+    // Why: Decline is wired to `if_close`; IF_IDS.TRADEMAIN_DECLINE has no `if_button` trigger and leaves the trade open.
     async decline(): Promise<void> {
         if (!Trade.active()) {
             return;
@@ -170,6 +171,6 @@ export const Trade = {
         }
 
         actions.closeModal();
-        await Execution.delayUntil(() => !Trade.active(), 3000);
+        await Execution.delayUntil(() => !Trade.active(), 3000); // non-component: wait budget
     }
 };

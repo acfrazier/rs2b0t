@@ -2,11 +2,12 @@ import { actions, reader } from '#/bot/adapter/ClientAdapter.js';
 import { Execution } from '#/bot/api/execution/Execution.js';
 import { Game } from '#/bot/api/game/Game.js';
 import { ATTACKSTYLE_MAGIC_VARP, AUTOCAST_ARMED, AUTO_CHOOSE_COM, AUTO_TOGGLE_COM, spellButtonCom } from '#/bot/api/combat/CombatStyleLogic.js';
+import { IF_IDS } from '#/bot/data/ifIds.js';
 
 const COMBAT_TAB = 0;
-const STAFF_TAB_ROOT = 328;
-const SPELL_PANEL_ROOT = 1829;
-const STEP_MS = 3000;
+const STAFF_TAB_ROOT = IF_IDS.COMBAT_STAFF_2;
+const SPELL_PANEL_ROOT = IF_IDS.STAFF_SPELLS;
+const STEP_MS = 3000; // non-component: wait budget
 
 export const Autocast = {
     armed(): boolean {
