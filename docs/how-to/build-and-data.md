@@ -43,7 +43,9 @@ collision pack is built in the run's private work directory and recorded as an `
 artifact at `out/collision.lcnav.gz` with its temporary source in `data/377/out/`; the
 cutover validates and moves that source. `build-collision.ts` defaults to
 `out/collision.lcnav` for every revision, and deploy/pack callers name that path explicitly,
-so a revision-specific build cannot overwrite a staged pack.
+so a revision-specific build cannot overwrite a staged pack. After the cutover the manifest reads
+`cutover: true` and the same command regenerates the committed data in place: generators write at
+their repo paths, the manifest rows land at their final paths, and `manifest.ts verify` passes.
 
 The stair and transport files are composed. `tools/nav/derive-transports.sh` runs
 `derive-stairs.ts`, which writes `stairEdges.json`. Then `derive-ladders.py` and
