@@ -75,7 +75,12 @@ const define = buildDefines(identity, TARGET_NAME, rsa);
 const out = process.env.B0T_OUT_DIR ?? 'out';
 fs.mkdirSync(out, { recursive: true });
 
-fs.copyFileSync('src/client/3rdparty/tinymidipcm/tinymidipcm.wasm', join(out, 'tinymidipcm.wasm'));
+const SPESSA_PROCESSOR = 'node_modules/spessasynth_lib/dist/spessasynth_processor.min.js';
+if (!fs.existsSync(SPESSA_PROCESSOR)) {
+    console.error(`missing ${SPESSA_PROCESSOR} — bun install spessasynth_lib@4.3.13`);
+    process.exit(1);
+}
+fs.copyFileSync(SPESSA_PROCESSOR, join(out, 'spessasynth_processor.min.js'));
 
 const entrypoints: [entry: string, output: string][] = [
     ['src/bot/main.ts', 'botclient.js'],

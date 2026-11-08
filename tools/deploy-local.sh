@@ -32,12 +32,12 @@ if [ "$need_basemap" = 1 ]; then
 fi
 
 cp out/client.js out/client.js.map out/ondemandworker.js out/ondemandworker.js.map \
-   out/tinymidipcm.wasm "$ENGINE/public/client/"
+   out/spessasynth_processor.min.js "$ENGINE/public/client/"
 
 mkdir -p "$ENGINE/public/bot"
 cp out/botclient.js out/botclient.js.map out/ondemandworker.js out/ondemandworker.js.map \
    out/navworker.js out/navworker.js.map out/collision.lcnav.gz \
-   out/tinymidipcm.wasm "$ENGINE/public/bot/"
+   out/spessasynth_processor.min.js "$ENGINE/public/bot/"
 # basemap + pre-baked overlays (fingerprinted names from the manifest)
 if [ -f out/worldmap-basemap.manifest.json ]; then
     cp out/worldmap-basemap.manifest.json "$ENGINE/public/bot/"
@@ -63,9 +63,6 @@ if [ -f out/version.json ]; then
     cp out/version.json "$ENGINE/public/bot/version.json"
 fi
 
-# the soundfont lives in the engine repo; the bot bundle resolves it relative to itself
-if [ -f "$ENGINE/public/client/SCC1_Florestan.sf2" ]; then
-    cp "$ENGINE/public/client/SCC1_Florestan.sf2" "$ENGINE/public/bot/"
-fi
+# Pitfall 28: Florestan is origin-absolute /client/SCC1_Florestan.sf2; do not copy it next to the bot bundle.
 
 echo "deployed: $ENGINE/public/bot.html (+ /bot, /client refreshed)"

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
 
 mock.module('#/client/3rdparty/audio.js', () => ({ playWave: async (): Promise<void> => {}, setWaveVolume: (): void => {} }));
-mock.module('#/client/3rdparty/tinymidipcm.js', () => ({ playMidi: (): void => {}, setMidiVolume: (): void => {}, stopMidi: (): void => {} }));
 
 const { RandomEvents } = await import('#/bot/runtime/randomevents/RandomEvents.js');
 const { ScriptContext } = await import('#/bot/runtime/ScriptContext.js');

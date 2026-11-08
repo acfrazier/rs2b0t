@@ -1,5 +1,6 @@
-import { playWave, setWaveVolume } from '#/client/3rdparty/audio.js';
-import { stopMidi, setMidiVolume, playMidi } from '#/client/3rdparty/tinymidipcm.js';
+import { playWave, replayWave, setWaveVolume } from '#/client/3rdparty/audio.js';
+// Decision 012: Jagex control plane + Spessa (Florestan bank) — single product backend
+import { playMidi, setMidiVolume, stopMidi } from '#/client/sound/MidiFacade.js';
 
 import ClientBuild from '#/client/shell/ClientBuild.js';
 import { ClientCode } from '#/client/shell/ClientCode.js';
@@ -614,7 +615,8 @@ export class Client extends GameShell {
     private minimapFlagZ: number = 0;
 
     private midiActive: boolean = true;
-    private midiVolume: number = 0;
+    /** Java signlink.midivol 0..128 (default 96). Not dB — Decision 012. */
+    private midiVolume: number = 96;
     private midiSong: number = -1;
     private nextMidiSong: number = -1;
     private nextMusicDelay: number = 0;
@@ -701,8 +703,29 @@ export class Client extends GameShell {
         ClientBuild.lowMem = false;
     }
 
+    /**
+     * Java `saveMidi(fade, data)` → midifade + midisave → signlink play.
+     * Volume is signlink.midivol (options clientcode 3), not per-call dB.
+     */
     saveMidi(data: Uint8Array, fading: boolean) {
+        if (!this.midiActive || Client.lowMem) {
+            return;
+        }
         playMidi(data, this.midiVolume, fading);
+    }
+
+    /** Java `stopMidi` — midifade=0, midi="stop". */
+    private stopMidiJava(): void {
+        stopMidi(false);
+    }
+
+    /**
+     * Java `setMidiVolume(midiActive, midivol)` — always writes midivol;
+     * voladjust only when music was already active.
+     */
+    private setMidiVolumeJava(active: boolean, midivol: number): void {
+        this.midiVolume = midivol;
+        setMidiVolume(midivol, active);
     }
 
     private getIntParam(name: string, fallback: number = 0): number {
@@ -3683,6 +3706,7 @@ export class Client extends GameShell {
     async soundsDoQueue() {
         for (let wave: number = 0; wave < this.waveCount; wave++) {
             if (this.waveDelay[wave] <= 0) {
+                let failed: boolean = false;
                 try {
                     // Java Client.java:3826 generates only when the id or loops differ; a repeat calls replayWave and does not throw.
                     // signlink.reporterror is true (signlink.java:49) and is never cleared, so the reachable catch is Client.java:3842-3845.
@@ -3695,23 +3719,37 @@ export class Client extends GameShell {
                         if (performance.now() + ((buf.pos / 22) | 0) > this.lastWaveStartTime + ((this.lastWaveLength / 22) | 0)) {
                             this.lastWaveLength = buf.pos;
                             this.lastWaveStartTime = performance.now();
-                            // playWave swallows decode errors and returns void, matching Java saveWave-failure: no EVENT_SYNTH_ERROR.
-                            await playWave(buf.data.slice(0, buf.pos));
-                            this.lastWaveId = this.waveIds[wave];
-                            this.lastWaveLoops = this.waveLoops[wave];
+                            // Java saveWave — false when signlink is busy; do not record the wave as played.
+                            if (await playWave(buf.data.slice(0, buf.pos))) {
+                                this.lastWaveId = this.waveIds[wave];
+                                this.lastWaveLoops = this.waveLoops[wave];
+                            } else {
+                                failed = true;
+                            }
+                        }
+                        // if gate fails: drop (failed stays false) — same as Java
+                    } else {
+                        // Java replayWave / wavereplay
+                        if (!(await replayWave())) {
+                            failed = true;
                         }
                     }
                 } catch {
                     writeEventSynthError(this.out, ClientProt.EVENT_SYNTH_ERROR, this.waveIds[wave] & 0x7fff);
                 }
 
-                this.waveCount--;
-                for (let i: number = wave; i < this.waveCount; i++) {
-                    this.waveIds[i] = this.waveIds[i + 1];
-                    this.waveLoops[i] = this.waveLoops[i + 1];
-                    this.waveDelay[i] = this.waveDelay[i + 1];
+                if (failed && this.waveDelay[wave] !== -5) {
+                    // Java: retry next frames
+                    this.waveDelay[wave] = -5;
+                } else {
+                    this.waveCount--;
+                    for (let i: number = wave; i < this.waveCount; i++) {
+                        this.waveIds[i] = this.waveIds[i + 1];
+                        this.waveLoops[i] = this.waveLoops[i + 1];
+                        this.waveDelay[i] = this.waveDelay[i + 1];
+                    }
+                    wave--;
                 }
-                wave--;
             } else {
                 this.waveDelay[wave]--;
             }
@@ -11488,37 +11526,34 @@ export class Client extends GameShell {
             ObjType.spriteCache?.clear();
             this.redrawFrame = true;
         } else if (clientcode === 3) {
+            // Java Client clientcode 3: midivol 128/96/64/32 / mute (Decision 012)
             const lastMidiActive: boolean = this.midiActive;
 
             if (value === 0) {
-                this.midiVolume = 0;
+                this.setMidiVolumeJava(this.midiActive, 128);
                 this.midiActive = true;
             } else if (value === 1) {
-                this.midiVolume = -4;
+                this.setMidiVolumeJava(this.midiActive, 96);
                 this.midiActive = true;
             } else if (value === 2) {
-                this.midiVolume = -8;
+                this.setMidiVolumeJava(this.midiActive, 64);
                 this.midiActive = true;
             } else if (value === 3) {
-                this.midiVolume = -12;
+                this.setMidiVolumeJava(this.midiActive, 32);
                 this.midiActive = true;
             } else if (value === 4) {
                 this.midiActive = false;
             }
 
-            if (this.midiActive) {
-                setMidiVolume(this.midiVolume);
-            }
-
+            // Java only restarts music when midiActive flips (and !lowMem)
             if (this.midiActive !== lastMidiActive && !Client.lowMem) {
                 if (this.midiActive) {
                     this.midiSong = this.nextMidiSong;
                     this.midiFading = true;
                     this.onDemand?.request(2, this.midiSong);
                 } else {
-                    stopMidi(false);
+                    this.stopMidiJava();
                 }
-
                 this.nextMusicDelay = 0;
             }
         } else if (clientcode === 4) {

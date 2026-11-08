@@ -57,7 +57,7 @@ async function referenceAssets(engineDir: string, build: string): Promise<(reque
         stdout: 'ignore', stderr: 'ignore'
     });
     if (await child.exited !== 0) throw new Error('capture reference browser build failed');
-    const assets = new Set(['botclient.js', 'botclient.js.map', 'multibox.js', 'multibox.js.map', 'ondemandworker.js', 'ondemandworker.js.map', 'navworker.js', 'navworker.js.map', 'tinymidipcm.wasm', 'version.json', 'target.json']);
+    const assets = new Set(['botclient.js', 'botclient.js.map', 'multibox.js', 'multibox.js.map', 'ondemandworker.js', 'ondemandworker.js.map', 'navworker.js', 'navworker.js.map', 'spessasynth_processor.min.js', 'version.json', 'target.json']);
     return async request => {
         const path = new URL(request.url).pathname;
         if (path === '/bot.html') return new Response(Bun.file(join(ROOT, 'public-bot/bot.html')), { headers: { 'content-type': 'text/html' } });

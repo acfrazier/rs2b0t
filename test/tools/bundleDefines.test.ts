@@ -61,6 +61,13 @@ describe.skipIf(RECORDED === null && PRESENT.length === 0)('browser bundle outpu
         expect(RECORDED?.strict).toEqual({ packets: '1', config: '1' });
     });
 
+    test.skipIf(RECORDED === null)('the Spessa processor is recorded and tinymidipcm.wasm is gone', () => {
+        expect(outputs).toContain('out/spessasynth_processor.min.js');
+        expect(outputs).not.toContain('out/tinymidipcm.wasm');
+        expect(existsSync('out/spessasynth_processor.min.js')).toBe(true);
+        expect(existsSync('out/tinymidipcm.wasm')).toBe(false);
+    });
+
     test.skipIf(RECORDED === null)('the prod compile is marked dummy exactly when it was built that way', () => {
         const version: unknown = JSON.parse(readFileSync('out/version.json', 'utf8'));
         const rsa = typeof version === 'object' && version !== null && 'rsa' in version ? version.rsa : undefined;

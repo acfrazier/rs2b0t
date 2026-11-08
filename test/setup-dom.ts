@@ -4,7 +4,7 @@ import { GlobalRegistrator } from '@happy-dom/global-registrator';
 process.env.STRICT_PACKETS = '1';
 process.env.STRICT_CONFIG = '1';
 
-// Why: happy-dom's fetch rejects file://, so anything transitively importing Client.ts aborts on tinymidipcm's wasm load. Keep Bun's fetch for file://.
+// Why: happy-dom's fetch rejects file://, so Client imports that fetch Florestan or other file URLs must keep Bun's fetch.
 export const nativeFetch = globalThis.fetch;
 // Bun.serve requires its native Response, not happy-dom's browser replacement.
 export const nativeResponse = globalThis.Response;
@@ -34,7 +34,7 @@ Object.defineProperty(globalThis, 'fetch', {
     }
 });
 
-// tinymidipcm.js constructs AudioContext at import time; happy-dom has no Web Audio.
+// Why: audio.js constructs AudioContext at import time; happy-dom has no Web Audio.
 if (typeof globalThis.window !== 'undefined' && !(globalThis.window as { audioContext?: unknown }).audioContext) {
     const param = () => ({
         value: 0,

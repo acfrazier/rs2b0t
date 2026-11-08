@@ -31,7 +31,7 @@ const OUTPUTS = [
     'out/multibox.js.map',
     'out/navworker.js',
     'out/navworker.js.map',
-    'out/tinymidipcm.wasm',
+    'out/spessasynth_processor.min.js',
     'out/target.json',
     'out/version.json'
 ];
@@ -51,7 +51,7 @@ if (prodKey && dummyRsa) {
     process.exit(1);
 }
 if (!prodKey && !dummyRsa) {
-    console.error('TARGET=prod needs PROD_RSAE and PROD_RSAN (the game server\'s public pair), or --dummy-rsa for a compile check.');
+    console.error("TARGET=prod needs PROD_RSAE and PROD_RSAN (the game server's public pair), or --dummy-rsa for a compile check.");
     process.exit(1);
 }
 
