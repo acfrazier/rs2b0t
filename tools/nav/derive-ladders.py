@@ -593,7 +593,7 @@ def pair_up_approaches(edges: list[dict], pack: CollisionPack) -> int:
 
     moved = 0
     for edge in edges:
-        coord_offset = edge.pop("_coordOffset", None)
+        coord_offset = edge.get("_coordOffset")
         if "locX" not in edge or "locZ" not in edge:
             continue
         if edge["to"]["level"] <= edge["from"]["level"]:

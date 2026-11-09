@@ -144,6 +144,7 @@ export class LocDef {
     length = 1;
     blockwalk = true;
     blockrange = true;
+    forceapproach = 0;
     active = -1;
     op: (string | null)[] | null = null;
     debugname: string | null = null;
@@ -202,8 +203,10 @@ export class LocDef {
             this.category = dat.g2();
         } else if (code === 24 || code === 60 || code === 65 || code === 66 || code === 67 || code === 68) {
             dat.g2();
-        } else if (code === 28 || code === 69 || code === 75) {
+        } else if (code === 28 || code === 75) {
             dat.g1();
+        } else if (code === 69) {
+            this.forceapproach = dat.g1();
         } else if (code === 29 || code === 39) {
             dat.g1b();
         } else if (code >= 30 && code < 35) {

@@ -43,19 +43,24 @@ exists in the pack.
 ## Revision 377 stair and ladder bake
 
 The stair and transport files are composed. `tools/nav/derive-transports.sh` runs
-`derive-stairs.ts`, then `derive-ladders.py` and `enrich-transports.py`, which rewrite both
-`stairEdges.json` and `transports.json`. A stairs-only run does not reproduce the committed
-files. `sh tools/nav/derive-transports.sh --check` reruns all three stages in a scratch root
-from the committed `transports.json` and compares both outputs. `derive-stairs.ts --check`
-runs the same full check; the other individual stage checks only verify their own output.
+`derive-stairs.ts`, `derive-ladders.py`, `enrich-transports.py`, then
+`fix-stair-approaches.ts`; together they rewrite `stairEdges.json` and `transports.json`. A
+stairs-only run does not reproduce the committed files. `sh tools/nav/derive-transports.sh
+--check` reruns all four stages in a scratch root from the committed `transports.json` and
+compares both outputs. `derive-stairs.ts --check` runs the same full check; the other
+individual stage checks only verify their own output.
 
 For revision 377, `stairs.rs2` and `ladders.rs2` destinations are authoritative. The parser
 retains each script handler and source coordinate until it resolves the map placement; a
 revision-specific loc name can match only when no more-specific movement handler exists.
 Coordinate-relative teleports use the selected approach tile, explicit destinations remain
 exact, reverse edges are not synthesized, and stair actions without a content movement
-handler stay disabled. The approach search extends one tile beyond the blocked footprint to
-cover rotated multi-tile stairs.
+handler stay disabled. The first approach search is collision-derived and extends one tile
+beyond the blocked footprint to cover rotated multi-tile stairs. After enrichment, the final
+pass resolves each exact map placement and loc config, including rotated dimensions and
+`forceapproach`, and keeps only a walkable adjacent tile accepted by revision 377's server
+`ReachStrategy` against the collision pack. It disables an edge if no allowed side is
+reachable, and recomputes coordinate-relative landings from the corrected approach.
 
 So is *same-level* routing, wherever the link is an Agility shortcut. `derive-doors`
 only sees doors, so a balance log or a climbable outcrop leaves two regions looking

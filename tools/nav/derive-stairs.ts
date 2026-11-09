@@ -30,7 +30,7 @@ interface StairPriceTable {
 }
 
 type PricedTransportEdgeData = TransportEdgeData & { extraTicks?: number };
-type RawStairEdgeData = PricedTransportEdgeData & { coordOffset?: NavPoint; scriptHandler?: string; scriptSource?: NavPoint; scriptOp?: number };
+type RawStairEdgeData = PricedTransportEdgeData & { _coordOffset?: NavPoint; scriptHandler?: string; scriptSource?: NavPoint; scriptOp?: number };
 // First stage of transport generation: bare source edges only.
 // tools/nav/derive-transports.sh runs this, then ladder derivation, then LostCity loc enrichment.
 
@@ -271,7 +271,7 @@ function footprint(finder: PathFinder, p: NavPoint): NavPoint[] {
     return solid;
 }
 
-/** Tiles the server will accept the Climb from. Empty when the placement is walkable and needs no snap. */
+/** Collision-derived candidates only; the post-enrichment pass verifies exact loc geometry and server reach. */
 function operableTiles(finder: PathFinder, p: NavPoint): Set<string> {
     const tiles = new Set<string>();
     for (const solid of footprint(finder, p)) {
@@ -328,7 +328,7 @@ function snapAndReverse(finder: PathFinder, curated: PricedTransportEdgeData[], 
         let t: NavPoint | null;
         let landing: NavPoint | null;
         const scriptedTo = (source: NavPoint): NavPoint => {
-            const offset = e.coordOffset;
+            const offset = e._coordOffset;
             if (selectedRevision !== 377 || !offset) {
                 return e.to;
             }
@@ -350,7 +350,6 @@ function snapAndReverse(finder: PathFinder, curated: PricedTransportEdgeData[], 
             continue;
         }
         const edgeData: RawStairEdgeData = { ...e, from: f, to: t };
-        delete edgeData.coordOffset;
         // Why: content destinations stay exact; the pathfinder silently drops an edge with an unwalkable endpoint.
         if (selectedRevision === 377 && (!finder.walkable(f.x, f.z, f.level) || !finder.walkable(t.x, t.z, t.level))) {
             edgeData.disabledReason = 'The content-defined stair approach or landing is not walkable in this collision pack.';
@@ -464,7 +463,7 @@ function main(): void {
         }
         const scriptedEdge: RawStairEdgeData = { ...edge(s.from, s.to, def.name ?? s.debugname, action, extraTicks), scriptHandler: s.debugname, scriptSource: s.from, scriptOp: s.op };
         if (s.coordOffset) {
-            scriptedEdge.coordOffset = s.coordOffset;
+            scriptedEdge._coordOffset = s.coordOffset;
         }
         edges.push(scriptedEdge);
         stairsCases++;
