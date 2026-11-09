@@ -47,7 +47,7 @@ DEFAULT_PREFIXES="
   nvtr nv2r nv2s n2rg nvt
   gbrp gbs gbr gb
   vgl ths
-  frl2 frl3 frs8 l1r
+  frl2 frl3 frs8 l1x l1i l1r l1z
   sk ds379 ds ext pw c371 i182b i182f lcs rcd scene in ks mp
   bx369 vw370 gt364 mc353
   pa sv df sbu sbp sbx re hp
