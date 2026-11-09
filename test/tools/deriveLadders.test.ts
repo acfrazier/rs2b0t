@@ -24,6 +24,11 @@ stand = module.Target(3210, 3216, 0)
 targets, reason = module.destinations(config.debug_name, "p_delay(0); p_telejump(0_50_150_9_17);", placement, stand)
 assert reason is None
 assert targets == [module.Target(3209, 9617, 0)]
+player_targets = set()
+dynamic, dynamic_reason = module.destinations("ladder_1750", "~climb_ladder(movecoord(coord(), 0, 1, 0), true);", placement, stand, player_targets)
+assert dynamic_reason is None
+assert dynamic == [module.Target(3210, 3216, 1)]
+assert player_targets == set(dynamic)
 edge = module.make_edge(SimpleNamespace(loc_id=14879, display_name="Trapdoor", debug_name=config.debug_name, options=config.options), placement, "Open", stand, targets[0], reason, 0)
 assert edge["kind"] == "dungeon"
 assert edge["locId"] == 14879
@@ -34,6 +39,41 @@ assert "disabledReason" not in edge
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
 });
+
+test('pairing a climb-up approach recomputes its player-relative scripted landing', () => {
+    const result = spawnSync('python3', ['-c', `
+import importlib.util
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+spec = importlib.util.spec_from_file_location("derive_ladders", Path(sys.argv[1]))
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+up = {
+    "from": {"x": 6, "z": 5, "level": 1},
+    "to": {"x": 7, "z": 6, "level": 2},
+    "locX": 5,
+    "locZ": 5,
+    "_coordOffset": {"x": 1, "z": 1, "level": 1},
+}
+down = {
+    "from": {"x": 5, "z": 5, "level": 2},
+    "to": {"x": 5, "z": 5, "level": 1},
+    "locX": 5,
+    "locZ": 5,
+}
+pack = SimpleNamespace(walkable=lambda *args: True)
+assert module.pair_up_approaches([up, down], pack) == 1
+assert up["from"] == {"x": 5, "z": 5, "level": 1}
+assert up["to"] == {"x": 6, "z": 6, "level": 2}
+assert "_coordOffset" not in up
+`, path.resolve('tools/nav/derive-ladders.py')], { encoding: 'utf8' });
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+});
+
 
 test('manhole enrichment resolves the scripted closed/open pair rather than disabling descent', () => {
     const result = spawnSync('python3', ['-c', `

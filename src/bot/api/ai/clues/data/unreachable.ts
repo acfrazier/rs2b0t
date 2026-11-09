@@ -4,6 +4,7 @@
 
 /** Clue destinations the 377 pack/content cannot serve yet, each with its stated gap. */
 export const PACK_UNREACHABLE: Record<number, string> = {
+    2691: 'content gap: the clue at (2971,3386,1) is beside scenery_11732 at (2973,3384,0), whose 377 handler only calls @unhandled_stairs (scripts/ladders+stairs/scripts/stairs.rs2:1101-1105)',
     // NAV: the baked ordinary graph cannot cross the Regicide seams; the solver's Tirannwn helper handles these after the quest gate opens.
     3560: 'nav gap: hard sextant031 Isafdar dig at (2209,3161,0) is beyond the ordinary graph’s Regicide seams; tirannwnTravel.ts handles the route after Regicide is complete',
     3562: 'nav gap: hard sextant032 Isafdar dig at (2181,3206,0) is beyond the ordinary graph’s Regicide seams; tirannwnTravel.ts handles the route after Regicide is complete',
