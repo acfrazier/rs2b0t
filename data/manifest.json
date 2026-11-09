@@ -23,7 +23,7 @@
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
     "tools/gen-377-data.sh": "9dc7273eaa2e23afb9bfebfde334561d3e30ac9d65ac61b8783584ee4429f23d",
-    "tools/gen-377-manifest.ts": "53a71c9afc83e942224823285c72c54f32583ed5d83d26d09ca365b15bdd9f54",
+    "tools/gen-377-manifest.ts": "81dd59b1e117970cf666dcb47482fc6d8780dc652471d05776bdbfe40ebaf725",
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/gen-scriptdocs.ts": "9b65974cf3e5f22a4d7010869e9182ddd5068c3e8e081962ce15183c31e6ddc5",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",

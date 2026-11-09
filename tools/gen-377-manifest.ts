@@ -200,9 +200,7 @@ function main(): void {
             })
         );
 
-    // Only named output paths are replaced, so nav-only or partial worldmap runs keep
-    // artifact rows this invocation did not produce.
-    // Qualification remains only for a same-path, same-kind, same-hash row.
+    // Replace only rows this run produced; keep qualification only for an unchanged same-path, same-kind row.
     const fresh = args.artifacts.map(spec => preserveQualification(artifactRow(spec, process.cwd())));
     const named = new Set([...fresh.map(a => a.path), ...outRows.map(a => a.path)]);
     const kept = manifest.artifacts.filter(a => !named.has(a.path));
