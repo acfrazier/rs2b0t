@@ -11,9 +11,13 @@ import { QUESTS } from '../data/quests.js';
 const COOK: NpcStop = { npc: 'Cook', anchor: new Tile(3209, 3215, 0), leash: 6, prefer: ["What's wrong?", "Yes, I'll help you."] };
 const EGG_PEN = new Tile(3227, 3300, 0);
 const FARMHOUSE_BUCKET = new Tile(3225, 3294, 0);
-const COW_FIELD = new Tile(3255, 3288, 0);
+// 377 (content cb6cc5ea1): milk comes from the Dairy Cow loc 8689 `fat_cow` (cow_milking.rs2:35-51); the Cow NPC refuses a bucket (:1-5). Spawns (3252,3275) and (3254,3272), maps/m50_51.jm2:7329,7397.
+const DAIRY_COWS = new Tile(3253, 3274, 0);
 const WHEAT_FIELD = new Tile(3158, 3300, 0);
-const POT_SPAWN = new Tile(3208, 3213, 0);
+// maps/m50_50.jm2:10731 `0 9 14: 1931`.
+const POT_SPAWN = new Tile(3209, 3214, 0);
+/** pickables.rs2:25-32 binds Pick only for wheat 313, wheat_small 5584 and wheat_smallest 5585; wheat_tall 5583 shares the name and op but has no handler. */
+const PICKABLE_WHEAT = new Set([313, 5584, 5585]);
 const MILL_TOP = new Tile(3166, 3306, 2);
 const MILL_BASE = new Tile(3166, 3306, 0);
 
@@ -25,6 +29,23 @@ const BIN_ALREADY_FULL = /flour bin downstairs is full, i should empty/i;
 /** Locs read blank for about a tick after a level change. */
 function sceneHas(name: string): Promise<boolean> {
     return Execution.delayUntil(() => Locs.query().name(name).within(8).exists(), 6000);
+}
+
+async function pickGrain(log: (m: string) => void): Promise<boolean> {
+    const wheat = () => Locs.query().name('Wheat').action('Pick').where(loc => PICKABLE_WHEAT.has(loc.id)).within(10).nearest();
+    if (!wheat() && !(await Traversal.walkResilient(WHEAT_FIELD, { radius: 2, attempts: 3, timeoutMs: 90_000, log }))) {
+        return false;
+    }
+    const target = wheat();
+    if (!target) {
+        log('no pickable Wheat near the field');
+        return false;
+    }
+    const before = Inventory.count('Grain');
+    if (!(await target.interact('Pick'))) {
+        return false;
+    }
+    return Execution.delayUntil(() => Inventory.count('Grain') > before, 8000);
 }
 
 async function fillHopper(log: (m: string) => void): Promise<boolean> {
@@ -116,7 +137,7 @@ export function gatherFlour(snap: QuestSnapshot): QuestStep {
         return { kind: 'grabGround', item: 'Pot', anchor: POT_SPAWN };
     }
     if (!snap.inv.has('grain')) {
-        return { kind: 'pickLoc', loc: 'Wheat', op: 'Pick', item: 'Grain', anchor: WHEAT_FIELD };
+        return { kind: 'custom', name: 'pick grain', run: pickGrain };
     }
     return { kind: 'custom', name: 'mill flour', run: millFlour };
 }
@@ -125,7 +146,7 @@ export function gatherMilk(snap: QuestSnapshot): QuestStep {
     if (!snap.inv.has('bucket')) {
         return { kind: 'grabGround', item: 'Bucket', anchor: FARMHOUSE_BUCKET };
     }
-    return { kind: 'useOn', item: 'Bucket', targetKind: 'npc', target: 'Cow', anchor: COW_FIELD, product: 'Bucket of milk' };
+    return { kind: 'useOn', item: 'Bucket', targetKind: 'loc', target: 'Dairy Cow', anchor: DAIRY_COWS, product: 'Bucket of milk' };
 }
 
 const gatherEgg = (): QuestStep => ({ kind: 'grabGround', item: 'Egg', anchor: EGG_PEN, waitIfMissing: true });

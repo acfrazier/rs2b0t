@@ -13,6 +13,96 @@ export const CASES: readonly Case[] = [
         note: 'Four 377 webwalk routes, three fresh accounts each, with serverTile readback; requires canon-1108 ENGINE_DIR, CONTENT_DIR and S8_LIVE_EVIDENCE_DIR.'
     },
     {
+        id: 'l2-boneburier-377-live',
+        harness: 'l2-boneburier-377-live.ts',
+        covers: { scripts: ['BoneBurier'] },
+        status: 'vetted',
+        provenAt: 'f2029252',
+        manual: true,
+        budgetMin: 15,
+        note: 'L2 377 template: three fresh accounts bury ten banked Bones through BoneBurier with bank, inventory and Prayer experience readbacks before, after and after a relog; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-bankshop-377-live',
+        harness: 'l2-bankshop-377-live.ts',
+        covers: { subsystems: ['world'] },
+        status: 'vetted',
+        provenAt: '1f6de12b',
+        manual: true,
+        budgetMin: 15,
+        note: 'L2 377 template: three fresh accounts buy a Cake tin at the Varrock general store, bank it at Varrock east bank across a relog, withdraw it and sell it back, with server pack, coin and bank readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-dialogue-377-live',
+        harness: 'l2-dialogue-377-live.ts',
+        covers: { subsystems: ['world'] },
+        status: 'vetted',
+        provenAt: '1180ad10',
+        manual: true,
+        budgetMin: 10,
+        note: 'L2 377 template: three fresh accounts buy and sell back a Bear fur through Baraek\'s option menus (ChatDialog), checking the offered option text against content, with server pack and coin readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-cooksassistant-377-live',
+        harness: 'l2-cooksassistant-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'vetted',
+        provenAt: '3e1a87ff',
+        manual: true,
+        budgetMin: 45,
+        note: 'L2 377 quest cell: three fresh accounts finish Cook\'s Assistant through AIOQuester (runUnqualified) with no quest, item or position seed; watched cookquest/hopper_full/flour/qp getvar timeline, Cooking XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-sheepshearer-377-live',
+        harness: 'l2-sheepshearer-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'vetted',
+        provenAt: '4632d86f',
+        manual: true,
+        budgetMin: 60,
+        note: 'L2 377 quest cell: three fresh accounts finish Sheep Shearer through AIOQuester (runUnqualified) with no quest, item, XP or position seed; shears pen sheep 43/1765, spins by using Wool on the Lumbridge castle wheel; watched sheep/qp getvar timeline, the_thing_sheared 0, Crafting XP, coins, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-priest-377-live',
+        harness: 'l2-priest-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'vetted',
+        provenAt: '9a962e19',
+        manual: true,
+        budgetMin: 100,
+        note: 'L2 377 quest cell: three fresh accounts run The Restless Ghost through AIOQuester (quests=priest, runUnqualified) with no seed beyond the fresh account; watched prieststart 0 -> 1 -> 2 -> 3 -> 4 -> 5 and qp 0 -> 1 getvar timeline, Prayer +1,125 XP, quest skull 553, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-hetty-377-live',
+        harness: 'l2-hetty-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'vetted',
+        provenAt: '84a9c2a1',
+        manual: true,
+        budgetMin: 60,
+        note: 'L2 377 quest cell: three fresh accounts with 50 seeded coins run Witch\'s Potion through AIOQuester (quests=hetty, runUnqualified); watched hetty 0 -> 1 -> 2 -> 3 and qp 0 -> 1 getvar timeline, Magic +325 XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-runemysteries-377-live',
+        harness: 'l2-runemysteries-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'vetted',
+        provenAt: 'b9bdaf83',
+        manual: true,
+        budgetMin: 75,
+        note: 'L2 377 quest cell: three fresh accounts run Rune Mysteries through AIOQuester (quests=runemysteries, runUnqualified) with the labelled Mugger fixture (Attack/Strength/Defence/Hitpoints 40, five trout); watched runemysteries 0 -> 1 -> ... -> 6 and qp 0 -> 1 getvar timeline, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
+        id: 'l2-doric-377-live',
+        harness: 'l2-doric-377-live.ts',
+        covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
+        status: 'vetted',
+        provenAt: '67070153',
+        manual: true,
+        budgetMin: 60,
+        note: 'L2 377 quest cell: three fresh accounts with the labelled Mining 15 seed run Doric\'s Quest through AIOQuester (quests=doric, runUnqualified), mining 377 rocks 9708-9719 through miningRocks.ts; watched doricquest 0 -> 10 -> 100 and qp 0 -> 1 getvar timeline, +180 coins, Mining +1,300 reward XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
+    },
+    {
         id: 'gnome-magic-north-stair-live',
         harness: 'gnome-magic-north-stair-live.ts',
         covers: { scripts: ['GnomeMagicChopper'] },
