@@ -291,17 +291,17 @@ export const SPECIAL_CROSSINGS: SpecialCrossing[] = [
     { x: 2945, z: 3041, level: 0, locName: 'Gate', action: 'Open', dialogue: { choose: ['Glough sent me.', 'Ka.', 'Lu.', 'Min.'] }, reopenAfterDialogue: true, label: 'Karamja shipyard gate (Ka-Lu-Min)' },
     { x: 2945, z: 3042, level: 0, locName: 'Gate', action: 'Open', dialogue: { choose: ['Glough sent me.', 'Ka.', 'Lu.', 'Min.'] }, reopenAfterDialogue: true, label: 'Karamja shipyard gate (Ka-Lu-Min)' },
 
-    // Why: shantay_pass.rs2 is one loc that reads direction from coordz; southbound (player north of it) consumes a pass and shows a disclaimer, northbound is free.
-    // Why: transports.json already carries dual directed edges, so only south needs a specialCrossing for the plan-time item and dialog (#403 / #371).
+    // Why: shantay_pass.rs2 reads direction from coordz: north-to-south consumes a pass and shows a disclaimer; south-to-north is free.
+    // Why: transports.json stores the engine-reachable stands, so only the paid edge's north-side approach carries the item/dialog gate (#403 / #371).
     {
-        x: 3304,
-        z: 3118,
+        x: 3303,
+        z: 3117,
         level: 0,
         locName: 'Shantay pass',
         action: 'Go-through',
         requires: { item: 'Shantay pass', count: 1 },
         dialogue: { choose: ["Yeah, that poster doesn't scare me!"] },
-        toTile: { x: 3304, z: 3114, level: 0 },
+        toTile: { x: 3304, z: 3115, level: 0 },
         label: 'Shantay Pass -> Kharidian desert'
     },
 

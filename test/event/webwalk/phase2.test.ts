@@ -186,7 +186,7 @@ describe('nav v2 phase 2–4 pathfinder', () => {
     test.skipIf(!HAS_COLLISION_PACK)('party under → falador still climbs ladder (no tele needed)', () => {
         const finder = loadFinder();
         const r = finder.findPath(
-            { x: 3019, z: 9849, level: 0 },
+            { x: 3019, z: 9848, level: 0 },
             { x: 2965, z: 3378, level: 0 },
             { policy: { useTeleports: false } }
         );

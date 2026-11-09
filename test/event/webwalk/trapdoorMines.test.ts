@@ -23,7 +23,7 @@ const EDGEVILLE_TRAP = {
 /** Falador party-room trapdoor into the Dwarven Mine (surface hop used by mining seeds). The stand is the walkable tile west of the 377 placement: the tile south of it is blocked in the 377 pack. */
 const DWARVEN_TRAP = {
     from: { x: 3018, z: 3450, level: 0 },
-    to: { x: 3019, z: 9849, level: 0 },
+    to: { x: 3019, z: 9848, level: 0 },
     locName: 'Trapdoor',
     action: 'Climb-down',
     kind: 'dungeon'
@@ -110,7 +110,7 @@ describe('Dwarven Mine + Edgeville trapdoor paths', () => {
         expect(finder.walkable(DWARVEN_TRAP.to.x, DWARVEN_TRAP.to.z, 0)).toBe(true);
 
         const start = { x: 3015, z: 3449, level: 0 };
-        const dest = { x: 3019, z: 9849, level: 0 };
+        const dest = { x: 3019, z: 9848, level: 0 };
         const route = finder.findPath(start, dest);
         expect(route.ok).toBe(true);
         if (!route.ok) {

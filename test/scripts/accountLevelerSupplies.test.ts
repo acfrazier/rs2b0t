@@ -359,7 +359,7 @@ test.skipIf(!existsSync('out/collision.lcnav.gz'))('the navigation graph reaches
     expect(route.ok).toBe(true);
     if (!route.ok) return;
     expect(route.hops.find(hop => hop.locId === 11867)).toMatchObject({
-        kind: 'dungeon', action: 'Climb-down', to: { x: 3019, z: 9849, level: 0 }
+        kind: 'dungeon', action: 'Climb-down', to: { x: 3019, z: 9848, level: 0 }
     });
     expect(route.waypoints.at(-1)).toMatchObject({ x: 2997, z: 9844, level: 0 });
 });

@@ -200,11 +200,12 @@ function main(): void {
             })
         );
 
-    // Why: this generator owns every worldmap row, dropping stale outputs but preserving other slices.
+    // Only named output paths are replaced, so nav-only or partial worldmap runs keep
+    // artifact rows this invocation did not produce.
     // Qualification remains only for a same-path, same-kind, same-hash row.
     const fresh = args.artifacts.map(spec => preserveQualification(artifactRow(spec, process.cwd())));
     const named = new Set([...fresh.map(a => a.path), ...outRows.map(a => a.path)]);
-    const kept = manifest.artifacts.filter(a => !named.has(a.path) && !a.path.startsWith('out/worldmap-'));
+    const kept = manifest.artifacts.filter(a => !named.has(a.path));
     manifest.artifacts = [...kept, ...fresh, ...outRows].sort((a, b) => a.path.localeCompare(b.path));
 
     writeManifest(process.cwd(), manifest);

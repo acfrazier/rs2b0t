@@ -54,7 +54,8 @@ export NAV_DATA_ROOT="$data_root"
 "$bun_bin" tools/nav/fix-stair-approaches.ts \
     --engine "$engine_dir" \
     --pack "$pack_path" \
-    --out "$data_dir/stairEdges.json"
+    --out "$data_dir/stairEdges.json" \
+    --transports "$data_dir/transports.json"
 
 if [ "$check" = 1 ]; then
     stale=0

@@ -13,7 +13,7 @@
     "commit": "cb6cc5ea1c9bbe13b9680bb2ddd4ccaeab2b5f40"
   },
   "toolchain": {
-    "node": "v26.13.0",
+    "node": "26.13.0",
     "bun": "1.4.4"
   },
   "generators": {
@@ -22,8 +22,8 @@
     "tools/combat/gen-dropdb.ts": "e4f41ca3151aac1ed5376c92470dc093a46b9f1b7c0965529dc916819d27550e",
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
-    "tools/gen-377-data.sh": "9791c29a1f22fdee05e8cde4d622e7e29edabcc4a4c668037944dc8f33e96925",
-    "tools/gen-377-manifest.ts": "655a95897a26e0af2fab60de7fb58cdadc5abe6517bd0247c3a97b1f35e9ffe6",
+    "tools/gen-377-data.sh": "9dc7273eaa2e23afb9bfebfde334561d3e30ac9d65ac61b8783584ee4429f23d",
+    "tools/gen-377-manifest.ts": "53a71c9afc83e942224823285c72c54f32583ed5d83d26d09ca365b15bdd9f54",
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/gen-scriptdocs.ts": "9b65974cf3e5f22a4d7010869e9182ddd5068c3e8e081962ce15183c31e6ddc5",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
@@ -38,9 +38,9 @@
     "tools/nav/derive-doors.ts": "3cf52059e6512d76bf2b6c369cfdbc4e36d1f99cfe9aedf6df4e84c059cc43b5",
     "tools/nav/derive-ladders.py": "ef74b1c5b4d0390633871245d8bb3123ef44632b517ab48f1f030911cd3edfee",
     "tools/nav/derive-stairs.ts": "40fe1011ee8777a882c924b7a69c82850fb946c629710b4208d3a051bc719b6c",
-    "tools/nav/derive-transports.sh": "4540eb92e4ef47a1ad247aa7e48570f4948d21b44c95a6568a0bed5a5827902c",
-    "tools/nav/enrich-transports.py": "8851242aa4ca215c087da1138fb611f22541c67241be300ec9ab9c71df2826fe",
-    "tools/nav/fix-stair-approaches.ts": "39dea6edc4e8906f602b601a285a56047260c5cdd3fb1b330772bca971691b52",
+    "tools/nav/derive-transports.sh": "b1627525080a65ba84746b1fc087e2329f1e83b4f4b582d5ee305388aea180c5",
+    "tools/nav/enrich-transports.py": "1aa40fd1de6dcc2997e917b468b4cda97fd40392579860a7b34fe4a4ef48102e",
+    "tools/nav/fix-stair-approaches.ts": "3d8b72992d3e3b9eb54de06c6b7569c27e3ff0d2d5d23d5626810aea10faa57f",
     "tools/nav/lib.ts": "ad99a207a195116b4c776e2a2890fec5a6575a840c530c75d35d7d17ef8e1b06",
     "tools/nav/stairsParse.ts": "0dbd99a23b9dd63edced534ccefa88a22c7df58bacfb88d2adc0496cf0dd5c88",
     "tools/patches/worldmap-377.patch": "0ac9dbe029993299bf4a2579944b24ff57f68611d4b54906990f329229ccf223",
@@ -609,7 +609,7 @@
     },
     {
       "path": "src/bot/event/webwalk/data/transports.json",
-      "sha256": "a7eef5fa1f754970c5794ad20708b2c3b426324116246b1da7223d9a6e3bc812",
+      "sha256": "5e4e30ddfcb591417bf21cbadd22d480f53cd39a8379641d55c41b62ab7fdc8c",
       "kind": "generated",
       "qualification": "pending"
     },
@@ -765,7 +765,13 @@
     },
     {
       "path": "test/tools/stairDestinations.test.ts",
-      "sha256": "862476acbb0f77b59bf293e95b30d1689905a96cddb751219af0a52ccb9a3a66",
+      "sha256": "259eee2bb63f1d122ab69f759f273c2697294f7f8f7145f7dbebdd5ace34ccc6",
+      "kind": "edition",
+      "qualification": "offline"
+    },
+    {
+      "path": "test/tools/transportReachability.test.ts",
+      "sha256": "04e7c972cbb467be61142413f7e6dbba05892ccad4d0c6ab9bbe048511936459",
       "kind": "edition",
       "qualification": "offline"
     },

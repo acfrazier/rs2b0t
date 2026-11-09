@@ -6,8 +6,8 @@ import transports from '#/bot/event/webwalk/data/transports.json';
 const REPORTED_START = { x: 3246, z: 3092, level: 0 } as const;
 const VARROCK = { x: 3213, z: 3424, level: 0 } as const;
 const SHANTAY_EXIT = {
-    from: { x: 3304, z: 3114, level: 0 },
-    to: { x: 3304, z: 3118, level: 0 },
+    from: { x: 3303, z: 3115, level: 0 },
+    to: { x: 3303, z: 3118, level: 0 },
     locName: 'Shantay pass',
     action: 'Go-through',
     kind: 'dungeon',

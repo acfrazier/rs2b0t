@@ -40,7 +40,7 @@ const cases = [
     {
         id: 'dwarven-mine-trapdoor',
         surface: { x: 3019, z: 3449, level: 0 },
-        under: { x: 3019, z: 9849, level: 0 },
+        under: { x: 3019, z: 9848, level: 0 },
         start: { x: 3015, z: 3450, level: 0 }
     }
 ] as const;
