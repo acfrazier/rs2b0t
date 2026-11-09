@@ -66,14 +66,13 @@ describe('revision-377 offline route corpus', () => {
         const upper = wizardStair(12538, 2, 'Climb-down');
 
         expect(lower).toMatchObject({
-            from: { x: 3103, z: 3161, level: 0 },
+            from: { x: 3105, z: 3159, level: 0 },
             to: { x: 3104, z: 3161, level: 1 },
             kind: 'stair',
             extraTicks: 0
         });
         expect(middle).toMatchObject({
-            // The loc stands at 1_48_49_31_23 (3103,3159); collision picks 3103,3158 as the nearest cardinal approach, and the script teleports to (3104,3161,L2).
-            from: { x: 3103, z: 3158, level: 1 },
+            from: { x: 3103, z: 3161, level: 1 },
             to: { x: 3104, z: 3161, level: 2 },
             kind: 'stair',
             extraTicks: 0

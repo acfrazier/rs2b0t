@@ -1,9 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
+import { gunzipSync } from 'fflate';
 import { describe, expect, test } from 'bun:test';
 
+import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
+import { CollisionFlag } from '#/bot/event/webwalk/rsmod/flags.js';
 import stairEdges from '#/bot/event/webwalk/data/stairEdges.json';
+import { LocDef, Reader, bridgedLevel, forEachLoc, loadLocTypes, loadMapsquares, parseLands } from '../../tools/nav/lib.js';
 import { skipUnless } from '../lib/skipUnless.js';
 
 interface Point {
@@ -22,6 +27,7 @@ interface StairEdge {
     locZ?: number;
     locId?: number;
     disabledReason?: string;
+    kind?: string;
 }
 
 const edges = stairEdges as StairEdge[];
@@ -34,6 +40,183 @@ const MOVECORD_RE = /^movecoord\s*\((.*)\)$/s;
 function pointKey(point: Point): string {
     return `${point.x},${point.z},${point.level}`;
 }
+
+interface LocPlacement {
+    shape: number;
+    angle: number;
+}
+
+interface ReachStrategy {
+    reached(
+        flags: { get(x: number, z: number, level: number): number },
+        level: number,
+        srcX: number,
+        srcZ: number,
+        destX: number,
+        destZ: number,
+        destWidth: number,
+        destHeight: number,
+        srcSize: number,
+        angle: number,
+        shape: number,
+        blockAccessFlags: number
+    ): boolean;
+}
+
+interface ReachEvidence {
+    finder: PathFinder;
+    configs: LocDef[];
+    placements: Map<string, LocPlacement>;
+    strategy: ReachStrategy;
+}
+
+type LocConfig = LocDef;
+
+let reachEvidence: Promise<ReachEvidence> | null = null;
+
+function placementKey(locId: number, x: number, z: number, level: number): string {
+    return `${locId},${x},${z},${level}`;
+}
+
+function loadReachEvidence(): Promise<ReachEvidence> {
+    if (!reachEvidence) {
+        reachEvidence = (async () => {
+            const engineDir = process.env.ENGINE_DIR;
+            if (!engineDir) throw new Error('ENGINE_DIR is required for server reach tests');
+
+            // The selected engine revision lives outside this project and is resolved through ENGINE_DIR.
+            const { default: strategy } = await import(
+                pathToFileURL(path.join(engineDir, 'src/engine/routefinder/ReachStrategy.ts')).href
+            ) as { default: ReachStrategy };
+            const { configs } = loadLocTypes(engineDir, 377);
+            const locIds = new Set(edges.filter(edge => !edge.disabledReason && edge.locId !== undefined).map(edge => edge.locId!));
+            const placements = new Map<string, LocPlacement>();
+
+            for (const square of loadMapsquares(engineDir)) {
+                const lands = parseLands(new Reader(square.land));
+                forEachLoc(new Reader(square.loc), instance => {
+                    if (!locIds.has(instance.locId)) return;
+                    const level = bridgedLevel(lands, instance.coord, instance.x, instance.z, instance.level);
+                    placements.set(
+                        placementKey(instance.locId, square.mx * 64 + instance.x, square.mz * 64 + instance.z, level),
+                        { shape: instance.shape, angle: instance.angle }
+                    );
+                });
+            }
+
+            const pack = gunzipSync(readFileSync(path.join(process.cwd(), 'out/collision.lcnav.gz')));
+            const finder = new PathFinder(pack);
+            return { finder, configs, placements, strategy };
+        })();
+    }
+    return reachEvidence;
+}
+
+function rotatedSize(config: LocConfig, angle: number): [number, number] {
+    return angle & 1 ? [config.length, config.width] : [config.width, config.length];
+}
+
+function isAdjacentToLoc(edge: StairEdge, config: LocConfig, placement: LocPlacement): boolean {
+    if (edge.locX === undefined || edge.locZ === undefined) return false;
+    const [width, height] = rotatedSize(config, placement.angle);
+    const east = edge.locX + width - 1;
+    const north = edge.locZ + height - 1;
+    return (
+        (edge.from.x === edge.locX - 1 && edge.from.z >= edge.locZ && edge.from.z <= north)
+        || (edge.from.x === east + 1 && edge.from.z >= edge.locZ && edge.from.z <= north)
+        || (edge.from.z === edge.locZ - 1 && edge.from.x >= edge.locX && edge.from.x <= east)
+        || (edge.from.z === north + 1 && edge.from.x >= edge.locX && edge.from.x <= east)
+    );
+}
+
+function reachesLoc(edge: StairEdge, evidence: ReachEvidence): boolean {
+    const placement = evidence.placements.get(placementKey(edge.locId!, edge.locX!, edge.locZ!, edge.from.level));
+    const config = evidence.configs[edge.locId!];
+    if (!placement || !config || !evidence.finder.walkable(edge.from.x, edge.from.z, edge.from.level)) return false;
+    const wallMask = evidence.finder.wallMask.bind(evidence.finder);
+    const flags = {
+        get(x: number, z: number, level: number): number {
+            if (!evidence.finder.walkable(x, z, level)) return CollisionFlag.NULL;
+            const walls = wallMask(x, z, level);
+            return (
+                ((walls & 1) ? CollisionFlag.WALL_NORTH : 0)
+                | ((walls & 2) ? CollisionFlag.WALL_EAST : 0)
+                | ((walls & 4) ? CollisionFlag.WALL_SOUTH : 0)
+                | ((walls & 8) ? CollisionFlag.WALL_WEST : 0)
+            );
+        }
+    };
+    return evidence.strategy.reached(
+        flags,
+        edge.from.level,
+        edge.from.x,
+        edge.from.z,
+        edge.locX!,
+        edge.locZ!,
+        config.width,
+        config.length,
+        1,
+        placement.angle,
+        placement.shape,
+        config.forceapproach
+    );
+}
+
+function stairEdgesWithApproaches(): StairEdge[] {
+    return edges.filter(edge =>
+        !edge.disabledReason
+        && (edge.kind === 'stair' || edge.kind === 'dungeon')
+    );
+}
+
+test('loc opcode 69 retains forced approach flags', () => {
+    const config = new LocDef();
+    config.decodeType(new Reader(new Uint8Array([69, 0x0b, 0])), 377);
+    expect(config.forceapproach).toBe(0x0b);
+});
+
+describe.skipIf(skipUnless('engine') || skipUnless('collision-pack'))('stair approach reachability', () => {
+    test('Lumbridge castle 1738 ascents use reachable approaches', async () => {
+        const ascents = edges.filter(edge =>
+            edge.locId === 1738
+            && edge.locX === 3204
+            && (edge.locZ === 3207 || edge.locZ === 3229)
+            && edge.action === 'Climb-up'
+            && edge.from.level === 0
+            && !edge.disabledReason
+        );
+        expect(ascents).toHaveLength(2);
+        expect(ascents.map(edge => pointKey(edge.from)).sort()).toEqual(['3205,3209,0', '3205,3228,0']);
+
+        const evidence = await loadReachEvidence();
+        expect(ascents.every(edge => {
+            const placement = evidence.placements.get(placementKey(edge.locId!, edge.locX!, edge.locZ!, edge.from.level));
+            const config = evidence.configs[edge.locId!];
+            return !!placement && !!config && isAdjacentToLoc(edge, config, placement) && reachesLoc(edge, evidence);
+        })).toBe(true);
+    });
+
+    test('every active stair or dungeon approach is adjacent and server-reachable', async () => {
+        const evidence = await loadReachEvidence();
+        const failures = stairEdgesWithApproaches().flatMap(edge => {
+            if (edge.locId === undefined || edge.locX === undefined || edge.locZ === undefined) {
+                return [`${edge.debugName}: missing loc placement identity`];
+            }
+            const config = evidence.configs[edge.locId];
+            if (!config) return [`${edge.debugName} loc ${edge.locId}: missing loc config`];
+            const placement = evidence.placements.get(placementKey(edge.locId, edge.locX, edge.locZ, edge.from.level));
+            if (!placement) return [`${edge.debugName} loc ${edge.locId}: missing map placement`];
+            if (!evidence.finder.walkable(edge.from.x, edge.from.z, edge.from.level)) {
+                return [`${edge.debugName} loc ${edge.locId} at ${edge.locX},${edge.locZ}: approach tile is blocked`];
+            }
+            if (!isAdjacentToLoc(edge, config, placement) || !reachesLoc(edge, evidence)) {
+                return [`${edge.debugName} loc ${edge.locId} at ${edge.locX},${edge.locZ}: (${edge.from.x},${edge.from.z},${edge.from.level}) is not server-reachable`];
+            }
+            return [];
+        });
+        expect(failures).toEqual([]);
+    });
+});
 
 function parseCoord(value: string): Point | null {
     const match = COORD_RE.exec(value.trim());

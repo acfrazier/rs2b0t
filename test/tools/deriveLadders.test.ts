@@ -68,7 +68,7 @@ pack = SimpleNamespace(walkable=lambda *args: True)
 assert module.pair_up_approaches([up, down], pack) == 1
 assert up["from"] == {"x": 5, "z": 5, "level": 1}
 assert up["to"] == {"x": 6, "z": 6, "level": 2}
-assert "_coordOffset" not in up
+assert up["_coordOffset"] == {"x": 1, "z": 1, "level": 1}
 `, path.resolve('tools/nav/derive-ladders.py')], { encoding: 'utf8' });
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
