@@ -390,6 +390,44 @@ def closed_open_loc_ids(
     return closed_id, open_id
 
 
+def switch_coord_blocks(body: str) -> list[tuple[int, int]]:
+    """Return each non-nested switch_coord block's inclusive-start/exclusive-end range."""
+    opener_re = re.compile(r"\bswitch_coord\s*\([^)]*\)\s*\{", re.IGNORECASE)
+    blocks: list[tuple[int, int]] = []
+    covered_through = -1
+    for match in opener_re.finditer(body):
+        if match.start() < covered_through:
+            continue
+        open_brace = match.end() - 1
+        depth = 0
+        quoted = False
+        escaped = False
+        for index in range(open_brace, len(body)):
+            char = body[index]
+            if quoted:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    quoted = False
+                continue
+            if char == '"':
+                quoted = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    end = index + 1
+                    blocks.append((match.start(), end))
+                    covered_through = end
+                    break
+        else:
+            raise ValueError("Unclosed switch_coord block in content handler")
+    return blocks
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--content", type=Path, required=True)
@@ -454,17 +492,30 @@ def main() -> None:
             if has_movement(body):
                 movement_handler_ops.add(key)
             uncommented_body = line_comment_re.sub("", body)
-            cases = list(case_re.finditer(uncommented_body))
-            for index, case in enumerate(cases):
-                body_end = cases[index + 1].start() if index + 1 < len(cases) else len(uncommented_body)
-                if not has_movement(uncommented_body[case.end():body_end]):
-                    continue
-                case_coord = case.group(1)
-                if case_coord.lower() == "default":
+            switch_blocks = switch_coord_blocks(uncommented_body)
+            for switch_start, switch_end in switch_blocks:
+                open_brace = uncommented_body.index("{", switch_start, switch_end)
+                switch_body = uncommented_body[open_brace + 1:switch_end - 1]
+                cases = list(case_re.finditer(switch_body))
+                for index, case in enumerate(cases):
+                    body_end = cases[index + 1].start() if index + 1 < len(cases) else len(switch_body)
+                    if not has_movement(switch_body[case.end():body_end]):
+                        continue
+                    case_coord = case.group(1)
+                    if case_coord.lower() == "default":
+                        unscoped_movement_ops.add(key)
+                        continue
+                    level, map_x, map_z, local_x, local_z = map(int, case_coord.split("_"))
+                    scripted_op_sources.setdefault(key, set()).add((level, map_x * 64 + local_x, map_z * 64 + local_z))
+
+            # Movement after a switch_coord block is not scoped by its last case.
+            cursor = 0
+            for switch_start, switch_end in switch_blocks:
+                if has_movement(uncommented_body[cursor:switch_start]):
                     unscoped_movement_ops.add(key)
-                    continue
-                level, map_x, map_z, local_x, local_z = map(int, case_coord.split("_"))
-                scripted_op_sources.setdefault(key, set()).add((level, map_x * 64 + local_x, map_z * 64 + local_z))
+                cursor = switch_end
+            if has_movement(uncommented_body[cursor:]):
+                unscoped_movement_ops.add(key)
     allowed_stair_debugs.update({"laddertop", "ladder", "laddermiddle", "laddertop_directional", "ladder_directional"})
     data_dir = args.rs2b0t / "src" / "bot" / "event" / "webwalk" / "data"
     curated = json.loads((data_dir / "transports.json").read_text(encoding="utf-8"))

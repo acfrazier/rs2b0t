@@ -169,6 +169,46 @@ function contentOptionOperations(scriptsDir: string): Map<string, Map<string, nu
 }
 
 const COORD_CASE_RE = /\bcase\s+\d+_\d+_\d+_\d+_\d+\s*:/;
+const SWITCH_COORD_RE = /\bswitch_coord\s*\([^)]*\)\s*\{/gi;
+const MISSING_HANDLER_REASON_RE = /^No (?:revision 377 OPLOC movement handler|matching revision 377 OPLOC handler) for this location action\.$/;
+
+function switchCoordBlocks(body: string): { start: number; end: number }[] {
+    const blocks: { start: number; end: number }[] = [];
+    let coveredThrough = -1;
+    for (const match of body.matchAll(SWITCH_COORD_RE)) {
+        const start = match.index!;
+        if (start < coveredThrough) continue;
+        const openBrace = start + match[0].lastIndexOf('{');
+        let depth = 0;
+        let quoted = false;
+        let escaped = false;
+        let end = -1;
+        for (let i = openBrace; i < body.length; i++) {
+            const char = body[i]!;
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (char === '\\') escaped = true;
+                else if (char === '"') quoted = false;
+                continue;
+            }
+            if (char === '"') quoted = true;
+            else if (char === '{') depth++;
+            else if (char === '}' && --depth === 0) {
+                end = i + 1;
+                break;
+            }
+        }
+        if (end < 0) throw new Error('Unclosed switch_coord block in content handler');
+        blocks.push({ start, end });
+        coveredThrough = end;
+    }
+    return blocks;
+}
+
+function hasMovementCall(body: string): boolean {
+    MOVEMENT_CALL_RE.lastIndex = 0;
+    return MOVEMENT_CALL_RE.test(body);
+}
 
 function sourceCaseDestinationCandidates(
     handlers: Map<string, string[]>,
@@ -188,38 +228,86 @@ function sourceCaseDestinationCandidates(
             const body = rawBody.replace(/\/\/[^\n]*/g, '');
             let matchedSource = false;
             const defaultCases: string[] = [];
-            const cases = [...body.matchAll(/\bcase\s+(\d+_\d+_\d+_\d+_\d+|default)\s*:/g)];
-            for (let i = 0; i < cases.length; i++) {
-                const start = cases[i].index! + cases[i][0].length;
-                const end = cases[i + 1]?.index ?? body.length;
-                const branch = body.slice(start, end);
-                if (cases[i][1] === 'default') {
-                    defaultCases.push(branch);
-                    continue;
-                }
-                const source = parseCoord(cases[i][1]);
-                if (
-                    !source
-                    || source.level !== placement.level
-                    || Math.max(Math.abs(source.x - placement.x), Math.abs(source.z - placement.z)) > 2
-                ) {
-                    continue;
-                }
-                matchedSource = true;
-                for (const destination of destinationCandidates(branch, edge)) {
-                    candidates.add(destination);
+            for (const block of switchCoordBlocks(body)) {
+                const openBrace = body.indexOf('{', block.start);
+                const switchBody = body.slice(openBrace + 1, block.end - 1);
+                const cases = [...switchBody.matchAll(/\bcase\s+(\d+_\d+_\d+_\d+_\d+|default)\s*:/g)];
+                for (let i = 0; i < cases.length; i++) {
+                    const start = cases[i]!.index! + cases[i]![0].length;
+                    const end = cases[i + 1]?.index ?? switchBody.length;
+                    const branch = switchBody.slice(start, end);
+                    if (cases[i]![1] === 'default') {
+                        defaultCases.push(branch);
+                        continue;
+                    }
+                    const source = parseCoord(cases[i]![1]!);
+                    if (
+                        !source
+                        || source.level !== placement.level
+                        || Math.max(Math.abs(source.x - placement.x), Math.abs(source.z - placement.z)) > 2
+                    ) {
+                        continue;
+                    }
+                    matchedSource = true;
+                    for (const destination of destinationCandidates(branch, edge)) candidates.add(destination);
                 }
             }
             if (onlyHandler !== undefined && !matchedSource) {
                 for (const branch of defaultCases) {
-                    for (const destination of destinationCandidates(branch, edge)) {
-                        candidates.add(destination);
-                    }
+                    for (const destination of destinationCandidates(branch, edge)) candidates.add(destination);
                 }
             }
         }
     }
     return candidates;
+}
+
+function unscopedDestinationCandidates(
+    handlers: Map<string, string[]>,
+    edge: StairEdge,
+    operations: number[],
+    onlyHandler?: string
+): Set<string> {
+    const candidates = new Set<string>();
+    for (const [handler, bodies] of handlers) {
+        const match = /^(.*)\|([1-5])$/.exec(handler);
+        const name = match?.[1];
+        const op = Number(match?.[2]);
+        if (!op || !operations.includes(op) || (onlyHandler !== undefined && name !== onlyHandler)) continue;
+        for (const rawBody of bodies) {
+            const body = rawBody.replace(/\/\/[^\n]*/g, '');
+            let cursor = 0;
+            for (const block of switchCoordBlocks(body)) {
+                for (const destination of destinationCandidates(body.slice(cursor, block.start), edge)) candidates.add(destination);
+                cursor = block.end;
+            }
+            for (const destination of destinationCandidates(body.slice(cursor), edge)) candidates.add(destination);
+        }
+    }
+    return candidates;
+}
+
+function handlerHasUnscopedMovement(
+    handlers: Map<string, string[]>,
+    operations: number[],
+    onlyHandler?: string
+): boolean {
+    for (const [handler, bodies] of handlers) {
+        const match = /^(.*)\|([1-5])$/.exec(handler);
+        const name = match?.[1];
+        const op = Number(match?.[2]);
+        if (!op || !operations.includes(op) || (onlyHandler !== undefined && name !== onlyHandler)) continue;
+        for (const rawBody of bodies) {
+            const body = rawBody.replace(/\/\/[^\n]*/g, '');
+            let cursor = 0;
+            for (const block of switchCoordBlocks(body)) {
+                if (hasMovementCall(body.slice(cursor, block.start))) return true;
+                cursor = block.end;
+            }
+            if (hasMovementCall(body.slice(cursor))) return true;
+        }
+    }
+    return false;
 }
 
 function destinationCandidates(body: string, edge: StairEdge): Set<string> {
@@ -299,6 +387,20 @@ test('Varrock West Bank dungeon stairs retain the walkable approach beyond their
     expect(exits[0]?.disabledReason).toBeUndefined();
 });
 
+test('ladder_1749 Climb-down placements stay enabled', () => {
+    const descents = edges.filter(edge => edge.debugName === 'ladder_1749' && edge.action === 'Climb-down');
+    expect(descents).toHaveLength(24);
+    expect(descents.filter(edge => edge.disabledReason)).toEqual([]);
+
+    const varrock = descents.filter(edge => edge.locX === 3202 && edge.locZ === 3416);
+    expect(varrock).toHaveLength(1);
+    expect(varrock[0]).toMatchObject({
+        from: { x: 3202, z: 3417, level: 1 },
+        to: { x: 3202, z: 3417, level: 0 }
+    });
+    expect(varrock[0]?.disabledReason).toBeUndefined();
+});
+
 describe.skipIf(skipUnless('content'))('377 stair landing destinations from content', () => {
     test('every content-backed stair landing matches its handler destination', () => {
         if (!CONTENT_DIR) {
@@ -326,16 +428,43 @@ describe.skipIf(skipUnless('content'))('377 stair landing destinations from cont
             const expected = bodies.length > 0
                 ? new Set([
                     ...sourceCaseDestinationCandidates(handlers, edge, operations, edge.debugName),
+                    ...unscopedDestinationCandidates(handlers, edge, operations, edge.debugName),
                     ...bodies
                         .filter(body => !COORD_CASE_RE.test(body))
                         .flatMap(body => [...destinationCandidates(body, edge)])
                 ])
-                : sourceCaseDestinationCandidates(handlers, edge, operations);
+                : new Set([
+                    ...sourceCaseDestinationCandidates(handlers, edge, operations),
+                    ...unscopedDestinationCandidates(handlers, edge, operations)
+                ]);
             if (expected.size === 0 && edge.disabledReason) continue;
             if (!expected.has(pointKey(edge.to))) {
                 mismatches.push(`${edge.debugName ?? edge.locId ?? edge.action} (${edge.action}): ${pointKey(edge.from)} -> ${pointKey(edge.to)} (content destinations: ${[...expected].join('; ') || 'no matching movement handler'})`);
             }
         }
         expect(mismatches).toEqual([]);
+    });
+    test('disabled no-handler stair edges have no unscoped content movement', () => {
+        const scriptsDir = path.join(CONTENT_DIR!, 'scripts');
+        const handlers = contentHandlers(scriptsDir);
+        const optionOps = contentOptionOperations(scriptsDir);
+        const disabledWithMovement: string[] = [];
+        for (const edge of edges) {
+            if (!edge.disabledReason || !MISSING_HANDLER_REASON_RE.test(edge.disabledReason)) continue;
+            const contentOps = edge.debugName
+                ? optionOps.get(edge.debugName)?.get(edge.action.toLowerCase())
+                : undefined;
+            const operations = contentOps?.length
+                ? contentOps
+                : edge.options?.flatMap((option, index) =>
+                    option?.toLowerCase() === edge.action.toLowerCase() ? [index + 1] : []
+                ) ?? [];
+            if (edge.debugName && handlerHasUnscopedMovement(handlers, operations, edge.debugName)) {
+                disabledWithMovement.push(
+                    `${edge.debugName} (${edge.action}) at ${pointKey(edge.from)} / loc ${edge.locX},${edge.locZ}`
+                );
+            }
+        }
+        expect(disabledWithMovement).toEqual([]);
     });
 });

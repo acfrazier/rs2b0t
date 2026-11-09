@@ -39,7 +39,7 @@
     "tools/nav/derive-ladders.py": "e0637f38b365f4dbc723eaa7c64205508a9297e1716d1992b07225be7c3896cc",
     "tools/nav/derive-stairs.ts": "0aa63c9efbcf3641f42ac38e642cca83cf94ebeb7c2737ddbaa3c332f57dca7f",
     "tools/nav/derive-transports.sh": "62b377a4a0610e1d49a5f91c824b44ddb5601f8e8fba63b4412cf7f9c32d1c08",
-    "tools/nav/enrich-transports.py": "ecb230d6ae74a6cd4a34eba058d218d274122451d9db6b69498e142e1bc7d83f",
+    "tools/nav/enrich-transports.py": "8851242aa4ca215c087da1138fb611f22541c67241be300ec9ab9c71df2826fe",
     "tools/nav/lib.ts": "93f5d22f03c65f8be03e95319085a16b0da62acdaa9753af81c777cb9c476a22",
     "tools/nav/stairsParse.ts": "0dbd99a23b9dd63edced534ccefa88a22c7df58bacfb88d2adc0496cf0dd5c88",
     "tools/patches/worldmap-377.patch": "0ac9dbe029993299bf4a2579944b24ff57f68611d4b54906990f329229ccf223",
@@ -494,7 +494,7 @@
     },
     {
       "path": "src/bot/api/ai/clues/data/unreachable.ts",
-      "sha256": "aa873e14204fd78a74e87065d4298348899cb0226b22a9c10b959f32bd7d0ca8",
+      "sha256": "6ceba23a978ce90f0328b4b488d387f7e091d79d1d93cff931e6bb24847f8f3f",
       "kind": "edition",
       "qualification": "offline"
     },
@@ -602,7 +602,7 @@
     },
     {
       "path": "src/bot/event/webwalk/data/stairEdges.json",
-      "sha256": "7e7bc9fd00322b25bfc93f33982e3acd6c752a0093f368e34599eba745481497",
+      "sha256": "3a96c936271d625cb61d326f7a18502afed1d94001df8fae072b9cd3afb10614",
       "kind": "generated",
       "qualification": "qualified"
     },
@@ -764,7 +764,7 @@
     },
     {
       "path": "test/tools/stairDestinations.test.ts",
-      "sha256": "870553bd118236e9003f8753b1cdbd9622329fb94e04c23920a2b6d8691d17f2",
+      "sha256": "4146ea1f90da4c9357dc28e1a802cb314ade5689953c0818cf696caa5f78b5ec",
       "kind": "edition",
       "qualification": "offline"
     },
