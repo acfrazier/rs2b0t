@@ -21,8 +21,9 @@
 # Inputs (environment):
 #   GEN377_WORK          required; workspace for the fresh clones, build and logs (keep it off the
 #                        repository; a second build passes a different GEN377_WORK and compares bytes)
-#   GEN377_ENGINE_REPO   required; engine clone source (a local checkout or the pinned repository)
-#   GEN377_CONTENT_REPO  required; content clone source
+#   GEN377_ENGINE_REPO   required; operator-provided engine source (local checkout or
+#                        authenticated clone URL)
+#   GEN377_CONTENT_REPO  required; operator-provided content source
 #   GEN377_NODE_MODULES  optional; a locked node_modules to copy into the engine clone (a fresh
 #                        clone has none). Without it the script runs `npm ci` (needs the registry).
 #   GEN377_OUT_DIR       where the basemap files are written and hashed from (default: out/, the

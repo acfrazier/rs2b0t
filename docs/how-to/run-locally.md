@@ -11,15 +11,24 @@ Production target is [rs2b2t](https://rs2b2t.com) only.
 
 | Need | Why |
 |---|---|
-| [Bun](https://bun.sh) | builds and tests this repo |
-| Node 24+ | the engine runs on it, as do the Electron and Playwright harnesses |
+| [Bun 1.4.4](https://bun.sh) | The CI workflow pins this version. |
+| Node 24+ | Runs the engine, Electron, and Playwright harnesses. |
 
-## Get an engine
+## Choose an engine
 
-Engine and content are separate repos on matching branches and **must be siblings**,
-the engine resolves content as `../content`.
+A build has one client revision. The client branch selects it. `TARGET` selects the network
+and login-key behavior, not the client revision.
 
-1. Clone both at revision 289:
+| Client branch | Matching engine and content | Revision |
+|---|---|---:|
+| `main` | Public LostCityRS Engine-TS and Content checkouts on branch `289`. | 289 |
+| `rev377` | Not published publicly; use matching checkouts supplied by the project operator. | 377 |
+
+Keep engine and content as sibling directories because Engine-TS reads content from `../content`.
+
+### Start a revision-289 engine
+
+1. Clone both repositories at revision 289:
 
    ```sh
    git clone https://github.com/LostCityRS/Engine-TS -b 289 --single-branch engine
@@ -37,34 +46,44 @@ the engine resolves content as `../content`.
 3. Wait for `World ready`. First boot packs the cache and logs harmless
    `WARN missing model …` lines.
 
-4. Confirm with `curl -o /dev/null -w '%{http_code}\n' http://localhost:<web>/rs2.cgi`, which prints `200`.
+4. Check the web route with `curl -o /dev/null -w '%{http_code}\n' http://localhost:80/rs2.cgi`.
+   Use the configured web port. The default is 80 on macOS and Windows, and 8888 on Linux.
 
 See [ports](../reference/ports.md) for defaults, changing them, and why `World ready`
 does not mean the game port is bound.
 
-## Derive the login key
+### Use the revision-377 engine
 
-An engine generates its RSA login key on first boot into `data/config/private.pem`, and
-the client must encrypt logins with that engine's public parameters.
+The public client contains 377-derived data, but it does not publish the 377 engine or
+content source. Obtain matching 377 checkouts from the project operator. Set `ENGINE_DIR`
+and `CONTENT_DIR` to their roots for local gates. Match their commits to `data/manifest.json`.
+Do not pair a 289 client with 377 inputs.
 
-rs2b0t's `local` target bakes rs2b2t's own rotated 1024-bit modulus. A stock upstream
-engine generates a 512-bit key with a **large random public exponent, not 65537**, so
-against one you must supply both values or every login fails with response code 6.
+## Regenerate revision-377 data
 
-Node's and Bun's crypto reject these keys outright (`ERR_OSSL_BAD_E_VALUE`) because the
-exponent is not a small standard value, so use `openssl`:
+From the client root, set `GEN377_ENGINE_REPO` and `GEN377_CONTENT_REPO` to operator-provided
+local checkouts or authenticated clone sources. The helper pins engine and content commits.
+It defaults to Node 26.13.0 and Bun 1.4.4. See [revision-377 data and local gates](revision-377-data.md)
+for the regeneration command, setup, and current gate status.
+
+### Run the local 377 gate
+
+Set `ENGINE_DIR` and `CONTENT_DIR` to matching 377 checkouts with a packed cache. The gate
+does not start a game server. Unit-test input skips are reported but do not fail the
+unit-test gate alone. Drift gates fail on command errors, stale output, a missing clean
+marker, or a skipped required local input.
+
+The current receipt remains open for milestone M. See the linked page for its failures and
+the collision-pack prerequisite.
+
+Run from the client root:
 
 ```sh
-# modulus
-HEX=$(openssl rsa -in data/config/private.pem -noout -modulus | sed 's/^Modulus=//')
-bun -e "console.log(BigInt('0x$HEX').toString())"
-
-# public exponent (handles OpenSSL 3.x single-line and older multi-line formats)
-openssl rsa -in data/config/private.pem -noout -text \
-  | sed -n 's/^publicExponent: \([0-9][0-9]*\).*/\1/p'
+ENGINE_DIR=/path/to/377-engine CONTENT_DIR=/path/to/377-content bun run e2e -- --gates-only
 ```
 
-`./tools/deploy-local-key.sh /path/to/engine` derives both automatically.
+Hosted CI has no 377 engine or content inputs. It cannot replace this gate. See
+[build and data plumbing](build-and-data.md).
 
 ## Deploy the client
 
@@ -72,10 +91,10 @@ openssl rsa -in data/config/private.pem -noout -text \
 2. Deploy:
 
    ```sh
-   LOCAL_RSAE=<exponent> LOCAL_RSAN=<modulus> ENGINE_DIR=/path/to/engine sh tools/deploy-local.sh
+   ./tools/deploy-local-key.sh /path/to/engine
    ```
 
-   Against the maintainer engine, omit both RSA values.
+To set the engine's public key values yourself, run `LOCAL_RSAE=<exponent> LOCAL_RSAN=<modulus> ENGINE_DIR=/path/to/engine sh tools/deploy-local.sh`. See [Local login key](../reference/build-targets.md#local-login-key) for how to derive both values.
 
 `tools/deploy-local.sh` requires `$ENGINE_DIR/public` to exist, then builds the stock
 and bot clients, builds the collision pack from that engine's map data if
@@ -84,10 +103,6 @@ absent, copies the bundles into `public/client/` and `public/bot/`, and installs
 `bot.html` and `multibox.html`.
 
 Both outputs live in the repo's `out/`, shared across the checkout.
-
-Not yet executed against an upstream engine: this section and the login key above are
-derived from `tools/deploy-local.sh` and `bot.bundle.ts` rather than an observed run.
-Open an issue if it does not work.
 
 ## Run a bot
 
@@ -110,17 +125,12 @@ The test, lint, format and smoke commands, plus what `bunfig.toml` preloads: [te
 
 `bun run build:all-targets`, the manifest, the `data/377/` cutover and the skip groups: [build and data](build-and-data.md).
 
-## Maintainer appendix
+## Maintainer cheats
 
-Requires repositories not published alongside this one.
-
-- Engine at `~/code/rs2b2t-engine`: `npm run quickstart` (web `:8890`). Deploy with
-  `ENGINE_DIR=~/code/rs2b2t-engine sh tools/deploy-local.sh`. Its committed key is a
-  rotated 1024-bit one whose public half the `local` target bakes, so no
-  `LOCAL_RSAE`/`LOCAL_RSAN` is needed.
-- Cheats (staffModLevel 4 locally): `::tele 0,mx,mz,lx,lz`, `::~maxme`,
-  `::give <objname> <count>` (use `cert_<objname>` for notes). The level-up
-  dialogs raised by `::~maxme` swallow the next typed command, clear dialogs first.
+On local test engines with `staffModLevel` 4, use `::tele 0,mx,mz,lx,lz`,
+`::~maxme`, and `::give <objname> <count>`. Use `cert_<objname>` for notes.
+The level-up dialogs raised by `::~maxme` swallow the next typed command. Clear
+those dialogs before you enter another command.
 
 ## See also
 
