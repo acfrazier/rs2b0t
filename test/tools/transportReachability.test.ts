@@ -1,10 +1,11 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { describe, expect, test } from 'bun:test';
 
-import transports from '#/bot/event/webwalk/data/transports.json';
-import stairEdges from '#/bot/event/webwalk/data/stairEdges.json';
+import committedTransports from '#/bot/event/webwalk/data/transports.json';
+import committedStairEdges from '#/bot/event/webwalk/data/stairEdges.json';
 import { BLOCK_MAP_SQUARE, LEVELS, MAP_X, MAP_Z, REMOVE_ROOFS, Reader, bridgedLevel, forEachLoc, loadLocTypes, loadMapsquares, packCoord, parseLands } from '../../tools/nav/lib.js';
 import { skipUnless } from '../lib/skipUnless.js';
 
@@ -77,8 +78,12 @@ interface ReachEvidence {
     locShapeLayer: EngineFlags['locShapeLayer'];
 }
 
-const transportRows = transports as Edge[];
-const stairRows = stairEdges as Edge[];
+const transportRows = process.env.NAV_TRANSPORTS_FILE
+    ? JSON.parse(readFileSync(process.env.NAV_TRANSPORTS_FILE, 'utf8')) as Edge[]
+    : committedTransports as Edge[];
+const stairRows = process.env.NAV_STAIR_EDGES_FILE
+    ? JSON.parse(readFileSync(process.env.NAV_STAIR_EDGES_FILE, 'utf8')) as Edge[]
+    : committedStairEdges as Edge[];
 const activeEdges = [...transportRows, ...stairRows];
 
 let evidencePromise: Promise<ReachEvidence> | null = null;

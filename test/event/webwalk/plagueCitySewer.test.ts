@@ -8,7 +8,7 @@ import { emptyWorldStateData, type WorldStateData } from '#/bot/event/webwalk/wo
 const SEWER = { x: 2514, z: 9739, level: 0 };
 const CITY = { x: 2529, z: 3304, level: 0 };
 const MUD_PILE = { x: 2518, z: 9760, level: 0 };
-const GARDEN = { x: 2566, z: 3330, level: 0 };
+const GARDEN = { x: 2566, z: 3331, level: 0 };
 
 function route(state: WorldStateData, from = SEWER, to = CITY): boolean {
     // One walkable bit per tile, grouped by map square: the sewer stand and the mud-pile landing share square 39,152.

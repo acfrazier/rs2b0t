@@ -2,7 +2,7 @@
  *  --from 3222,3218,0 --to 2965,3378,0 [--pack out/collision.lcnav.gz] [--explain] [--tele --magic 99 --runes --distanceBeforeTeleport 0] */
 
 //   bun tools/nav/route-probe.ts --from 3222,3218,0 --to 2965,3378,0 --explain
-//   bun tools/nav/route-probe.ts --from 3019,9849,0 --to 2965,3378,0 --explain
+//   bun tools/nav/route-probe.ts --from 3019,9848,0 --to 2965,3378,0 --explain
 //   bun tools/nav/route-probe.ts --from 3222,3218,0 --to 3213,3424,0 --tele --magic 99 --runes
 import fs from 'node:fs';
 

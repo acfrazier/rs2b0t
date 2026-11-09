@@ -172,6 +172,54 @@ describe('gen-377-manifest', () => {
     });
 
 
+    test('keeps worldmap rows when regeneration did not produce worldmaps', () => {
+        const root = tempDir();
+        const worldmaps = Array.from({ length: 67 }, (_, index) => ({
+            path: `out/worldmap-retained-${index}.png`,
+            sha256: HASH_A,
+            kind: 'out' as const,
+            qualification: 'qualified' as const
+        })).sort((a, b) => a.path.localeCompare(b.path));
+        const navHash = put(root, 'data/377/src/bot/event/webwalk/data/doors.json', '{}\n');
+        seed(root, { ...emptyManifest(), artifacts: [...worldmaps, {
+            path: 'data/377/src/bot/event/webwalk/data/doors.json',
+            sha256: navHash,
+            kind: 'nav-input',
+            qualification: 'pending'
+        }] });
+        mkdirSync(join(root, 'out'), { recursive: true });
+
+        const result = run(root, ['--revision', '377']);
+        expect(result.code).toBe(0);
+
+        const artifacts = readManifest(root).artifacts;
+        expect(artifacts.filter(a => a.path.startsWith('out/worldmap-'))).toEqual(worldmaps);
+        expect(artifacts.find(a => a.path.endsWith('doors.json'))?.sha256).toBe(navHash);
+    });
+
+    test('keeps unproduced worldmap rows during partial regeneration', () => {
+        const root = tempDir();
+        const worldmaps = Array.from({ length: 67 }, (_, index) => ({
+            path: `out/worldmap-retained-${index}.png`,
+            sha256: HASH_A,
+            kind: 'out' as const,
+            qualification: 'qualified' as const
+        })).sort((a, b) => a.path.localeCompare(b.path));
+        seed(root, { ...emptyManifest(), artifacts: worldmaps });
+        mkdirSync(join(root, 'out'), { recursive: true });
+        const producedPath = 'out/worldmap-retained-3.png';
+        const producedHash = put(root, producedPath, 'new worldmap\n');
+
+        const result = run(root, ['--revision', '377']);
+        expect(result.code).toBe(0);
+
+        const expected = worldmaps.map(artifact => artifact.path === producedPath
+            ? { ...artifact, sha256: producedHash, qualification: 'pending' as const }
+            : artifact
+        );
+        expect(readManifest(root).artifacts).toEqual(expected);
+    });
+
     test('rows for another slice survive a run that does not name them', () => {
         const root = tempDir();
         const navHash = put(root, 'data/377/src/bot/event/webwalk/data/doors.json', '{}\n');

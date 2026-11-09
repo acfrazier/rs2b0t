@@ -118,6 +118,19 @@ OPEN_LOC_DEBUGS = {"manholeclosed": "manholeopen", "plaguemanholeclosed": "plagu
 def clean_value(value: str) -> str:
     return value.split("//", 1)[0].strip()
 
+CONTENT_DERIVED_TRANSPORT_LANDINGS = {
+    "fai_dwarf_trapdoor_down",
+    "fai_wiztower_spiralstairs",
+    "plaguemudpile",
+}
+
+
+def revision_coord(value: str) -> dict[str, int] | None:
+    match = re.fullmatch(r"(\d+)_(\d+)_(\d+)_(\d+)_(\d+)", value.strip())
+    if not match:
+        return None
+    level, map_x, map_z, local_x, local_z = map(int, match.groups())
+    return {"x": map_x * 64 + local_x, "z": map_z * 64 + local_z, "level": level}
 
 def load_loc_configs(content: Path) -> dict[int, LocConfig]:
     id_to_debug: dict[int, str] = {}
@@ -477,6 +490,13 @@ def main() -> None:
                 labels.setdefault(match.group(1), []).append(body)
 
         use_handlers.update(oplocu_re.findall(text))
+    constants: dict[str, dict[str, int]] = {}
+    for constant_path in sorted((args.content / "scripts").rglob("*.constant")):
+        for raw in constant_path.read_text(encoding="utf-8").splitlines():
+            match = re.match(r"^\^([a-zA-Z0-9_]+)\s*=\s*(\d+_\d+_\d+_\d+_\d+)$", clean_value(raw))
+            point = revision_coord(match.group(2)) if match else None
+            if match and point:
+                constants[f"^{match.group(1)}"] = point
 
     def has_movement(body: str, visiting: frozenset[str] = frozenset()) -> bool:
         uncommented = line_comment_re.sub("", body)
@@ -530,6 +550,46 @@ def main() -> None:
             for index, option in enumerate(config.options if config else [])
             if normalized(option) == wanted
         ]
+    def simple_script_destination(body: str) -> dict[str, int] | None:
+        uncommented = line_comment_re.sub("", body)
+        call = re.search(r"\b(?:p_telejump|p_teleport)\s*\(\s*([^()]*)\s*\)", uncommented, re.IGNORECASE)
+        if not call:
+            return None
+        expression = call.group(1).strip()
+        return revision_coord(expression) or constants.get(expression)
+
+    def content_transport_landing(edge: dict, config: LocConfig | None) -> None:
+        debug_name = edge.get("debugName")
+        if debug_name not in CONTENT_DERIVED_TRANSPORT_LANDINGS:
+            return
+        if config is None or edge.get("locX") is None or edge.get("locZ") is None:
+            raise RuntimeError(f"Cannot resolve content landing for {debug_name}: missing loc placement")
+        candidates: set[tuple[int, int, int]] = set()
+        for operation in matching_options(config, edge.get("action")):
+            for raw_body in handler_bodies.get((debug_name, operation), []):
+                uncommented = line_comment_re.sub("", raw_body)
+                if debug_name == "fai_wiztower_spiralstairs":
+                    source = (edge["from"]["level"], edge["locX"], edge["locZ"])
+                    for start, end in switch_coord_blocks(uncommented):
+                        open_brace = uncommented.index("{", start, end)
+                        switch_body = uncommented[open_brace + 1:end - 1]
+                        cases = list(case_re.finditer(switch_body))
+                        for index, case in enumerate(cases):
+                            case_coord = revision_coord(case.group(1))
+                            if case_coord is None or (case_coord["level"], case_coord["x"], case_coord["z"]) != source:
+                                continue
+                            branch_end = cases[index + 1].start() if index + 1 < len(cases) else len(switch_body)
+                            destination = simple_script_destination(switch_body[case.end():branch_end])
+                            if destination:
+                                candidates.add((destination["x"], destination["z"], destination["level"]))
+                else:
+                    destination = simple_script_destination(uncommented)
+                    if destination:
+                        candidates.add((destination["x"], destination["z"], destination["level"]))
+        if len(candidates) != 1:
+            raise RuntimeError(f"Cannot resolve one content landing for {debug_name}: found {sorted(candidates)}")
+        x, z, level = next(iter(candidates))
+        edge["to"] = {"x": x, "z": z, "level": level}
 
     def disable_unhandled_movement(
         edge: dict,
@@ -689,6 +749,7 @@ def main() -> None:
             if disable_unhandled_movement(edge, action_config, require_stair_movement, script_handler, script_source, script_op):
                 enriched.append(edge)
                 continue
+            content_transport_landing(edge, action_config)
             apply_price(edge)
             enriched.append(edge)
         return enriched

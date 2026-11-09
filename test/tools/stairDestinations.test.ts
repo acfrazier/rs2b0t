@@ -7,8 +7,8 @@ import { describe, expect, test } from 'bun:test';
 
 import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { CollisionFlag } from '#/bot/event/webwalk/rsmod/flags.js';
-import transports from '#/bot/event/webwalk/data/transports.json';
-import stairEdges from '#/bot/event/webwalk/data/stairEdges.json';
+import committedTransports from '#/bot/event/webwalk/data/transports.json';
+import committedStairEdges from '#/bot/event/webwalk/data/stairEdges.json';
 import { LocDef, Reader, bridgedLevel, forEachLoc, loadLocTypes, loadMapsquares, parseLands } from '../../tools/nav/lib.js';
 import { skipUnless } from '../lib/skipUnless.js';
 
@@ -31,43 +31,14 @@ interface StairEdge {
     kind?: string;
 }
 
-const edges = stairEdges as StairEdge[];
-const reachCensusTransportPlacements = new Set([
-    '3381,2647,9377',
-    '194,2408,3417',
-    '4031,3302,3116',
-    '2541,2514,9737',
-    '3789,2843,10108',
-    '3788,2842,10108',
-    '3789,2852,10107',
-    '1757,2400,9508',
-    '195,2409,9818',
-    '4912,2430,3082',
-    '1757,2430,9482',
-    '1759,2547,3551',
-    '1757,2556,9844',
-    '1759,2823,3513',
-    '1759,2824,3507',
-    '1759,2827,3510',
-    '1759,2845,3516',
-    '1759,2848,3513',
-    '1759,2848,3519',
-    '1759,2857,3517',
-    '1759,2859,3519',
-    '1759,2884,3397',
-    '1757,2892,9907',
-    '1759,3088,3571',
-    '133,3092,3362',
-    '132,3117,9754',
-    '14879,3209,3216',
-    '1757,3504,9970',
-    '5812,2715,3472'
-]);
-const transportLandingEdges = (transports as StairEdge[]).filter(edge =>
-    edge.locId !== undefined
-    && edge.locX !== undefined
-    && edge.locZ !== undefined
-    && reachCensusTransportPlacements.has(`${edge.locId},${edge.locX},${edge.locZ}`)
+const edges = process.env.NAV_STAIR_EDGES_FILE
+    ? JSON.parse(readFileSync(process.env.NAV_STAIR_EDGES_FILE, 'utf8')) as StairEdge[]
+    : committedStairEdges as StairEdge[];
+const transportRows = process.env.NAV_TRANSPORTS_FILE
+    ? JSON.parse(readFileSync(process.env.NAV_TRANSPORTS_FILE, 'utf8')) as StairEdge[]
+    : committedTransports as StairEdge[];
+const transportLandingEdges = transportRows.filter(edge =>
+    !edge.disabledReason && (edge.kind === 'stair' || edge.kind === 'dungeon')
 );
 const landingEdges = [...edges, ...transportLandingEdges];
 const CONTENT_DIR = process.env.CONTENT_DIR;
@@ -425,7 +396,13 @@ function contentOptionOperations(scriptsDir: string): Map<string, Map<string, nu
 const COORD_CASE_RE = /\bcase\s+\d+_\d+_\d+_\d+_\d+\s*:/;
 const SWITCH_COORD_RE = /\bswitch_coord\s*\([^)]*\)\s*\{/gi;
 const MISSING_HANDLER_REASON_RE = /^No (?:revision 377 OPLOC movement handler|matching revision 377 OPLOC handler) for this location action\.$/;
-
+const TRANSPORT_CONTENT_PARSER_LIMITS = new Map([
+    ['zq_logbalance|Cross|2906,3049,0|2910,3049,0', 'random agility crossing uses dynamic forced movement'],
+    ['zq_logbalance|Cross|2910,3049,0|2906,3049,0', 'random agility crossing uses dynamic forced movement'],
+    ['zqclimbingrocks|Climb|2795,2979,0|2791,2979,0', 'agility movement uses exact/forced movement without a script teleport'],
+    ['zqclimbingrocks|Climb|2791,2979,0|2795,2979,0', 'agility movement uses exact/forced movement without a script teleport'],
+    ['plaguemudpatch1|Dig|2566,3330,0|2518,9760,0', 'use-item handler is oplocu and parser does not resolve its item switch']
+]);
 function switchCoordBlocks(body: string): { start: number; end: number }[] {
     const blocks: { start: number; end: number }[] = [];
     let coveredThrough = -1;
@@ -614,6 +591,9 @@ function destinationCandidates(body: string, edge: StairEdge, constants?: Readon
     }
     return candidates;
 }
+function transportLandingKey(edge: StairEdge): string {
+    return `${edge.debugName ?? ''}|${edge.action}|${pointKey(edge.from)}|${pointKey(edge.to)}`;
+}
 
 test('Lumbridge Castle South staircase lands only on its content teleport destination', () => {
     const group = edges.filter(edge =>
@@ -660,7 +640,7 @@ test('ladder_1749 Climb-down placements stay enabled', () => {
 });
 
 describe.skipIf(skipUnless('content'))('377 stair and transport landing destinations from content', () => {
-    test('every stair landing and each previously rejected transport landing matches its content destination', () => {
+    test('every stair landing and every active transport stair/dungeon landing matches content', () => {
         if (!CONTENT_DIR) {
             throw new Error('CONTENT_DIR must name the 377 content checkout');
         }
@@ -672,9 +652,11 @@ describe.skipIf(skipUnless('content'))('377 stair and transport landing destinat
         const constants = contentConstants(scriptsDir);
         const optionOps = contentOptionOperations(scriptsDir);
         const mismatches: string[] = [];
-        expect(transportLandingEdges).toHaveLength(30);
-        expect(transportLandingEdges.filter(edge => edge.disabledReason)).toEqual([]);
-        expect(new Set(transportLandingEdges.map(edge => `${edge.locId},${edge.locX},${edge.locZ}`))).toEqual(reachCensusTransportPlacements);
+        const observedParserLimits: string[] = [];
+        expect(transportLandingEdges).toHaveLength(219);
+        expect(transportLandingEdges.filter(edge =>
+            edge.locId === undefined || edge.locX === undefined || edge.locZ === undefined || edge.debugName === undefined
+        )).toEqual([]);
         for (const edge of landingEdges) {
             const contentOps = edge.debugName
                 ? optionOps.get(edge.debugName)?.get(edge.action.toLowerCase())
@@ -704,10 +686,21 @@ describe.skipIf(skipUnless('content'))('377 stair and transport landing destinat
                 expected.add(pointKey(shantayQueuedDestination(scriptsDir)));
             }
             if (expected.size === 0 && edge.disabledReason) continue;
+            if (transportLandingEdges.includes(edge)) {
+                const key = transportLandingKey(edge);
+                const reason = TRANSPORT_CONTENT_PARSER_LIMITS.get(key);
+                if (reason) {
+                    observedParserLimits.push(`${key}: ${reason}`);
+                    continue;
+                }
+            }
             if (!expected.has(pointKey(edge.to))) {
                 mismatches.push(`${edge.debugName ?? edge.locId ?? edge.action} (${edge.action}): ${pointKey(edge.from)} -> ${pointKey(edge.to)} (content destinations: ${[...expected].join('; ') || 'no matching movement handler'})`);
             }
         }
+        expect(observedParserLimits.sort()).toEqual(
+            [...TRANSPORT_CONTENT_PARSER_LIMITS].map(([key, reason]) => `${key}: ${reason}`).sort()
+        );
         expect(mismatches).toEqual([]);
     });
     test('disabled no-handler stair edges have no unscoped content movement', () => {

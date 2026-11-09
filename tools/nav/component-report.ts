@@ -1,7 +1,7 @@
 /** Pairwise pathability between seed tiles under the collision pack plus the default nav edges.
- *  --seed 3019,9849,0 (repeatable), --pack out/collision.lcnav.gz, --max 500000 expansions. */
+ *  --seed 3019,9848,0 (repeatable), --pack out/collision.lcnav.gz, --max 500000 expansions. */
 
-//   bun tools/nav/component-report.ts --seed 3019,9849,0 --seed 3019,9739,0
+//   bun tools/nav/component-report.ts --seed 3019,9848,0 --seed 3019,9739,0
 //   bun tools/nav/component-report.ts --seeds-file tools/nav/mainland-routes.json
 import fs from 'node:fs';
 
@@ -33,7 +33,7 @@ for (let i = 0; i < args.length; i++) {
 
 if (seeds.length === 0) {
     seeds.push(
-        { x: 3019, z: 9849, level: 0 }, // party under
+        { x: 3019, z: 9848, level: 0 }, // Dwarven Mine trapdoor landing
         { x: 3019, z: 9739, level: 0 }, // guild under
         { x: 3222, z: 3218, level: 0 }, // lumbridge
         { x: 2965, z: 3378, level: 0 }, // falador

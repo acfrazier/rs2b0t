@@ -261,6 +261,7 @@ do
 done
 ARTIFACT_ARGS+=(--artifact "test/event/webwalk/routeCorpus377.test.ts=edition:offline")
 ARTIFACT_ARGS+=(--artifact "test/tools/stairDestinations.test.ts=edition:offline")
+ARTIFACT_ARGS+=(--artifact "test/tools/transportReachability.test.ts=edition:offline")
 ARTIFACT_ARGS+=(--artifact "$(stage_path tools/nav/door-categories.json)=nav-input")
 ARTIFACT_ARGS+=(--artifact "$(stage_path tools/nav/stair-prices.json)=nav-input")
 ARTIFACT_ARGS+=(--artifact "$(stage_path out/collision.lcnav.gz)=out")

@@ -102,19 +102,11 @@ async function main(): Promise<void> {
     }));
     const edges = outputFiles.flatMap(file => file.edges);
     const reachOnlyDisableReason = `No walkable adjacent tile passes revision ${revision} reach while preserving a walkable landing for this loc placement.`;
-    const isLocTileOpenTeleport = (edge: StairEdge): boolean =>
-        edge.disabledReason === reachOnlyDisableReason
-        && edge.action.toLowerCase() === 'open'
-        && edge.locX !== undefined
-        && edge.locZ !== undefined
-        && edge.from.x === edge.locX
-        && edge.from.z === edge.locZ
-        && (edge.to.x !== edge.from.x || edge.to.z !== edge.from.z || edge.to.level !== edge.from.level);
     const generatedStairEdges = new Set(outputFiles[0]!.edges);
     const { configs } = loadLocTypes(engine, revision);
     const locIds = new Set(
         edges
-            .filter(edge => (!edge.disabledReason || isLocTileOpenTeleport(edge)) && (edge.kind === 'stair' || edge.kind === 'dungeon'))
+            .filter(edge => !edge.disabledReason && (edge.kind === 'stair' || edge.kind === 'dungeon'))
             .flatMap(edge => [edge.locId, edge.openLocId])
             .filter((id): id is number => id !== undefined)
     );
@@ -157,8 +149,6 @@ async function main(): Promise<void> {
     const unresolved: string[] = [];
 
     for (const edge of edges) {
-        // A script-driven open teleport can be activated while standing on the loc tile.
-        if (isLocTileOpenTeleport(edge)) delete edge.disabledReason;
         if (edge.disabledReason || (edge.kind !== 'stair' && edge.kind !== 'dungeon')) continue;
         if (edge.locId === undefined || edge.locX === undefined || edge.locZ === undefined) {
             throw new Error(`${edge.debugName ?? edge.action}: active stair edge is missing loc identity`);
