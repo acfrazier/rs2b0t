@@ -30,7 +30,7 @@ interface StairPriceTable {
 }
 
 type PricedTransportEdgeData = TransportEdgeData & { extraTicks?: number };
-
+type RawStairEdgeData = PricedTransportEdgeData & { coordOffset?: NavPoint; scriptHandler?: string; scriptSource?: NavPoint; scriptOp?: number };
 // First stage of transport generation: bare source edges only.
 // tools/nav/derive-transports.sh runs this, then ladder derivation, then LostCity loc enrichment.
 
@@ -235,6 +235,8 @@ function snapWalkable(finder: PathFinder, x: number, z: number, level: number): 
 
 // Climb works from a cardinal neighbour with no intervening wall; the radius matches the walker's PathFinder.cardinalGoals and covers a 1x3 staircase (loc 11724).
 const FOOTPRINT_RADIUS = 2;
+// Why: the stand tile can be one tile beyond the bounded blocked footprint (for example, rotated 2x3 stairs).
+const APPROACH_OFFSETS = offsets(FOOTPRINT_RADIUS + 1);
 const SIDES: readonly [number, number, number][] = [
     [0, 1, 1 << 2],
     [1, 0, 1 << 3],
@@ -285,12 +287,13 @@ function operableTiles(finder: PathFinder, p: NavPoint): Set<string> {
 }
 
 // Why: snapWalkable can choose the other side of a wall; move the anchor only when it has no wall-free approach.
-function snapApproach(finder: PathFinder, p: NavPoint, nearest: NavPoint | null): NavPoint | null {
+function snapApproach(finder: PathFinder, p: NavPoint, nearest: NavPoint | null, revision: number): NavPoint | null {
     const operable = operableTiles(finder, p);
     if (operable.size === 0 || (nearest && operable.has(`${nearest.x},${nearest.z}`))) {
         return nearest;
     }
-    for (const [dx, dz] of SNAP_OFFSETS) {
+    const candidates = revision === 377 ? APPROACH_OFFSETS : SNAP_OFFSETS;
+    for (const [dx, dz] of candidates) {
         const candidate = { x: p.x + dx, z: p.z + dz, level: p.level };
         if (operable.has(`${candidate.x},${candidate.z}`) && localComponentSize(finder, candidate) > 1) {
             return candidate;
@@ -316,34 +319,53 @@ function pivotBoth(finder: PathFinder, x: number, z: number, a: number, b: numbe
     return fallback;
 }
 
-function snapAndReverse(finder: PathFinder, curated: PricedTransportEdgeData[], raw: PricedTransportEdgeData[], selectedRevision: number): { edges: PricedTransportEdgeData[]; dropped: number; supersededDropped: number } {
+function snapAndReverse(finder: PathFinder, curated: PricedTransportEdgeData[], raw: RawStairEdgeData[], selectedRevision: number): { edges: PricedTransportEdgeData[]; dropped: number; supersededDropped: number } {
     // Why: reverse landing tiles are unknown; moving them to the approach side can disconnect pockets such as Yanille and south Falador.
-    const snapped: { edge: PricedTransportEdgeData; landing: NavPoint }[] = [];
+    const snapped: { edge: RawStairEdgeData; landing: NavPoint }[] = [];
     let dropped = 0;
     for (const e of raw) {
         let f: NavPoint | null;
         let t: NavPoint | null;
         let landing: NavPoint | null;
+        const scriptedTo = (source: NavPoint): NavPoint => {
+            const offset = e.coordOffset;
+            if (selectedRevision !== 377 || !offset) {
+                return e.to;
+            }
+            return { x: source.x + offset.x, z: source.z + offset.z, level: source.level + offset.level };
+        };
         if (e.from.x === e.to.x && e.from.z === e.to.z) {
             const piv = pivotBoth(finder, e.from.x, e.from.z, e.from.level, e.to.level);
             f = piv ? { x: piv.x, z: piv.z, level: e.from.level } : null;
-            t = piv ? { x: piv.x, z: piv.z, level: e.to.level } : null;
+            t = selectedRevision === 377 ? (f ? scriptedTo(f) : null) : piv ? { x: piv.x, z: piv.z, level: e.to.level } : null;
             landing = f;
         } else {
             landing = snapWalkable(finder, e.from.x, e.from.z, e.from.level);
-            f = snapApproach(finder, e.from, landing);
-            t = snapWalkable(finder, e.to.x, e.to.z, e.to.level);
+            f = snapApproach(finder, e.from, landing, selectedRevision);
+            // Why: a 377 p_telejump destination is the server landing; collision snapping invents adjacent, unreachable landings.
+            t = selectedRevision === 377 ? (f ? scriptedTo(f) : null) : snapWalkable(finder, e.to.x, e.to.z, e.to.level);
         }
-        if (!f || !t || !landing) {
+        if (!f || !t || (selectedRevision !== 377 && !landing)) {
             dropped++;
             continue;
         }
-        snapped.push({ edge: { ...e, from: f, to: t }, landing });
+        const edgeData: RawStairEdgeData = { ...e, from: f, to: t };
+        delete edgeData.coordOffset;
+        // Why: content destinations stay exact; the pathfinder silently drops an edge with an unwalkable endpoint.
+        if (selectedRevision === 377 && (!finder.walkable(f.x, f.z, f.level) || !finder.walkable(t.x, t.z, t.level))) {
+            edgeData.disabledReason = 'The content-defined stair approach or landing is not walkable in this collision pack.';
+        }
+        snapped.push({ edge: edgeData, landing: landing ?? f });
     }
     const seen = new Set<string>();
     const edges: PricedTransportEdgeData[] = [];
-    const key = (e: PricedTransportEdgeData): string => `${e.from.x},${e.from.z},${e.from.level}>${e.to.x},${e.to.z},${e.to.level}`;
-    const add = (e: PricedTransportEdgeData): void => {
+    const transitionKey = (e: Pick<PricedTransportEdgeData, 'from' | 'to'>): string =>
+        `${e.from.x},${e.from.z},${e.from.level}>${e.to.x},${e.to.z},${e.to.level}`;
+    const key = (e: PricedTransportEdgeData & { scriptHandler?: string; scriptSource?: NavPoint }): string => {
+        const source = e.scriptSource;
+        return `${transitionKey(e)}:${e.action}:${e.scriptHandler ?? ''}:${source ? `${source.x},${source.z},${source.level}` : ''}`;
+    };
+    const add = (e: PricedTransportEdgeData & { scriptHandler?: string; scriptSource?: NavPoint }): void => {
         const k = key(e);
         if (!seen.has(k)) {
             seen.add(k);
@@ -353,37 +375,42 @@ function snapAndReverse(finder: PathFinder, curated: PricedTransportEdgeData[], 
     for (const { edge: e } of snapped) {
         add({ ...e, kind: edgeKind(e) });
     }
+    // Why: 377 scripts define each movement direction; a synthesized reverse can land on a snapped loc coordinate the content never teleports to.
     for (const { edge: e, landing } of snapped) {
-        if (changesFloor(e) && /-(up|down)/i.test(e.action)) {
+        if (selectedRevision === 289 && changesFloor(e) && /-(up|down)/i.test(e.action)) {
             const reverse: PricedTransportEdgeData = { from: e.to, to: landing, locName: e.locName, action: reverseAction(e.action), kind: edgeKind(e), extraTicks: e.extraTicks };
-            const disabledReason = selectedRevision === 289 ? DISABLED_AUTO_REVERSES.get(key(reverse)) : undefined;
+            const disabledReason = DISABLED_AUTO_REVERSES.get(transitionKey(reverse));
             add(disabledReason ? { ...reverse, disabledReason } : reverse);
         }
     }
 
     const tileKey = (p: NavPoint): string => `${p.x},${p.z},${p.level}`;
-    const curatedFromsByDest = new Map<string, Set<string>>();
-    for (const c of curated) {
-        if (c.from.level === c.to.level) {
-            continue;
-        }
-        const dk = tileKey(c.to);
-        let froms = curatedFromsByDest.get(dk);
-        if (!froms) {
-            froms = new Set<string>();
-            curatedFromsByDest.set(dk, froms);
-        }
-        froms.add(tileKey(c.from));
-    }
     let supersededDropped = 0;
-    const kept = edges.filter(e => {
-        const froms = curatedFromsByDest.get(tileKey(e.to));
-        if (froms && !froms.has(tileKey(e.from))) {
-            supersededDropped++;
-            return false;
+    let kept = edges;
+    // Why: 377 content-script destinations are authoritative, even when a legacy curated edge reaches the same landing from another source.
+    if (selectedRevision !== 377) {
+        const curatedFromsByDest = new Map<string, Set<string>>();
+        for (const c of curated) {
+            if (c.from.level === c.to.level) {
+                continue;
+            }
+            const dk = tileKey(c.to);
+            let froms = curatedFromsByDest.get(dk);
+            if (!froms) {
+                froms = new Set<string>();
+                curatedFromsByDest.set(dk, froms);
+            }
+            froms.add(tileKey(c.from));
         }
-        return true;
-    });
+        kept = edges.filter(e => {
+            const froms = curatedFromsByDest.get(tileKey(e.to));
+            if (froms && !froms.has(tileKey(e.from))) {
+                supersededDropped++;
+                return false;
+            }
+            return true;
+        });
+    }
     return { edges: kept, dropped, supersededDropped };
 }
 
@@ -406,7 +433,7 @@ function main(): void {
     }
     const { configs } = loadLocTypes(engine, revision);
     const prices = revision === 377 ? loadStairPrices() : null;
-    const edges: PricedTransportEdgeData[] = [];
+    const edges: RawStairEdgeData[] = [];
 
     if (prices) {
         for (const [handler, price] of Object.entries(prices.handlers)) {
@@ -435,7 +462,11 @@ function main(): void {
             stairsSkipped++;
             continue;
         }
-        edges.push(edge(s.from, s.to, def.name ?? s.debugname, action, extraTicks));
+        const scriptedEdge: RawStairEdgeData = { ...edge(s.from, s.to, def.name ?? s.debugname, action, extraTicks), scriptHandler: s.debugname, scriptSource: s.from, scriptOp: s.op };
+        if (s.coordOffset) {
+            scriptedEdge.coordOffset = s.coordOffset;
+        }
+        edges.push(scriptedEdge);
         stairsCases++;
     }
 

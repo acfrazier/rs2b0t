@@ -232,21 +232,27 @@ def resolve_source_loc(
     spatial: dict[tuple[int, int, int], list[Placement]],
     allowed_stair_debugs: set[str],
     revision: int,
+    script_handler: str | None = None,
+    script_source: dict | None = None,
 ) -> tuple[LocConfig, Placement] | None:
     wanted_name = normalized(edge.get("locName"))
     wanted_action = normalized(edge.get("action"))
     kind = normalized(edge.get("kind"))
     ranked: list[tuple[float, float, float, int, int, LocConfig, Placement]] = []
+    script_ranked: list[tuple[float, float, float, int, int, LocConfig, Placement]] = []
 
     source = edge["from"]
+    candidate_source = script_source if script_source is not None else source
     destination = edge["to"]
     span = max(abs(destination["x"] - source["x"]), abs(destination["z"] - source["z"]))
-    # Why: local crossings use the midpoint, but long transports need a loc near the source.
-    use_midpoint = kind in {"door", "gate", "stair"} and span <= 8
+    # Why: a script's loc_coord may be any tile within a multi-tile placement's footprint.
+    use_midpoint = script_source is None and kind in {"door", "gate", "stair"} and span <= 8
     midpoint_x = (source["x"] + destination["x"]) / 2
     midpoint_z = (source["z"] + destination["z"]) / 2
 
-    for distance, placement in candidates_near(spatial, edge["from"]):
+    for distance, placement in candidates_near(spatial, candidate_source, 2 if script_source is not None else 4):
+        if script_source is not None and placement.level != script_source["level"]:
+            continue
         placed_config = configs.get(placement.loc_id)
         if not placed_config:
             continue
@@ -257,7 +263,11 @@ def resolve_source_loc(
             variants.extend(config for config in configs.values() if config.debug_name == open_debug)
 
         for config in variants:
-            if kind == "stair" and config.debug_name not in allowed_stair_debugs:
+            script_handler_match = script_handler is None or config.debug_name == script_handler
+            if script_handler is not None and not script_handler_match and script_source is None:
+                continue
+            script_handler_alias = script_handler is not None and not script_handler_match
+            if kind == "stair" and config.debug_name not in allowed_stair_debugs and not script_handler_alias:
                 continue
             display = normalized(config.display_name)
             debug = normalized(config.debug_name)
@@ -288,6 +298,8 @@ def resolve_source_loc(
             elif not (name_match or action_match):
                 continue
             score = 0
+            if script_handler_match:
+                score += 50
             if name_match:
                 score += 100
             if action_match:
@@ -302,10 +314,16 @@ def resolve_source_loc(
             proximity = corridor_distance if use_midpoint else distance
             score -= proximity * 6
             # Why: Chebyshev distance ties two placements that sit one tile orthogonally and one tile diagonally from the stand (the Gu'Tanoth battlements at 2507,3011 and 2507,3012); the straight-line distance picks the one the stand is beside instead of the first one scanned.
-            reference_x, reference_z = (midpoint_x, midpoint_z) if use_midpoint else (source["x"], source["z"])
+            reference_x, reference_z = (midpoint_x, midpoint_z) if use_midpoint else (candidate_source["x"], candidate_source["z"])
             straight_line = (placement.x - reference_x) ** 2 + (placement.z - reference_z) ** 2
-            ranked.append((score, -proximity, -straight_line, -distance, -placement.loc_id, config, placement))
+            candidate = (score, -proximity, -straight_line, -distance, -placement.loc_id, config, placement)
+            if script_handler is not None and script_handler_match:
+                script_ranked.append(candidate)
+            else:
+                ranked.append(candidate)
 
+    if script_ranked:
+        ranked = script_ranked
     if not ranked:
         return None
     ranked.sort(key=lambda item: item[:5], reverse=True)
@@ -372,6 +390,44 @@ def closed_open_loc_ids(
     return closed_id, open_id
 
 
+def switch_coord_blocks(body: str) -> list[tuple[int, int]]:
+    """Return each non-nested switch_coord block's inclusive-start/exclusive-end range."""
+    opener_re = re.compile(r"\bswitch_coord\s*\([^)]*\)\s*\{", re.IGNORECASE)
+    blocks: list[tuple[int, int]] = []
+    covered_through = -1
+    for match in opener_re.finditer(body):
+        if match.start() < covered_through:
+            continue
+        open_brace = match.end() - 1
+        depth = 0
+        quoted = False
+        escaped = False
+        for index in range(open_brace, len(body)):
+            char = body[index]
+            if quoted:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    quoted = False
+                continue
+            if char == '"':
+                quoted = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    end = index + 1
+                    blocks.append((match.start(), end))
+                    covered_through = end
+                    break
+        else:
+            raise ValueError("Unclosed switch_coord block in content handler")
+    return blocks
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--content", type=Path, required=True)
@@ -389,15 +445,77 @@ def main() -> None:
     # Include quest ladders with oploc handlers, but exclude decorative ladders.
     allowed_stair_debugs: set[str] = set()
     movement_handler_ops: set[tuple[str, int]] = set()
-    oploc_re = re.compile(r"^\[oploc([1-5]),([a-z0-9_]+)]", re.MULTILINE)
+    unscoped_movement_ops: set[tuple[str, int]] = set()
+    declared_handler_ops: set[tuple[str, int]] = set()
+    header_re = re.compile(r"^\[([^\]]+)]([ \t].*)?$", re.MULTILINE)
+    oploc_re = re.compile(r"^oploc([1-5]),([a-z0-9_]+)$")
     oplocu_re = re.compile(r"^\[oplocu,([a-z0-9_]+)]", re.MULTILINE)
+    label_re = re.compile(r"^label,([a-zA-Z0-9_]+)$")
+    movement_call_re = re.compile(r"(?:[@~][ \t]*)?(?:p_telejump|p_teleport|climb_ladder|stair_options|ladder_options)\s*\(", re.IGNORECASE)
+    label_call_re = re.compile(r"@([a-zA-Z0-9_]+)")
+    line_comment_re = re.compile(r"//[^\n]*")
+    case_re = re.compile(r"case\s+(default|\d+_\d+_\d+_\d+_\d+)\s*:", re.IGNORECASE)
     use_handlers: set[str] = set()
+    handler_bodies: dict[tuple[str, int], list[str]] = {}
+    labels: dict[str, list[str]] = {}
+    scripted_op_sources: dict[tuple[str, int], set[tuple[int, int, int]]] = {}
     for script in (args.content / "scripts").rglob("*.rs2"):
         text = script.read_text(encoding="utf-8")
-        handlers = {(name, int(option)) for option, name in oploc_re.findall(text)}
-        movement_handler_ops.update(handlers)
-        allowed_stair_debugs.update(name for name, _ in handlers)
+        headers = list(header_re.finditer(text))
+        for index, header in enumerate(headers):
+            name = header.group(1)
+            trailer = (header.group(2) or "").strip()
+            body_start = header.end()
+            body_end = headers[index + 1].start() if index + 1 < len(headers) else len(text)
+            body = (trailer + "\n" if trailer else "") + text[body_start:body_end]
+            if match := oploc_re.fullmatch(name):
+                key = (match.group(2), int(match.group(1)))
+                declared_handler_ops.add(key)
+                allowed_stair_debugs.add(key[0])
+                handler_bodies.setdefault(key, []).append(body)
+            elif match := label_re.fullmatch(name):
+                labels.setdefault(match.group(1), []).append(body)
+
         use_handlers.update(oplocu_re.findall(text))
+
+    def has_movement(body: str, visiting: frozenset[str] = frozenset()) -> bool:
+        uncommented = line_comment_re.sub("", body)
+        if movement_call_re.search(uncommented):
+            return True
+        for label in label_call_re.findall(uncommented):
+            if label not in visiting and any(has_movement(candidate, visiting | {label}) for candidate in labels.get(label, [])):
+                return True
+        return False
+
+    for key, bodies in handler_bodies.items():
+        for body in bodies:
+            if has_movement(body):
+                movement_handler_ops.add(key)
+            uncommented_body = line_comment_re.sub("", body)
+            switch_blocks = switch_coord_blocks(uncommented_body)
+            for switch_start, switch_end in switch_blocks:
+                open_brace = uncommented_body.index("{", switch_start, switch_end)
+                switch_body = uncommented_body[open_brace + 1:switch_end - 1]
+                cases = list(case_re.finditer(switch_body))
+                for index, case in enumerate(cases):
+                    body_end = cases[index + 1].start() if index + 1 < len(cases) else len(switch_body)
+                    if not has_movement(switch_body[case.end():body_end]):
+                        continue
+                    case_coord = case.group(1)
+                    if case_coord.lower() == "default":
+                        unscoped_movement_ops.add(key)
+                        continue
+                    level, map_x, map_z, local_x, local_z = map(int, case_coord.split("_"))
+                    scripted_op_sources.setdefault(key, set()).add((level, map_x * 64 + local_x, map_z * 64 + local_z))
+
+            # Movement after a switch_coord block is not scoped by its last case.
+            cursor = 0
+            for switch_start, switch_end in switch_blocks:
+                if has_movement(uncommented_body[cursor:switch_start]):
+                    unscoped_movement_ops.add(key)
+                cursor = switch_end
+            if has_movement(uncommented_body[cursor:]):
+                unscoped_movement_ops.add(key)
     allowed_stair_debugs.update({"laddertop", "ladder", "laddermiddle", "laddertop_directional", "ladder_directional"})
     data_dir = args.rs2b0t / "src" / "bot" / "event" / "webwalk" / "data"
     curated = json.loads((data_dir / "transports.json").read_text(encoding="utf-8"))
@@ -413,12 +531,50 @@ def main() -> None:
             if normalized(option) == wanted
         ]
 
-    def disable_unhandled_movement(edge: dict, config: LocConfig | None) -> bool:
+    def disable_unhandled_movement(
+        edge: dict,
+        config: LocConfig | None,
+        require_movement: bool = False,
+        script_handler: str | None = None,
+        script_source: dict | None = None,
+        script_op: int | None = None,
+    ) -> bool:
         if revision != 377 or edge.get("kind") not in {"stair", "dungeon"} or edge.get("disabledReason"):
             return False
-        handler = config.debug_name if config is not None else None
-        if handler and any((handler, op) in movement_handler_ops for op in matching_options(config, edge.get("action"))):
+        if (
+            require_movement
+            and config is not None
+            and script_handler == config.debug_name
+            and script_source is not None
+            and script_op is not None
+            and (script_source.get("level"), script_source.get("x"), script_source.get("z"))
+            in scripted_op_sources.get((script_handler, script_op), set())
+        ):
             return False
+        handler = config.debug_name if config is not None else None
+        available_handlers = movement_handler_ops if require_movement else declared_handler_ops
+        matching_ops = [op for op in matching_options(config, edge.get("action")) if handler and (handler, op) in available_handlers]
+        if matching_ops:
+            if require_movement:
+                source = (
+                    script_source.get("level") if script_source is not None else edge.get("from", {}).get("level"),
+                    script_source.get("x") if script_source is not None else edge.get("locX"),
+                    script_source.get("z") if script_source is not None else edge.get("locZ"),
+                )
+                source_matches = False
+                has_unscoped_handler = False
+                for op in matching_ops:
+                    if (handler, op) in unscoped_movement_ops:
+                        has_unscoped_handler = True
+                    sources = scripted_op_sources.get((handler, op))
+                    if sources is None:
+                        has_unscoped_handler = True
+                    elif source in sources:
+                        source_matches = True
+                if script_handler in {None, handler} and (source_matches or has_unscoped_handler):
+                    return False
+            else:
+                return False
         # Why: a crossing opened by using an item (Dig with a spade on the Plague City mud patch) is an oplocu handler, and its action is not one of the loc's own options.
         placed = configs.get(edge.get("locId", -1))
         if (
@@ -428,9 +584,43 @@ def main() -> None:
             and normalized(edge.get("action")) not in {normalized(option) for option in option_values(placed)}
         ):
             return False
-        edge["disabledReason"] = "No matching revision 377 OPLOC handler for this location action."
+        edge["disabledReason"] = "No revision 377 OPLOC movement handler for this location action."
         edge.pop("extraTicks", None)
         return True
+
+    # Why: a script handler can name a movement case while the map uses a revision-specific loc ID.
+    def script_handler_matches(
+        config: LocConfig | None,
+        script_handler: str | None,
+        script_source: dict | None = None,
+        edge: dict | None = None,
+    ) -> bool:
+        if script_handler is None:
+            return True
+        if config is None:
+            return False
+        if script_handler == config.debug_name:
+            return True
+        if script_source is None or edge is None:
+            return False
+        source = (script_source.get("level"), script_source.get("x"), script_source.get("z"))
+        for op in matching_options(config, edge.get("action")):
+            key = (config.debug_name, op)
+            if key in declared_handler_ops and key not in movement_handler_ops:
+                return False
+            if key in unscoped_movement_ops:
+                return False
+            if key in movement_handler_ops:
+                sources = scripted_op_sources.get(key)
+                if sources is None or source in sources:
+                    return False
+        loc_x, loc_z = edge.get("locX"), edge.get("locZ")
+        return (
+            edge.get("from", {}).get("level") == script_source.get("level")
+            and isinstance(loc_x, int)
+            and isinstance(loc_z, int)
+            and max(abs(loc_x - script_source["x"]), abs(loc_z - script_source["z"])) <= 2
+        )
 
     def apply_price(edge: dict) -> None:
         debug_name = edge.get("debugName")
@@ -455,10 +645,13 @@ def main() -> None:
         elif revision == 377 and edge.get("kind") in {"stair", "dungeon"}:
             raise RuntimeError(f"Unpriced movement handler '{debug_name}'")
 
-    def enrich(edges: list[dict]) -> list[dict]:
+    def enrich(edges: list[dict], require_stair_movement: bool = False) -> list[dict]:
         enriched: list[dict] = []
         for raw in edges:
             edge = dict(raw)
+            script_handler = edge.pop("scriptHandler", None)
+            script_source = edge.pop("scriptSource", None)
+            script_op = edge.pop("scriptOp", None)
             existing = configs.get(edge.get("locId", -1))
             source_backed_ladder = existing is not None and (
                 normalized(existing.display_name) == "ladder"
@@ -466,14 +659,16 @@ def main() -> None:
             )
             # Keep ladder placements derived from handlers; refresh metadata for all other edges.
             if source_backed_ladder and all(field in edge for field in ("locId", "locX", "locZ", "debugName", "options")):
-                if disable_unhandled_movement(edge, existing):
+                if require_stair_movement and not script_handler_matches(existing, script_handler, script_source, edge):
+                    continue
+                if disable_unhandled_movement(edge, existing, require_stair_movement, script_handler, script_source, script_op):
                     enriched.append(edge)
                     continue
                 apply_price(edge)
                 enriched.append(edge)
                 continue
             action_config = None
-            resolved = resolve_source_loc(edge, configs, spatial, allowed_stair_debugs, revision)
+            resolved = resolve_source_loc(edge, configs, spatial, allowed_stair_debugs, revision, script_handler, script_source)
             if resolved:
                 config, placement = resolved
                 action_config = config
@@ -489,7 +684,9 @@ def main() -> None:
                     edge.pop("openLocId", None)
             else:
                 edge["options"] = [edge["action"]]
-            if disable_unhandled_movement(edge, action_config):
+            if require_stair_movement and not script_handler_matches(action_config, script_handler, script_source, edge):
+                continue
+            if disable_unhandled_movement(edge, action_config, require_stair_movement, script_handler, script_source, script_op):
                 enriched.append(edge)
                 continue
             apply_price(edge)
@@ -497,7 +694,8 @@ def main() -> None:
         return enriched
 
     enriched_curated = enrich(curated)
-    enriched_stairs = enrich(stairs)
+    # Why: generic script rows must not become active at placements whose own handler has no matching movement case.
+    enriched_stairs = enrich(stairs, require_stair_movement=True)
 
     def write_json(path: Path, edges: list[dict]) -> None:
         text = "[\n" + ",\n".join("    " + json.dumps(edge, separators=(",", ":")) for edge in edges) + "\n]\n"

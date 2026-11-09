@@ -15,10 +15,11 @@ export interface StairCase {
     to: NavPoint;
     debugname: string;
     op: number;
+    coordOffset?: NavPoint;
 }
 
 const CASE_RE = /case\s+(\d+_\d+_\d+_\d+_\d+)\s*:\s*p_telejump\(\s*(movecoord\([^)]*\)|\d+(?:_\d+)+)\s*\)/g;
-const MOVECOORD_RE = /^movecoord\(\s*(?:loc_)?coord\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/;
+const MOVECOORD_RE = /^movecoord\(\s*(loc_coord|coord)(?:\(\s*\))?\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/;
 const LITERAL_RE = /^\d+(?:_\d+)+$/;
 
 export function parseSwitchStairs(text: string): StairCase[] {
@@ -38,7 +39,14 @@ export function parseSwitchStairs(text: string): StairCase[] {
             const dest = c[2].trim();
             const mv = MOVECOORD_RE.exec(dest);
             if (mv) {
-                out.push({ from, to: applyMovecoord(from, [Number(mv[1]), Number(mv[2]), Number(mv[3])]), debugname, op });
+                const dx = Number(mv[2]);
+                const deltaLevel = Number(mv[3]);
+                const dz = Number(mv[4]);
+                const row: StairCase = { from, to: applyMovecoord(from, [dx, deltaLevel, dz]), debugname, op };
+                if (mv[1] === 'coord') {
+                    row.coordOffset = { x: dx, z: dz, level: deltaLevel };
+                }
+                out.push(row);
             } else if (LITERAL_RE.test(dest)) {
                 out.push({ from, to: decodeCoord(dest), debugname, op });
             }

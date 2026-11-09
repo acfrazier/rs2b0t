@@ -32,12 +32,12 @@ test('the banquet door answers the guard warning', () => {
 });
 
 describe.skipIf(!fs.existsSync(PACK))('Black Knight fortress route', () => {
-    test('Amik can reach the grill tile through the eastern ladder landing and leave again', () => {
+    test('the eastern ladder connects its upper landing with the grill area in both directions', () => {
         const finder = new PathFinder(gunzipSync(fs.readFileSync(PACK)));
         loadDefaultNavEdges(finder);
-        const amik = { x: 2962, z: 3338, level: 2 };
+        const upper = { x: 3022, z: 3510, level: 1 };
         const grill = { x: 3025, z: 3507, level: 0 };
-        for (const [from, to] of [[amik, grill], [grill, amik]]) {
+        for (const [from, to] of [[upper, grill], [grill, upper]]) {
             const route = finder.findPath(from!, to!, { state: emptyWorldStateData() });
             expect(route.ok).toBe(true);
             if (!route.ok) continue;

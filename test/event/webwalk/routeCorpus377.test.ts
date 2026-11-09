@@ -58,7 +58,7 @@ describe('revision-377 offline route corpus', () => {
     });
 
     test('prices the 377 Wizard Tower stairs, trapdoor, and quest-gated telejump edges', () => {
-        const edges = [...(transportsJson as PricedTransportEdge[]), ...(stairsJson as PricedTransportEdge[])];
+        const edges = stairsJson as PricedTransportEdge[];
         const wizardStair = (locId: number, fromLevel: number, action: string) =>
             edges.find(edge => edge.locId === locId && edge.from.level === fromLevel && edge.action === action);
         const lower = wizardStair(12536, 0, 'Climb-up');
@@ -66,13 +66,13 @@ describe('revision-377 offline route corpus', () => {
         const upper = wizardStair(12538, 2, 'Climb-down');
 
         expect(lower).toMatchObject({
-            from: { x: 3105, z: 3160, level: 0 },
-            to: { x: 3105, z: 3160, level: 1 },
+            from: { x: 3103, z: 3161, level: 0 },
+            to: { x: 3104, z: 3161, level: 1 },
             kind: 'stair',
             extraTicks: 0
         });
         expect(middle).toMatchObject({
-            // The loc stands at 1_48_49_31_23 (3103,3159); the walker's cardinal goals accept 3103,3158 and 3103,3161, and the generator takes the one nearest the placement, which is the tile the upper stair drops you on.
+            // The loc stands at 1_48_49_31_23 (3103,3159); collision picks 3103,3158 as the nearest cardinal approach, and the script teleports to (3104,3161,L2).
             from: { x: 3103, z: 3158, level: 1 },
             to: { x: 3104, z: 3161, level: 2 },
             kind: 'stair',
@@ -80,7 +80,7 @@ describe('revision-377 offline route corpus', () => {
         });
         expect(upper).toMatchObject({
             from: { x: 3104, z: 3161, level: 2 },
-            to: { x: 3103, z: 3158, level: 1 },
+            to: { x: 3104, z: 3161, level: 1 },
             kind: 'stair',
             extraTicks: 0
         });
