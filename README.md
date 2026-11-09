@@ -9,7 +9,7 @@ the screen, so a bot's packets match a human click byte for byte.
 |---|---|
 | Revision | 289 (~2004) on `main`; 377 (~2006) on `rev377` |
 | Supported target | [rs2b2t](https://rs2b2t.com), a 2004scape anarchy fork |
-| Local dev engine | 289: [LostCityRS](https://github.com/LostCityRS) Engine-TS + Content (branch `289`); 377: matching Engine-TS + Content (branch `rs2-r377`) |
+| Local dev engine | 289: [LostCityRS](https://github.com/LostCityRS) Engine-TS + Content (branch `289`); 377: matching engine and content checkouts are not published publicly; request them from the project operator. |
 | Unsupported targets | the pure Lost City and 2004scape projects |
 | Hosted client | https://w1.rs2b2t.com/rs2b0t |
 | Hosted MultiBox wall | https://w1.rs2b2t.com/rs2b0t/wall |
@@ -46,7 +46,7 @@ tab is throttled by the browser, which starves every bot in it.
 
 ## Quick start
 
-Requires [Bun](https://bun.sh), Node 24+, and a local game engine to deploy into.
+Requires [Bun 1.4.4](https://bun.sh) (the CI-pinned version), Node 24+, and a local game engine to deploy into.
 
 1. `bun install`
 2. `./tools/deploy-local-key.sh /path/to/engine`

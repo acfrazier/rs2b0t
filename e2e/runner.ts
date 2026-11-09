@@ -1,4 +1,4 @@
-/** E2E runner for offline gates and browser harnesses. */
+/** E2E runner for local gates and browser harnesses. */
 // Deploys once and compares the report with the previous run.
 
 // Usage:
@@ -6,7 +6,7 @@
 //   bun run e2e -- --level smart    # only what the working diff can affect
 //   bun run e2e -- --level full     # every harness, quests included
 //   bun run e2e -- --only troll,horror
-//   bun run e2e -- --gates-only     # offline gates, no engine needed
+//   bun run e2e -- --gates-only     # packed 377 inputs required; no running game server
 //   bun run e2e -- --verbose        # stream every child line
 //   bun run e2e -- --level full --jobs 6   # every harness, six at a time
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

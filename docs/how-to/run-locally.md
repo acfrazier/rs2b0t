@@ -11,21 +11,20 @@ Production target is [rs2b2t](https://rs2b2t.com) only.
 
 | Need | Why |
 |---|---|
-| [Bun](https://bun.sh) | builds and tests this repo |
-| Node 24+ | the engine runs on it, as do the Electron and Playwright harnesses |
+| [Bun 1.4.4](https://bun.sh) | The CI workflow pins this version. |
+| Node 24+ | Runs the engine, Electron, and Playwright harnesses. |
 
 ## Choose an engine
 
 A build has one client revision. The client branch selects it. `TARGET` selects the network
 and login-key behavior, not the client revision.
 
-| Client branch | Engine and content branch | Revision |
+| Client branch | Matching engine and content | Revision |
 |---|---|---:|
-| `main` | `289` | 289 |
-| `rev377` | `rs2-r377` | 377 |
+| `main` | Public LostCityRS Engine-TS and Content checkouts on branch `289`. | 289 |
+| `rev377` | Not published publicly; use matching checkouts supplied by the project operator. | 377 |
 
-Use matching client, engine, and content revisions. Keep engine and content as sibling
-directories because Engine-TS reads content from `../content`.
+Keep engine and content as sibling directories because Engine-TS reads content from `../content`.
 
 ### Start a revision-289 engine
 
@@ -55,34 +54,36 @@ does not mean the game port is bound.
 
 ### Use the revision-377 engine
 
-Use the client branch `rev377` with the matching 377 Engine-TS and Content checkouts on
-`rs2-r377`. Use the engine and content commits recorded in `data/manifest.json`. Do not
-pair a 289 client with the 377 engine or content.
+The public client contains 377-derived data, but it does not publish the 377 engine or
+content source. Obtain matching 377 checkouts from the project operator. Set `ENGINE_DIR`
+and `CONTENT_DIR` to their roots for local gates. Match their commits to `data/manifest.json`.
+Do not pair a 289 client with 377 inputs.
 
 ## Regenerate revision-377 data
 
-From the client root, set the engine and content variables to matching 377 repository paths
-or clone URLs. Set `GEN377_WORK` to a disposable directory outside this checkout. The helper
-pins the engine and content commits, regenerates the data, and verifies the manifest. After
-cutover, the helper writes generated files at their final paths.
+From the client root, set `GEN377_ENGINE_REPO` and `GEN377_CONTENT_REPO` to operator-provided
+local checkouts or authenticated clone sources. The helper pins engine and content commits.
+It defaults to Node 26.13.0 and Bun 1.4.4. See [revision-377 data and local gates](revision-377-data.md)
+for the regeneration command, setup, and current gate status.
+
+### Run the local 377 gate
+
+Set `ENGINE_DIR` and `CONTENT_DIR` to matching 377 checkouts with a packed cache. The gate
+does not start a game server. Unit-test input skips are reported but do not fail the
+unit-test gate alone. Drift gates fail on command errors, stale output, a missing clean
+marker, or a skipped required local input.
+
+The current receipt remains open for milestone M. See the linked page for its failures and
+the collision-pack prerequisite.
+
+Run from the client root:
 
 ```sh
-GEN377_WORK=/path/to/377-data-work \
-GEN377_ENGINE_REPO=/path/to/engine \
-GEN377_CONTENT_REPO=/path/to/content \
-bash tools/gen-377-data.sh
+ENGINE_DIR=/path/to/377-engine CONTENT_DIR=/path/to/377-content bun run e2e -- --gates-only
 ```
 
-Run the local-only gate with matching 377 engine and content checkouts in `ENGINE_DIR` and
-`CONTENT_DIR`. It runs offline unit tests, typecheck, lint, generator `--check` commands, and
-manifest verification. A command error, stale output, or skipped local input fails the gate.
-
-```sh
-ENGINE_DIR=/path/to/engine CONTENT_DIR=/path/to/content bun run e2e -- --gates-only
-```
-
-Hosted CI lacks these 377 inputs. It cannot replace this gate. See [build and data
-plumbing](build-and-data.md).
+Hosted CI has no 377 engine or content inputs. It cannot replace this gate. See
+[build and data plumbing](build-and-data.md).
 
 ## Deploy the client
 
@@ -93,7 +94,7 @@ plumbing](build-and-data.md).
    ./tools/deploy-local-key.sh /path/to/engine
    ```
 
-For a preconfigured engine, run `ENGINE_DIR=/path/to/engine sh tools/deploy-local.sh` instead.
+To set the engine's public key values yourself, run `LOCAL_RSAE=<exponent> LOCAL_RSAN=<modulus> ENGINE_DIR=/path/to/engine sh tools/deploy-local.sh`. See [Local login key](../reference/build-targets.md#local-login-key) for how to derive both values.
 
 `tools/deploy-local.sh` requires `$ENGINE_DIR/public` to exist, then builds the stock
 and bot clients, builds the collision pack from that engine's map data if
@@ -123,6 +124,13 @@ The test, lint, format and smoke commands, plus what `bunfig.toml` preloads: [te
 ## Build and data plumbing
 
 `bun run build:all-targets`, the manifest, the `data/377/` cutover and the skip groups: [build and data](build-and-data.md).
+
+## Maintainer cheats
+
+On local test engines with `staffModLevel` 4, use `::tele 0,mx,mz,lx,lz`,
+`::~maxme`, and `::give <objname> <count>`. Use `cert_<objname>` for notes.
+The level-up dialogs raised by `::~maxme` swallow the next typed command. Clear
+those dialogs before you enter another command.
 
 ## See also
 
