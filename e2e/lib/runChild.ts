@@ -35,8 +35,27 @@ export async function run(label: string, cmd: string[], logFile: string, budgetM
     const timer = setTimeout(() => proc.kill(9), budgetMs);
     const log = Bun.file(logFile).writer();
     const lines: string[] = [];
+    const verdictLines: string[] | null = verdict === undefined ? null : [];
     let last = '';
     let beat = Date.now();
+
+    const recordLine = (line: string, terminated: boolean): void => {
+        log.write(terminated ? `${line}\n` : line);
+        lines.push(line);
+        if (lines.length > 400) lines.shift();
+        verdictLines?.push(line);
+
+        const clean = line.trim();
+        if (!clean) return;
+        last = clean;
+        if (VERBOSE) {
+            if (TTY) process.stdout.write('\r\u001b[2K');
+            console.log(`     ${clean}`.slice(0, (process.stdout.columns || 100) - 1));
+        } else if (TTY || Date.now() - beat > HEARTBEAT_MS) {
+            beat = Date.now();
+            statusLine(label, started, clean);
+        }
+    };
 
     const pump = async (stream: ReadableStream<Uint8Array>): Promise<void> => {
         const decoder = new TextDecoder();
@@ -48,22 +67,10 @@ export async function run(label: string, cmd: string[], logFile: string, budgetM
             buf += decoder.decode(value, { stream: true });
             const parts = buf.split('\n');
             buf = parts.pop() ?? '';
-            for (const line of parts) {
-                log.write(`${line}\n`);
-                lines.push(line);
-                if (lines.length > 400) lines.shift();
-                const clean = line.trim();
-                if (!clean) continue;
-                last = clean;
-                if (VERBOSE) {
-                    if (TTY) process.stdout.write('\r\u001b[2K');
-                    console.log(`     ${clean}`.slice(0, (process.stdout.columns || 100) - 1));
-                } else if (TTY || Date.now() - beat > HEARTBEAT_MS) {
-                    beat = Date.now();
-                    statusLine(label, started, clean);
-                }
-            }
+            for (const line of parts) recordLine(line, true);
         }
+        buf += decoder.decode();
+        if (buf.length > 0) recordLine(buf, false);
     };
 
     const ticker = TTY && !VERBOSE ? setInterval(() => statusLine(label, started, last), 1000) : null;
@@ -75,7 +82,7 @@ export async function run(label: string, cmd: string[], logFile: string, budgetM
     await log.end();
 
     const ms = Date.now() - started;
-    const text = lines.join('\n');
+    const text = verdictLines?.join('\n') ?? '';
     const timedOut = ms >= budgetMs - 1000;
     return { status: settle(timedOut, code, text, verdict), ms, tail: errorTail(lines) };
 }
