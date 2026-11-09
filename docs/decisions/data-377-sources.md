@@ -64,7 +64,7 @@ Rimmington also carries the new-series field (clay 9713 at (2986,3239), copper 9
 
 `mine.dbrow` names every rock per ore table: clay :12-20, copper :30-36, tin :46-54, iron :64-73, coal :83-92, gold :102-110, silver :120-126, mithril :136-142, adamantite :152-158, runite :168-174.
 `pack/loc.pack` maps each debugname to its id (`2091:2090=copperrock1`, `9709:9708=rocks_9708`). The new-series placements are the Rimmington, Crafting Guild and Barbarian Village fields (decoded from engine `data/pack/.cache/maps-server.zip`).
-The 377 pack and `mine.dbrow:174` define `rocks_14861` as a runite rock, but no canon-1108 map places it; keep the table entry distinct from placed camp fields.
+The 377 pack and `mine.dbrow:174` define `rocks_14861` as a runite rock, but no pinned 377 map places it; keep the table entry distinct from placed camp fields.
 289 had only the classic block, so a camp's ore list can no longer assume two ids per ore.
 
 Gas rocks: `mine.dbrow` lists each `macro_*rock` beside its ore: :32-33 copper, :48-49 tin, :66-67 iron, :85-86 coal, :104-105 gold, :125-126 silver, :138-139 mithril, :154-155 adamantite, :170-171 runite, :14-15 clay, :186-187 blurite, :197-198 gem.

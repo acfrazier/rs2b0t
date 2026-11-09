@@ -693,9 +693,9 @@
     },
     {
       "path": "test/data/mining-rocks.test.ts",
-      "sha256": "a7b6c9883b09cb58ac9bd34d5c7c8d3ac6afaa3a8aab2fa3e550ee66d94e74a7",
+      "sha256": "825b94be1a8e3ab679d3f5536bc64ef7daf5d4de19db3c054448116b91448f15",
       "kind": "edition",
-      "qualification": "offline"
+      "qualification": "pending"
     },
     {
       "path": "test/data/nameCollisions.test.ts",
