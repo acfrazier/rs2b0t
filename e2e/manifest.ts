@@ -86,16 +86,18 @@ export const CASES: readonly Case[] = [
         id: 'l2-runemysteries-377-live',
         harness: 'l2-runemysteries-377-live.ts',
         covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: 'b9bdaf83',
         manual: true,
-        budgetMin: 60,
+        budgetMin: 75,
         note: 'L2 377 quest cell: three fresh accounts run Rune Mysteries through AIOQuester (quests=runemysteries, runUnqualified) with the labelled Mugger fixture (Attack/Strength/Defence/Hitpoints 40, five trout); watched runemysteries 0 -> 1 -> ... -> 6 and qp 0 -> 1 getvar timeline, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
     },
     {
         id: 'l2-doric-377-live',
         harness: 'l2-doric-377-live.ts',
         covers: { scripts: ['AIOQuester'], subsystems: ['quests'] },
-        status: 'unvetted',
+        status: 'vetted',
+        provenAt: '67070153',
         manual: true,
         budgetMin: 60,
         note: 'L2 377 quest cell: three fresh accounts with the labelled Mining 15 seed run Doric\'s Quest through AIOQuester (quests=doric, runUnqualified), mining 377 rocks 9708-9719 through miningRocks.ts; watched doricquest 0 -> 10 -> 100 and qp 0 -> 1 getvar timeline, +180 coins, Mining +1,300 reward XP, quest row and relog readbacks; requires ENGINE_DIR and L2_LIVE_EVIDENCE_DIR.'
