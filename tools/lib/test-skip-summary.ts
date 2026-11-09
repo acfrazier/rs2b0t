@@ -165,11 +165,10 @@ export function generateSkipSummary(junit: string, testLog: string, root = proce
         const explicit = reasonsByFile.get(file) ?? [];
         const gateInput = source?.match(/\bskipUnless\(\s*(['"])([^'"]+)\1\s*\)/)?.[2];
         const matching = gateInput ? explicit.filter(skip => skip.input === gateInput) : explicit;
+        const fileReasons = explicit.length > 0 ? `file-level SKIP reason(s): ${explicit.map(skip => skip.reason).join('; ')}` : null;
         const reason = source?.includes('skipUnless(')
-            ? matching.map(skip => skip.reason).join('; ') || source
-            : explicit.length > 0
-                ? `file-level SKIP reason(s): ${explicit.map(skip => skip.reason).join('; ')}`
-                : source;
+            ? matching.map(skip => skip.reason).join('; ') || (fileReasons ? `${source}; ${fileReasons}` : source)
+            : fileReasons ?? source;
         if (!reason) throw new Error(`Skipped testcase '${testCase.name}' in ${file} has no recorded reason or source skip condition`);
         return `- ${escapeSummaryText(file)}:${testCase.line ?? '?'} — ${escapeSummaryText(testCase.name)} — ${escapeSummaryText(reason)}`;
     });

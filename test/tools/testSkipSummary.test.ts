@@ -59,6 +59,24 @@ describe('generateSkipSummary', () => {
 
     });
 
+    test('keeps a file-level SKIP reason when the skipUnless gate input does not match it', () => {
+        source('test/gated/market.test.ts', [
+            "import { test } from 'bun:test';",
+            "(skipUnless('collision-pack') ? test.skip : skipped)('market gate route', () => {});"
+        ]);
+        const junit = `<?xml version="1.0"?>
+<testsuites name="bun test" skipped="1">
+  <testsuite name="market" file="test/gated/market.test.ts" line="1" tests="1" skipped="1">
+    <testcase name="market gate route" file="test/gated/market.test.ts" line="2"><skipped /></testcase>
+  </testsuite>
+</testsuites>`;
+        const log = 'SKIP: test/gated/market.test.ts: 377 data gap: loc 2411 is placed in no map file';
+        const row = generateSkipSummary(junit, log, root).split('\n').find(line => line.includes('market gate route'));
+
+        expect(row).toContain("skipUnless('collision-pack')");
+        expect(row).toContain('377 data gap: loc 2411 is placed in no map file');
+    });
+
     test('reports when the JUnit report has no skipped tests', () => {
         expect(generateSkipSummary('<testsuites></testsuites>', '', root)).toBe('## Skipped tests\n\nNone reported by the JUnit report.');
     });
