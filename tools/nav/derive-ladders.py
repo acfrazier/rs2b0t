@@ -396,56 +396,85 @@ def split_args(value: str) -> list[str]:
     return parts
 
 
-def resolve_expression(expression: str, placement: EffectivePlacement, stand: Target, body: str) -> Target | None:
+def resolve_expression(
+    expression: str,
+    placement: EffectivePlacement,
+    stand: Target,
+    body: str,
+    player_relative: list[bool] | None = None,
+    visiting: frozenset[str] = frozenset(),
+) -> Target | None:
     expression = expression.strip()
     direct = parse_coord(expression)
     if direct:
         return direct
+    if expression in {"coord", "coord()"}:
+        if player_relative is not None:
+            player_relative[0] = True
+        return stand
+    if expression in {"loc_coord", "loc_coord()"}:
+        return Target(placement.x, placement.z, placement.level)
     map_square = re.fullmatch(r"map_findsquare\s*\((.+)\)", expression, re.DOTALL)
     if map_square:
-        return parse_coord(split_args(map_square.group(1))[0])
+        return resolve_expression(split_args(map_square.group(1))[0], placement, stand, body, player_relative, visiting)
     move = re.fullmatch(r"movecoord\s*\((.+)\)", expression, re.DOTALL)
     if move:
         args = split_args(move.group(1))
         if len(args) != 4 or not all(re.fullmatch(r"-?\d+", value) for value in args[1:]):
             return None
-        base_name = re.sub(r"\s+", "", args[0])
-        base = Target(placement.x, placement.z, placement.level) if base_name in {"loc_coord", "loc_coord()"} else stand if base_name in {"coord", "coord()"} else None
+        base = resolve_expression(args[0], placement, stand, body, player_relative, visiting)
         if base is None:
             return None
         dx, dl, dz = map(int, args[1:])
         return Target(base.x + dx, base.z + dz, base.level + dl)
-    if re.fullmatch(r"\$[a-zA-Z0-9_]+", expression):
+    if re.fullmatch(r"\$[a-zA-Z0-9_]+", expression) and expression not in visiting:
         variable = re.escape(expression)
         assignments = re.findall(rf"{variable}\s*=\s*([^;]+);", body)
         if len(assignments) == 1:
-            return resolve_expression(assignments[0], placement, stand, body)
+            return resolve_expression(assignments[0], placement, stand, body, player_relative, visiting | {expression})
     return None
 
 
-def destinations(debug_name: str, body: str, placement: EffectivePlacement, stand: Target) -> tuple[list[Target], str | None]:
+def destinations(
+    debug_name: str,
+    body: str,
+    placement: EffectivePlacement,
+    stand: Target,
+    player_targets: set[Target] | None = None,
+) -> tuple[list[Target], str | None]:
     body = select_loc_coord_ifs(select_switch(select_switch(body, placement, "int"), placement, "coord"), placement)
 
     # Zanaris's ladder_from_cellar returns early with a special destination instead of z - 6400.
     if debug_name == "ladder_from_cellar":
         if coord_text(placement) == "0_50_149_22_52":
             return [Target(3201, 3169, 0)], None
-        return [Target(stand.x, stand.z - 6400, stand.level)], None
+        target = Target(stand.x, stand.z - 6400, stand.level)
+        if player_targets is not None:
+            player_targets.add(target)
+        return [target], None
 
     expressions = call_arguments(body, ("~climb_ladder", "p_teleport", "p_telejump"))
-    resolved = [target for expression in expressions if (target := resolve_expression(expression, placement, stand, body))]
-
+    resolved = []
+    for expression in expressions:
+        player_relative = [False]
+        target = resolve_expression(expression, placement, stand, body, player_relative)
+        if target:
+            resolved.append(target)
+            if player_relative[0] and player_targets is not None:
+                player_targets.add(target)
     # dragonshipladdertop2 uses a fixed fallback only when the usual landing is blocked.
     if not resolved and "$coord" in expressions:
         assignments = re.findall(r"\$coord\s*=\s*([^;]+);", body)
-        normal = resolve_expression(assignments[0], placement, stand, body) if assignments else None
+        normal_relative = [False]
+        normal = resolve_expression(assignments[0], placement, stand, body, normal_relative) if assignments else None
         fallback_match = re.search(r"\$coord\s*=\s*(\d+_\d+_\d+_\d+_\d+)\s*;", body)
         fallback = parse_coord(fallback_match.group(1)) if fallback_match else None
         if normal:
             resolved.append(normal)
+            if normal_relative[0] and player_targets is not None:
+                player_targets.add(normal)
         if fallback:
             resolved.append(fallback)
-
     unique = list(dict.fromkeys(resolved))
     if len(unique) > 1:
         if "p_choice" in body:
@@ -564,6 +593,7 @@ def pair_up_approaches(edges: list[dict], pack: CollisionPack) -> int:
 
     moved = 0
     for edge in edges:
+        coord_offset = edge.pop("_coordOffset", None)
         if "locX" not in edge or "locZ" not in edge:
             continue
         if edge["to"]["level"] <= edge["from"]["level"]:
@@ -588,6 +618,12 @@ def pair_up_approaches(edges: list[dict], pack: CollisionPack) -> int:
         if stands and (lx, lz) not in stands:
             continue
         edge["from"]["x"], edge["from"]["z"] = lx, lz
+        if coord_offset is not None:
+            edge["to"] = {
+                "x": lx + coord_offset["x"],
+                "z": lz + coord_offset["z"],
+                "level": edge["from"]["level"] + coord_offset["level"],
+            }
         moved += 1
     return moved
 
@@ -669,11 +705,13 @@ def main() -> None:
                 body = handlers.get((config.debug_name, op), "")
                 # Why: a climb lands on the climber's own x,z one level away, so of the tiles the server accepts the stand is the one whose landing is walkable (the Black Knights' banquet ladder lands inside a wall from its east side).
                 op_source = source
-                raw_targets, disabled_reason = destinations(config.debug_name, body, placement, source)
+                player_targets: set[Target] = set()
+                raw_targets, disabled_reason = destinations(config.debug_name, body, placement, source, player_targets)
                 for candidate in candidates:
-                    candidate_targets, candidate_reason = destinations(config.debug_name, body, placement, candidate)
+                    candidate_player_targets: set[Target] = set()
+                    candidate_targets, candidate_reason = destinations(config.debug_name, body, placement, candidate, candidate_player_targets)
                     if candidate_targets and all(collision.walkable(t.x, t.z, t.level) for t in candidate_targets):
-                        op_source, raw_targets, disabled_reason = candidate, candidate_targets, candidate_reason
+                        op_source, raw_targets, disabled_reason, player_targets = candidate, candidate_targets, candidate_reason, candidate_player_targets
                         break
                 if config.debug_name == "dragonshipladdertop2" and len(raw_targets) == 2:
                     normal, fallback = raw_targets
@@ -685,13 +723,21 @@ def main() -> None:
                     generated.append(make_edge(config, placement, action, op_source, op_source, disabled_reason, price))
                     continue
                 for raw_target in raw_targets:
-                    target = snap(collision, raw_target)
+                    # Why: 377 content teleports to this exact tile; snapping it invents a landing not present in the handler.
+                    target = raw_target if revision == 377 else snap(collision, raw_target)
                     reason = disabled_reason
                     if target is None:
                         unsnappable += 1
                         target = raw_target
                         reason = reason or "The scripted destination has no walkable tile within two squares in this collision pack."
-                    generated.append(make_edge(config, placement, action, op_source, target, reason, price))
+                    edge = make_edge(config, placement, action, op_source, target, reason, price)
+                    if revision == 377 and raw_target in player_targets:
+                        edge["_coordOffset"] = {
+                            "x": target.x - edge["from"]["x"],
+                            "z": target.z - edge["from"]["z"],
+                            "level": target.level - edge["from"]["level"],
+                        }
+                    generated.append(edge)
     data_dir = args.rs2b0t / "src" / "bot" / "event" / "webwalk" / "data"
     transport_path = data_dir / "transports.json"
     stair_path = data_dir / "stairEdges.json"
@@ -704,6 +750,12 @@ def main() -> None:
     output_transports = transports + generated_transports
     output_stairs = stairs + generated_stairs
     repaired = pair_up_approaches(output_stairs, collision) + pair_up_approaches(output_transports, collision)
+    # Why: retain exact 377 script destinations but disable rows the pathfinder would silently drop.
+    if revision == 377:
+        for edge in generated:
+            source, target = edge["from"], edge["to"]
+            if not collision.walkable(source["x"], source["z"], source["level"]) or not collision.walkable(target["x"], target["z"], target["level"]):
+                edge.setdefault("disabledReason", "The content-defined ladder approach or landing is not walkable in this collision pack.")
     write_json(transport_path, output_transports, args.check)
     write_json(stair_path, output_stairs, args.check)
 

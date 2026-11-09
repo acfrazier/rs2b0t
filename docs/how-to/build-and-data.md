@@ -47,15 +47,8 @@ so a revision-specific build cannot overwrite a staged pack. After the cutover t
 `cutover: true` and the same command regenerates the committed data in place: generators write at
 their repo paths, the manifest rows land at their final paths, and `manifest.ts verify` passes.
 
-The stair and transport files are composed. `tools/nav/derive-transports.sh` runs
-`derive-stairs.ts`, which writes `stairEdges.json`. Then `derive-ladders.py` and
-`enrich-transports.py` rewrite `stairEdges.json` and `transports.json` in place. So the stair
-stage alone never reproduces the committed file. `sh tools/nav/derive-transports.sh --check`
-reruns all three stages in a scratch root, starting from the committed `transports.json`,
-and compares both results with the committed files. `derive-stairs.ts --check` runs that
-same check. The `--check` of `derive-ladders.py` or `enrich-transports.py` reruns only that
-stage on the committed files, and `derive-doors.ts --check` compares `doors.json`. Each
-prints `ok:` per file, or a `STALE:` line and exits 1.
+For the full stair/ladder composition, source-of-truth rules, and `--check` behavior, see the
+[revision-377 stair and ladder bake](../reference/nav-pack.md#revision-377-stair-and-ladder-bake).
 
 ### Generator output and staging
 

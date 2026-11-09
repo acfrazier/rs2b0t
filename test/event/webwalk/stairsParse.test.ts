@@ -31,7 +31,7 @@ switch_coord (loc_coord) {
         expect(rows).toEqual([
             { from: { x: 3204, z: 3207, level: 0 }, to: { x: 3205, z: 3209, level: 1 }, debugname: 'spiralstairs', op: 1 },
             { from: { x: 3255, z: 3421, level: 0 }, to: { x: 3255, z: 3420, level: 1 }, debugname: 'spiralstairs', op: 1 },
-            { from: { x: 3108, z: 3363, level: 0 }, to: { x: 3108, z: 3367, level: 1 }, debugname: 'spiralstairs', op: 1 }
+            { from: { x: 3108, z: 3363, level: 0 }, to: { x: 3108, z: 3367, level: 1 }, debugname: 'spiralstairs', op: 1, coordOffset: { x: 0, z: 4, level: 1 } }
         ]);
     });
 });
