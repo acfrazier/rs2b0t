@@ -259,6 +259,8 @@ for path in \
 do
     ARTIFACT_ARGS+=(--artifact "$(stage_path "$path")=generated")
 done
+ARTIFACT_ARGS+=(--artifact "test/event/webwalk/routeCorpus377.test.ts=edition:offline")
+ARTIFACT_ARGS+=(--artifact "test/tools/stairDestinations.test.ts=edition:offline")
 ARTIFACT_ARGS+=(--artifact "$(stage_path tools/nav/door-categories.json)=nav-input")
 ARTIFACT_ARGS+=(--artifact "$(stage_path tools/nav/stair-prices.json)=nav-input")
 ARTIFACT_ARGS+=(--artifact "$(stage_path out/collision.lcnav.gz)=out")
@@ -276,7 +278,8 @@ for gen in \
     tools/lib/content.ts tools/lib/genout.ts \
     tools/gen-377-manifest.ts tools/gen-377-data.sh tools/patches/worldmap-377.patch \
     tools/nav/build-collision.ts tools/nav/derive-doors.ts tools/nav/derive-stairs.ts \
-    tools/nav/derive-ladders.py tools/nav/enrich-transports.py tools/nav/derive-transports.sh
+    tools/nav/derive-ladders.py tools/nav/enrich-transports.py tools/nav/derive-transports.sh \
+    tools/nav/fix-stair-approaches.ts
 do
     GEN_ARGS+=(--generator "$gen")
 done

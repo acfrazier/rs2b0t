@@ -51,6 +51,10 @@ export NAV_DATA_ROOT="$data_root"
     --rs2b0t "$data_root" \
     --transports-output "$data_dir/transports.json" \
     --stairs-output "$data_dir/stairEdges.json"
+"$bun_bin" tools/nav/fix-stair-approaches.ts \
+    --engine "$engine_dir" \
+    --pack "$pack_path" \
+    --out "$data_dir/stairEdges.json"
 
 if [ "$check" = 1 ]; then
     stale=0
