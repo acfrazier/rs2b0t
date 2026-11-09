@@ -99,6 +99,55 @@ describe('gen-377-manifest', () => {
             { path: 'out/worldmap-basemap.abc.png', sha256: rerunHash, kind: 'out', qualification: 'pending' }
         ]);
     });
+    test('preserves qualification for unchanged generated artifacts and resets it after a byte change', () => {
+        const root = tempDir();
+        const path = 'data/377/src/bot/data/itemdb.ts';
+        const originalHash = put(root, path, 'same artifact\n');
+        seed(root, {
+            ...emptyManifest(),
+            artifacts: [{ path, sha256: originalHash, kind: 'generated', qualification: 'qualified' }]
+        });
+        mkdirSync(join(root, 'scratch'));
+
+        const args = ['--revision', '377', '--out-dir', 'scratch', '--artifact', `${path}=generated`];
+        expect(run(root, args).code).toBe(0);
+        expect(readManifest(root).artifacts[0]?.qualification).toBe('qualified');
+
+        const changedHash = put(root, path, 'changed artifact\n');
+        expect(changedHash).not.toBe(originalHash);
+        expect(run(root, args).code).toBe(0);
+        expect(readManifest(root).artifacts[0]).toEqual({
+            path,
+            sha256: changedHash,
+            kind: 'generated',
+            qualification: 'pending'
+        });
+    });
+
+    test('preserves qualification for unchanged worldmap outputs and resets it after a byte change', () => {
+        const root = tempDir();
+        const path = 'out/worldmap-basemap.png';
+        const originalHash = put(root, 'scratch/worldmap-basemap.png', 'same basemap\n');
+        seed(root, {
+            ...emptyManifest(),
+            artifacts: [{ path, sha256: originalHash, kind: 'out', qualification: 'qualified' }]
+        });
+
+        const args = ['--revision', '377', '--out-dir', 'scratch'];
+        expect(run(root, args).code).toBe(0);
+        expect(readManifest(root).artifacts[0]?.qualification).toBe('qualified');
+
+        const changedHash = put(root, 'scratch/worldmap-basemap.png', 'changed basemap\n');
+        expect(changedHash).not.toBe(originalHash);
+        expect(run(root, args).code).toBe(0);
+        expect(readManifest(root).artifacts[0]).toEqual({
+            path,
+            sha256: changedHash,
+            kind: 'out',
+            qualification: 'pending'
+        });
+    });
+
     test('records a staged out artifact at its final path and hashes the staged source', () => {
         const root = tempDir();
         seed(root, emptyManifest());

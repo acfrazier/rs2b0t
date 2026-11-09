@@ -181,15 +181,28 @@ function main(): void {
     }
     manifest.generators = Object.fromEntries(Object.entries(manifest.generators).sort(([a], [b]) => a.localeCompare(b)));
 
+    const previous = new Map(manifest.artifacts.map(artifact => [artifact.path, artifact] as const));
+    const preserveQualification = (artifact: ManifestArtifact): ManifestArtifact => {
+        const prior = previous.get(artifact.path);
+        return prior?.kind === artifact.kind && prior.sha256 === artifact.sha256 ? { ...artifact, qualification: prior.qualification } : artifact;
+    };
+
     // Why: a byte-identity run hashes its basemap from a scratch directory while the row keeps
     // the repo's untracked path, so the manifest stays comparable between runs.
     const outRows = readdirSync(args.outDir)
         .filter(f => f.startsWith('worldmap-') && statSync(join(args.outDir, f)).isFile())
-        .map(f => ({ path: `out/${f}`, sha256: sha256File(join(args.outDir, f)), kind: 'out' as const, qualification: 'pending' as const }));
+        .map(f =>
+            preserveQualification({
+                path: `out/${f}`,
+                sha256: sha256File(join(args.outDir, f)),
+                kind: 'out',
+                qualification: 'pending'
+            })
+        );
 
-    // Rows named this run are replaced; rows for other slices' artifacts survive. This tool owns
-    // every `out/worldmap-*` row, so one whose file this bake did not produce is stale.
-    const fresh = args.artifacts.map(spec => artifactRow(spec, process.cwd()));
+    // Why: this generator owns every worldmap row, dropping stale outputs but preserving other slices.
+    // Qualification remains only for a same-path, same-kind, same-hash row.
+    const fresh = args.artifacts.map(spec => preserveQualification(artifactRow(spec, process.cwd())));
     const named = new Set([...fresh.map(a => a.path), ...outRows.map(a => a.path)]);
     const kept = manifest.artifacts.filter(a => !named.has(a.path) && !a.path.startsWith('out/worldmap-'));
     manifest.artifacts = [...kept, ...fresh, ...outRows].sort((a, b) => a.path.localeCompare(b.path));
