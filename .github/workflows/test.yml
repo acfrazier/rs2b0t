@@ -18,7 +18,16 @@ jobs:
         with:
           bun-version: 1.4.4
 
-      - run: bun install --frozen-lockfile
+      # Why: @vvago/vale's postinstall downloads the Vale binary from GitHub releases, which
+      # returned HTTP 504 on several runs (42571069871, 42581969085); retry the install, not the tests.
+      - name: install dependencies
+        run: |
+          for attempt in 1 2 3 4; do
+            bun install --frozen-lockfile && exit 0
+            echo "bun install failed (attempt $attempt); retrying in $((attempt * 30)) s"
+            sleep $((attempt * 30))
+          done
+          exit 1
 
       # Why: every browser and worker entry, both targets, before the test that requires them
       # (pitfall 7). There is no production key on a hosted runner, so the prod compile is the
