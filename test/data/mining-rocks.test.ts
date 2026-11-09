@@ -92,7 +92,7 @@ describe.skipIf(skipUnless('content'))('377 pack-backed rocks (content-gated)', 
                 // All ore rocks render as "Rocks" (all.loc `[rocks_9708] name=Rocks`, `[copperrock1] name=Rocks`).
                 expect(debugname, `id ${id} (${debugname}) is not a Rocks loc`).toMatch(/^(rocks(_\d+)?|[a-z]*rock\d*)$/);
             }
-            // The pack and mine table define 14861 as a runite rock, but no canon-1108 map places it.
+            // The pack and mine table define 14861 as a runite rock, but no pinned 377 map places it.
             const unplaced = ids.filter(id => !placed.has(id));
             expect(unplaced, `${name} unplaced rock ids`).toEqual(name === 'Runite' ? [14861] : []);
             expect(ids.some(id => placed.has(id)), `${name} has no placed map field`).toBe(true);

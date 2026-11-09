@@ -43,7 +43,7 @@ jobs:
       - name: unit tests
         run: |
           set -o pipefail
-          bun test 2>&1 | tee "$RUNNER_TEMP/bun-test.log"
+          bun test --reporter=junit --reporter-outfile="$RUNNER_TEMP/bun-test.junit.xml" 2>&1 | tee "$RUNNER_TEMP/bun-test.log"
 
       - name: typecheck
         run: bun run typecheck
@@ -57,16 +57,7 @@ jobs:
       - name: prose extras
         run: bun run lint:prose:extras
 
-      # Why: a green hosted run must say what it did not check; every SKIP line names its input.
+      # Why: include every skipped testcase, with the logged reason or the exact source gate.
       - name: skip summary
         if: always()
-        run: |
-          {
-            echo '## Skipped checks'
-            echo ''
-            if [ -f "$RUNNER_TEMP/bun-test.log" ]; then
-              grep -E '^SKIP: ' "$RUNNER_TEMP/bun-test.log" || echo 'None reported.'
-            else
-              echo 'The test step did not produce a log.'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: bun tools/test-skip-summary.ts "$RUNNER_TEMP/bun-test.junit.xml" "$RUNNER_TEMP/bun-test.log" "$GITHUB_STEP_SUMMARY"

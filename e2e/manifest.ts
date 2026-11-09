@@ -10,7 +10,7 @@ export const CASES: readonly Case[] = [
         provenAt: '7088f810',
         manual: true,
         budgetMin: 30,
-        note: 'Four 377 webwalk routes, three fresh accounts each, with serverTile readback; requires canon-1108 ENGINE_DIR, CONTENT_DIR and S8_LIVE_EVIDENCE_DIR.'
+        note: 'Four 377 webwalk routes, three fresh accounts each, with serverTile readback; requires the pinned 377 ENGINE_DIR, CONTENT_DIR and S8_LIVE_EVIDENCE_DIR.'
     },
     {
         id: 'l2-boneburier-377-live',

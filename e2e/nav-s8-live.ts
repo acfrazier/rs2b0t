@@ -1,5 +1,5 @@
 /** S8 377 live qualification: four pure-webwalk routes, three fresh mainland accounts per route.
- *  Run with the canon-1108 ENGINE_DIR/CONTENT_DIR and S8_LIVE_EVIDENCE_DIR set; the isolated client deployment is removed in finally. */
+ *  Run with the pinned 377 ENGINE_DIR/CONTENT_DIR and S8_LIVE_EVIDENCE_DIR set; the isolated client deployment is removed in finally. */
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -20,7 +20,7 @@ const ARRIVAL_READBACK_MS = 20_000;
 const EVIDENCE_DIR = process.env.S8_LIVE_EVIDENCE_DIR;
 const ENGINE_DIR = process.env.ENGINE_DIR;
 if (!EVIDENCE_DIR) throw new Error('set S8_LIVE_EVIDENCE_DIR to the private evidence directory');
-if (!ENGINE_DIR) throw new Error('set ENGINE_DIR to the canon-1108 engine');
+if (!ENGINE_DIR) throw new Error('set ENGINE_DIR to the pinned 377 engine');
 
 const { base } = parseArgs(process.argv.slice(2), {
     base: process.env.BASE ?? 'http://localhost:81'

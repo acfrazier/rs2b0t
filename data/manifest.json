@@ -23,7 +23,7 @@
     "tools/combat/gen-spelldb.ts": "65706ca6d2cfda1826b9e4d27ba082654338ca12d3b3329e08167e7a24d8e421",
     "tools/cooking/gen-cooksurfaces.ts": "73bf615a95ed3923329c8525ab3a5d2c20e1f5d2088b3a1965798b6d0dca5c07",
     "tools/gen-377-data.sh": "9791c29a1f22fdee05e8cde4d622e7e29edabcc4a4c668037944dc8f33e96925",
-    "tools/gen-377-manifest.ts": "8858ee663c1a654fdce3872c999ecced78dbf2677d8c8c4fba67c15c94a7bf3c",
+    "tools/gen-377-manifest.ts": "655a95897a26e0af2fab60de7fb58cdadc5abe6517bd0247c3a97b1f35e9ffe6",
     "tools/gen-ifids.ts": "f097b9c6ed14b137fa4b710820f80c76cc661f1b0bceba160da514d896938815",
     "tools/gen-scriptdocs.ts": "9b65974cf3e5f22a4d7010869e9182ddd5068c3e8e081962ce15183c31e6ddc5",
     "tools/items/gen-itemdb.ts": "b1ea4fa6176e9443b34f924a8f73322b651a7d539180a4266b7920a2cd1eba2a",
@@ -58,7 +58,7 @@
       "path": "out/collision.lcnav.gz",
       "sha256": "ed64309ee43a7eb117f101cd542ceedb2bbf5db7dbaad18cab7415ce0baf5a99",
       "kind": "out",
-      "qualification": "pending",
+      "qualification": "qualified",
       "uncompressedSha256": "80813bd54070dfcaebb25213c019076fefbf9444ff3484af2d143ccbf97403cb"
     },
     {
@@ -599,7 +599,7 @@
       "path": "src/bot/event/webwalk/data/doors.json",
       "sha256": "92cb2b23d552c9019e084be1caf9763405cd42308aecfde06396b38acac26317",
       "kind": "generated",
-      "qualification": "pending"
+      "qualification": "qualified"
     },
     {
       "path": "src/bot/event/webwalk/data/stairEdges.json",
@@ -693,9 +693,9 @@
     },
     {
       "path": "test/data/mining-rocks.test.ts",
-      "sha256": "a7b6c9883b09cb58ac9bd34d5c7c8d3ac6afaa3a8aab2fa3e550ee66d94e74a7",
+      "sha256": "825b94be1a8e3ab679d3f5536bc64ef7daf5d4de19db3c054448116b91448f15",
       "kind": "edition",
-      "qualification": "offline"
+      "qualification": "pending"
     },
     {
       "path": "test/data/nameCollisions.test.ts",

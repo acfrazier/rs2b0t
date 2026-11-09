@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,6 +23,22 @@ describe('run (the e2e runner child executor)', () => {
     test('a clean marker with exit 0 passes', async () => {
         const r = await run('clean', child("console.log('ok: matches')"), join(dir, 'b.log'), 30_000, driftVerdict);
         expect(r.status).toBe('pass');
+    });
+
+    test('a clean marker on line 1 survives a report longer than the retained tail', async () => {
+        const report = ['ok: report is clean', ...Array.from({ length: 500 }, (_, i) => `report line ${i + 1}`)];
+        const logFile = join(dir, 'long-report.log');
+        const r = await run(
+            'long-report',
+            child(`process.stdout.write(${JSON.stringify(`${report.join('\n')}\n`)})`),
+            logFile,
+            30_000,
+            driftVerdict
+        );
+        expect(r.status).toBe('pass');
+        const logged = readFileSync(logFile, 'utf8').trimEnd().split('\n');
+        expect(logged).toHaveLength(501);
+        expect(logged[0]).toBe('ok: report is clean');
     });
 
     test('exit 0 without a clean marker fails the drift verdict', async () => {
