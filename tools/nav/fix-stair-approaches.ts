@@ -16,6 +16,7 @@ interface StairEdge {
     action: string;
     kind?: string;
     locId?: number;
+    openLocId?: number;
     locX?: number;
     locZ?: number;
     debugName?: string;
@@ -94,9 +95,29 @@ async function main(): Promise<void> {
     const out = argVal('--out') ?? 'src/bot/event/webwalk/data/stairEdges.json';
     if (!engine) throw new Error('Set ENGINE_DIR to the revision-matched Engine-TS checkout');
 
-    const edges = JSON.parse(fs.readFileSync(out, 'utf8')) as StairEdge[];
+    const transportOut = argVal('--transports');
+    const outputFiles = [out, ...(transportOut ? [transportOut] : [])].map(file => ({
+        path: file,
+        edges: JSON.parse(fs.readFileSync(file, 'utf8')) as StairEdge[]
+    }));
+    const edges = outputFiles.flatMap(file => file.edges);
+    const reachOnlyDisableReason = `No walkable adjacent tile passes revision ${revision} reach while preserving a walkable landing for this loc placement.`;
+    const isLocTileOpenTeleport = (edge: StairEdge): boolean =>
+        edge.disabledReason === reachOnlyDisableReason
+        && edge.action.toLowerCase() === 'open'
+        && edge.locX !== undefined
+        && edge.locZ !== undefined
+        && edge.from.x === edge.locX
+        && edge.from.z === edge.locZ
+        && (edge.to.x !== edge.from.x || edge.to.z !== edge.from.z || edge.to.level !== edge.from.level);
+    const generatedStairEdges = new Set(outputFiles[0]!.edges);
     const { configs } = loadLocTypes(engine, revision);
-    const locIds = new Set(edges.filter(edge => !edge.disabledReason && (edge.kind === 'stair' || edge.kind === 'dungeon')).map(edge => edge.locId));
+    const locIds = new Set(
+        edges
+            .filter(edge => (!edge.disabledReason || isLocTileOpenTeleport(edge)) && (edge.kind === 'stair' || edge.kind === 'dungeon'))
+            .flatMap(edge => [edge.locId, edge.openLocId])
+            .filter((id): id is number => id !== undefined)
+    );
     const placements = new Map<string, LocPlacement>();
     for (const square of loadMapsquares(engine)) {
         const lands = parseLands(new Reader(square.land));
@@ -133,23 +154,43 @@ async function main(): Promise<void> {
     ) as { default: ReachStrategy };
     const changed: string[] = [];
     const disabled: string[] = [];
+    const unresolved: string[] = [];
 
     for (const edge of edges) {
+        // A script-driven open teleport can be activated while standing on the loc tile.
+        if (isLocTileOpenTeleport(edge)) delete edge.disabledReason;
         if (edge.disabledReason || (edge.kind !== 'stair' && edge.kind !== 'dungeon')) continue;
         if (edge.locId === undefined || edge.locX === undefined || edge.locZ === undefined) {
             throw new Error(`${edge.debugName ?? edge.action}: active stair edge is missing loc identity`);
         }
-        const config = configs[edge.locId];
-        const placement = placements.get(pointKey(edge.locId, edge.locX, edge.locZ, edge.from.level));
+        const primaryKey = pointKey(edge.locId, edge.locX, edge.locZ, edge.from.level);
+        const openKey = edge.openLocId === undefined ? undefined : pointKey(edge.openLocId, edge.locX, edge.locZ, edge.from.level);
+        const mappedLocId = placements.has(primaryKey)
+            ? edge.locId
+            : edge.openLocId !== undefined && openKey && placements.has(openKey) ? edge.openLocId : undefined;
+        if (mappedLocId === undefined) {
+            throw new Error(`${edge.debugName ?? edge.action} loc ${edge.locId} at ${edge.locX},${edge.locZ}: missing revision ${revision} loc/open-loc map placement`);
+        }
+        const config = configs[mappedLocId];
+        const placement = placements.get(pointKey(mappedLocId, edge.locX, edge.locZ, edge.from.level));
         if (!config || !placement) {
-            throw new Error(`${edge.debugName ?? edge.action} loc ${edge.locId} at ${edge.locX},${edge.locZ}: missing revision ${revision} config or map placement`);
+            throw new Error(`${edge.debugName ?? edge.action} loc ${mappedLocId} at ${edge.locX},${edge.locZ}: missing revision ${revision} config or map placement`);
         }
         const [width, height] = rotatedSize(config.width, config.length, placement.angle);
+        // Shantay Pass selects a different content branch on each side of the gate.
+        const shantay = edge.debugName === 'shantay_pass_henge_doorway';
+        const southToNorth = shantay && edge.to.z > edge.locZ!;
+        const contentSide = (point: NavPoint): boolean =>
+            !shantay || (southToNorth ? point.z <= edge.locZ! : point.z > edge.locZ!);
         const landingFor = (point: NavPoint): NavPoint => {
             const offset = edge._coordOffset;
-            return offset
-                ? { x: point.x + offset.x, z: point.z + offset.z, level: point.level + offset.level }
-                : edge.to;
+            if (offset) {
+                return { x: point.x + offset.x, z: point.z + offset.z, level: point.level + offset.level };
+            }
+            if (!shantay) return edge.to;
+            return southToNorth
+                ? { x: point.x, z: point.z + 3, level: point.level }
+                : { x: edge.locX! + 2, z: edge.locZ! - 1, level: point.level };
         };
         const isReachableSide = (point: NavPoint): boolean => {
             const west = edge.locX! - 1;
@@ -162,8 +203,11 @@ async function main(): Promise<void> {
                 || (point.z === south && point.x >= edge.locX! && point.x < edge.locX! + width)
                 || (point.z === north && point.x >= edge.locX! && point.x < edge.locX! + width);
             const landing = landingFor(point);
+            const originalApproach =
+                point.x === edge.from.x && point.z === edge.from.z && point.level === edge.from.level;
             if (
-                !adjacent
+                (!adjacent && !originalApproach)
+                || !contentSide(point)
                 || !finder.walkable(point.x, point.z, point.level)
                 || !finder.walkable(landing.x, landing.z, landing.level)
             ) return false;
@@ -183,26 +227,36 @@ async function main(): Promise<void> {
             );
         };
 
-        if (isReachableSide(edge.from)) continue;
+        if (isReachableSide(edge.from)) {
+            if (shantay) edge.to = landingFor(edge.from);
+            continue;
+        }
         const candidates = sideApproaches(edge.locX, edge.locZ, width, height, edge.from.level);
         const candidate = candidates.find(isReachableSide);
         if (!candidate) {
             const details = candidates.map(point => {
                 const landing = landingFor(point);
-                let status = 'rejected by server reach';
+                let status = 'rejected by ReachStrategy';
                 if (!finder.walkable(point.x, point.z, point.level)) status = 'blocked approach';
                 else if (!finder.walkable(landing.x, landing.z, landing.level)) {
                     status = `blocked landing ${landing.x},${landing.z},${landing.level}`;
                 }
                 return `${point.x},${point.z}:${status}`;
             }).join(' ');
-            edge.disabledReason = `No walkable adjacent tile passes revision ${revision} reach while preserving a walkable landing for this loc placement.`;
-            delete edge.extraTicks;
-            disabled.push(`${edge.locId},${edge.locX},${edge.locZ} (${edge.from.x},${edge.from.z},${edge.from.level}); ${details}`);
+            const record =
+                `${edge.locId},${edge.locX},${edge.locZ} current=${edge.from.x},${edge.from.z},${edge.from.level}; ${details}`;
+            if (generatedStairEdges.has(edge)) {
+                edge.disabledReason = reachOnlyDisableReason;
+                delete edge.extraTicks;
+                disabled.push(record);
+            } else {
+                unresolved.push(record);
+            }
             continue;
         }
         changed.push(`${edge.locId},${edge.locX},${edge.locZ} ${edge.from.x},${edge.from.z},${edge.from.level} -> ${candidate.x},${candidate.z},${candidate.level}`);
         edge.from = candidate;
+        if (shantay) edge.to = landingFor(candidate);
     }
 
     for (const edge of edges) {
@@ -215,11 +269,14 @@ async function main(): Promise<void> {
         };
         delete edge._coordOffset;
     }
-    const output = '[\n' + edges.map(edge => `    ${JSON.stringify(edge)}`).join(',\n') + '\n]\n';
-    fs.writeFileSync(out, output);
-    console.log(`corrected ${changed.length} stair approach tiles against revision ${revision} ReachStrategy; disabled ${disabled.length} with no reachable side`);
+    for (const outputFile of outputFiles) {
+        const output = '[\n' + outputFile.edges.map(edge => `    ${JSON.stringify(edge)}`).join(',\n') + '\n]\n';
+        fs.writeFileSync(outputFile.path, output);
+    }
+    console.log(`corrected ${changed.length} stair and transport approach tiles against revision ${revision} ReachStrategy; disabled ${disabled.length} generated stair edges with no reachable side; kept ${unresolved.length} transport stands active where no adjacent candidate passed`);
     for (const row of changed) console.log(row);
-    for (const row of disabled) console.log(`disabled unreachable: ${row}`);
+    for (const row of disabled) console.log(`disabled unreachable stair: ${row}`);
+    for (const row of unresolved) console.log(`kept current transport stand active: ${row}`);
 }
 
 if (import.meta.main) await main();

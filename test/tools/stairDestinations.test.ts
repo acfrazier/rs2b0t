@@ -7,6 +7,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { CollisionFlag } from '#/bot/event/webwalk/rsmod/flags.js';
+import transports from '#/bot/event/webwalk/data/transports.json';
 import stairEdges from '#/bot/event/webwalk/data/stairEdges.json';
 import { LocDef, Reader, bridgedLevel, forEachLoc, loadLocTypes, loadMapsquares, parseLands } from '../../tools/nav/lib.js';
 import { skipUnless } from '../lib/skipUnless.js';
@@ -31,6 +32,44 @@ interface StairEdge {
 }
 
 const edges = stairEdges as StairEdge[];
+const reachCensusTransportPlacements = new Set([
+    '3381,2647,9377',
+    '194,2408,3417',
+    '4031,3302,3116',
+    '2541,2514,9737',
+    '3789,2843,10108',
+    '3788,2842,10108',
+    '3789,2852,10107',
+    '1757,2400,9508',
+    '195,2409,9818',
+    '4912,2430,3082',
+    '1757,2430,9482',
+    '1759,2547,3551',
+    '1757,2556,9844',
+    '1759,2823,3513',
+    '1759,2824,3507',
+    '1759,2827,3510',
+    '1759,2845,3516',
+    '1759,2848,3513',
+    '1759,2848,3519',
+    '1759,2857,3517',
+    '1759,2859,3519',
+    '1759,2884,3397',
+    '1757,2892,9907',
+    '1759,3088,3571',
+    '133,3092,3362',
+    '132,3117,9754',
+    '14879,3209,3216',
+    '1757,3504,9970',
+    '5812,2715,3472'
+]);
+const transportLandingEdges = (transports as StairEdge[]).filter(edge =>
+    edge.locId !== undefined
+    && edge.locX !== undefined
+    && edge.locZ !== undefined
+    && reachCensusTransportPlacements.has(`${edge.locId},${edge.locX},${edge.locZ}`)
+);
+const landingEdges = [...edges, ...transportLandingEdges];
 const CONTENT_DIR = process.env.CONTENT_DIR;
 const HEADER_RE = /^\[([^\]]+)]([ \t].*)?$/gm;
 const MOVEMENT_CALL_RE = /(?:~|@)?(?:p_telejump|p_teleport|climb_ladder|stair_options|ladder_options)\s*\(/g;
@@ -279,6 +318,38 @@ function contentFiles(directory: string, extension: string): string[] {
     return files;
 }
 
+function contentConstants(scriptsDir: string): Map<string, Point> {
+    const constants = new Map<string, Point>();
+    for (const file of contentFiles(scriptsDir, '.constant')) {
+        for (const raw of readFileSync(file, 'utf8').split(/\r?\n/)) {
+            const line = raw.split('//', 1)[0]!.trim();
+            const match = /^\^([a-zA-Z0-9_]+)\s*=\s*(\d+_\d+_\d+_\d+_\d+)$/.exec(line);
+            const point = match ? parseCoord(match[2]!) : null;
+            if (match && point) constants.set(`^${match[1]}`, point);
+        }
+    }
+    return constants;
+}
+
+function shantayQueuedDestination(scriptsDir: string): Point {
+    const source = readFileSync(path.join(scriptsDir, 'areas/area_alkharid/scripts/shantay_pass.rs2'), 'utf8');
+    const header = '[queue,shantay_pass_enter]';
+    const start = source.indexOf(header);
+    if (start < 0) throw new Error('Missing Shantay pass destination queue in content');
+    const bodyStart = start + header.length;
+    const nextHeader = source.indexOf('\n[', bodyStart);
+    const body = source.slice(bodyStart, nextHeader < 0 ? undefined : nextHeader);
+    const teleport = /\bp_teleport\s*\(\s*(\d+_\d+_\d+_\d+_\d+)\s*\)/.exec(body);
+    const jump = /\bp_telejump\s*\(\s*movecoord\s*\(\s*coord(?:\(\s*\))?\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*\)/.exec(body);
+    const destination = teleport ? parseCoord(teleport[1]!) : null;
+    if (!destination || !jump) throw new Error('Cannot resolve Shantay pass queued content destination');
+    return {
+        x: destination.x + Number(jump[1]),
+        z: destination.z + Number(jump[3]),
+        level: destination.level + Number(jump[2])
+    };
+}
+
 function contentHandlers(scriptsDir: string): Map<string, string[]> {
     const handlers = new Map<string, string[]>();
     const labels = new Map<string, string[]>();
@@ -397,7 +468,8 @@ function sourceCaseDestinationCandidates(
     handlers: Map<string, string[]>,
     edge: StairEdge,
     operations: number[],
-    onlyHandler?: string
+    onlyHandler?: string,
+    constants?: ReadonlyMap<string, Point>
 ): Set<string> {
     const candidates = new Set<string>();
     if (edge.locX === undefined || edge.locZ === undefined) return candidates;
@@ -432,12 +504,12 @@ function sourceCaseDestinationCandidates(
                         continue;
                     }
                     matchedSource = true;
-                    for (const destination of destinationCandidates(branch, edge)) candidates.add(destination);
+                    for (const destination of destinationCandidates(branch, edge, constants)) candidates.add(destination);
                 }
             }
             if (onlyHandler !== undefined && !matchedSource) {
                 for (const branch of defaultCases) {
-                    for (const destination of destinationCandidates(branch, edge)) candidates.add(destination);
+                    for (const destination of destinationCandidates(branch, edge, constants)) candidates.add(destination);
                 }
             }
         }
@@ -449,7 +521,8 @@ function unscopedDestinationCandidates(
     handlers: Map<string, string[]>,
     edge: StairEdge,
     operations: number[],
-    onlyHandler?: string
+    onlyHandler?: string,
+    constants?: ReadonlyMap<string, Point>
 ): Set<string> {
     const candidates = new Set<string>();
     for (const [handler, bodies] of handlers) {
@@ -461,10 +534,10 @@ function unscopedDestinationCandidates(
             const body = rawBody.replace(/\/\/[^\n]*/g, '');
             let cursor = 0;
             for (const block of switchCoordBlocks(body)) {
-                for (const destination of destinationCandidates(body.slice(cursor, block.start), edge)) candidates.add(destination);
+                for (const destination of destinationCandidates(body.slice(cursor, block.start), edge, constants)) candidates.add(destination);
                 cursor = block.end;
             }
-            for (const destination of destinationCandidates(body.slice(cursor), edge)) candidates.add(destination);
+            for (const destination of destinationCandidates(body.slice(cursor), edge, constants)) candidates.add(destination);
         }
     }
     return candidates;
@@ -493,7 +566,7 @@ function handlerHasUnscopedMovement(
     return false;
 }
 
-function destinationCandidates(body: string, edge: StairEdge): Set<string> {
+function destinationCandidates(body: string, edge: StairEdge, constants?: ReadonlyMap<string, Point>): Set<string> {
     const candidates = new Set<string>();
     const assignments = new Map<string, string[]>();
     for (const match of body.matchAll(/(\$[a-zA-Z0-9_]+)\s*=\s*([^;]+);/g)) {
@@ -504,6 +577,8 @@ function destinationCandidates(body: string, edge: StairEdge): Set<string> {
         const value = expression.trim();
         const literal = parseCoord(value);
         if (literal) return [literal];
+        const constant = constants?.get(value);
+        if (constant) return [constant];
         if (value === 'coord' || value === 'coord()') return [edge.from];
         if (value === 'loc_coord' || value === 'loc_coord()') {
             return edge.locX === undefined || edge.locZ === undefined ? [] : [{ x: edge.locX, z: edge.locZ, level: edge.from.level }];
@@ -584,8 +659,8 @@ test('ladder_1749 Climb-down placements stay enabled', () => {
     expect(varrock[0]?.disabledReason).toBeUndefined();
 });
 
-describe.skipIf(skipUnless('content'))('377 stair landing destinations from content', () => {
-    test('every content-backed stair landing matches its handler destination', () => {
+describe.skipIf(skipUnless('content'))('377 stair and transport landing destinations from content', () => {
+    test('every stair landing and each previously rejected transport landing matches its content destination', () => {
         if (!CONTENT_DIR) {
             throw new Error('CONTENT_DIR must name the 377 content checkout');
         }
@@ -594,9 +669,13 @@ describe.skipIf(skipUnless('content'))('377 stair landing destinations from cont
             throw new Error('CONTENT_DIR must name the 377 content checkout');
         }
         const handlers = contentHandlers(scriptsDir);
+        const constants = contentConstants(scriptsDir);
         const optionOps = contentOptionOperations(scriptsDir);
         const mismatches: string[] = [];
-        for (const edge of edges) {
+        expect(transportLandingEdges).toHaveLength(30);
+        expect(transportLandingEdges.filter(edge => edge.disabledReason)).toEqual([]);
+        expect(new Set(transportLandingEdges.map(edge => `${edge.locId},${edge.locX},${edge.locZ}`))).toEqual(reachCensusTransportPlacements);
+        for (const edge of landingEdges) {
             const contentOps = edge.debugName
                 ? optionOps.get(edge.debugName)?.get(edge.action.toLowerCase())
                 : undefined;
@@ -610,16 +689,20 @@ describe.skipIf(skipUnless('content'))('377 stair landing destinations from cont
                 : [];
             const expected = bodies.length > 0
                 ? new Set([
-                    ...sourceCaseDestinationCandidates(handlers, edge, operations, edge.debugName),
-                    ...unscopedDestinationCandidates(handlers, edge, operations, edge.debugName),
+                    ...sourceCaseDestinationCandidates(handlers, edge, operations, edge.debugName, constants),
+                    ...unscopedDestinationCandidates(handlers, edge, operations, edge.debugName, constants),
                     ...bodies
                         .filter(body => !COORD_CASE_RE.test(body))
-                        .flatMap(body => [...destinationCandidates(body, edge)])
+                        .flatMap(body => [...destinationCandidates(body, edge, constants)])
                 ])
                 : new Set([
-                    ...sourceCaseDestinationCandidates(handlers, edge, operations),
-                    ...unscopedDestinationCandidates(handlers, edge, operations)
+                    ...sourceCaseDestinationCandidates(handlers, edge, operations, undefined, constants),
+                    ...unscopedDestinationCandidates(handlers, edge, operations, undefined, constants)
                 ]);
+            if (edge.debugName === 'shantay_pass_henge_doorway' && edge.locZ !== undefined && edge.from.z > edge.locZ) {
+                expected.clear();
+                expected.add(pointKey(shantayQueuedDestination(scriptsDir)));
+            }
             if (expected.size === 0 && edge.disabledReason) continue;
             if (!expected.has(pointKey(edge.to))) {
                 mismatches.push(`${edge.debugName ?? edge.locId ?? edge.action} (${edge.action}): ${pointKey(edge.from)} -> ${pointKey(edge.to)} (content destinations: ${[...expected].join('; ') || 'no matching movement handler'})`);

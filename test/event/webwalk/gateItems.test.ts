@@ -14,8 +14,8 @@ const state = (items: Record<string, number> = {}): WorldStateData => ({
 });
 
 /**
- * Geometry from the baked pack: the player stands at (3304,3118), the loc
- * is at (3302,3116), and the hop lands at (3304,3114).
+ * Geometry from the baked pack: the player stands at (3303,3117), the loc
+ * is at (3302,3116), and the hop lands at (3304,3115).
  */
 const shantayPath = (): PathResult =>
     ({
@@ -23,10 +23,10 @@ const shantayPath = (): PathResult =>
         cost: 100,
         expanded: 10,
         waypoints: [
-            { x: 3304, z: 3118, level: 0 },
+            { x: 3303, z: 3117, level: 0 },
             {
                 x: 3304,
-                z: 3114,
+                z: 3115,
                 level: 0,
                 transport: { locName: 'Shantay pass', action: 'Go-through', locX: 3302, locZ: 3116, kind: 'door' }
             }

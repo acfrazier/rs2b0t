@@ -141,11 +141,11 @@ describe('itemsRequiredByWaypoints / missing', () => {
         expect(missingItemsForPath(path, half)).toEqual([{ name: 'Coins', count: 30 }]);
     });
 
-    // Why: the baked pack keys the crossing at the approach stand (3304,3118) while the loc sits at (3302,3116), so a lookup on the loc alone finds nothing.
+    // Why: the baked pack keys the crossing at the approach stand (3303,3117) while the loc sits at (3302,3116), so a lookup on the loc alone finds nothing.
     test('Shantay pass toll is found when the loc tile differs from the crossing key', () => {
         const path: Waypoint[] = [
-            wp(3304, 3118),
-            wp(3304, 3114, {
+            wp(3303, 3117),
+            wp(3304, 3115, {
                 locName: 'Shantay pass',
                 action: 'Go-through',
                 locX: 3302,

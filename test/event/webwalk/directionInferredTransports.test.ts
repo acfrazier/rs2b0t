@@ -29,16 +29,16 @@ function directed(
 
 describe('direction-inferred dual edges (#403)', () => {
     test('Shantay pass: dual edges; only southbound plan-requires a pass', () => {
-        const south = directed('Shantay pass', { x: 3304, z: 3118 }, { x: 3304, z: 3114 });
-        const north = directed('Shantay pass', { x: 3304, z: 3114 }, { x: 3304, z: 3118 });
+        const south = directed('Shantay pass', { x: 3303, z: 3117 }, { x: 3304, z: 3115 });
+        const north = directed('Shantay pass', { x: 3303, z: 3115 }, { x: 3303, z: 3118 });
         expect(south).toBeDefined();
         expect(north).toBeDefined();
-        // specialCrossing + specialRequiresAt only on the north approach (into desert).
-        expect(specialCrossingAt(3304, 3118, 0)?.requires?.item).toBe('Shantay pass');
-        expect(specialCrossingAt(3304, 3114, 0)).toBeNull();
-        const southReq = specialRequiresAt(3304, 3118, 0);
+        // The north-side approach pays; the south-side approach is free.
+        expect(specialCrossingAt(3303, 3117, 0)?.requires?.item).toBe('Shantay pass');
+        expect(specialCrossingAt(3303, 3115, 0)).toBeNull();
+        const southReq = specialRequiresAt(3303, 3117, 0);
         expect(southReq?.items?.some(i => i.name === 'Shantay pass')).toBe(true);
-        expect(specialRequiresAt(3304, 3114, 0)).toBeUndefined();
+        expect(specialRequiresAt(3303, 3115, 0)).toBeUndefined();
     });
 
     test('Gnome Stronghold areagate: dual Open edges on same loc', () => {

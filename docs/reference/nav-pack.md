@@ -58,9 +58,20 @@ exact, reverse edges are not synthesized, and stair actions without a content mo
 handler stay disabled. The first approach search is collision-derived and extends one tile
 beyond the blocked footprint to cover rotated multi-tile stairs. After enrichment, the final
 pass resolves each exact map placement and loc config, including rotated dimensions and
-`forceapproach`, and keeps only a walkable adjacent tile accepted by revision 377's server
-`ReachStrategy` against the collision pack. It disables an edge if no allowed side is
-reachable, and recomputes coordinate-relative landings from the corrected approach.
+`forceapproach`, and preserves the current stand when it is walkable and accepted by revision
+377's `ReachStrategy` with a walkable landing (content portals may stand on the loc tile).
+For content-authored transport rows, a missing adjacent correction leaves the row active for
+the independent engine census rather than inventing an unusable-content reason; generated
+stair edges keep their existing disable mechanism. Coordinate-relative landings are
+recomputed from corrected approaches.
+
+The revision-377 reach census builds an isolated engine collision map from `maps-server.zip`
+and calls the engine's `ReachStrategy.reached` for every active stair/dungeon edge; each
+rejection reports its loc ID, placement, approach, and reason. A companion landing census
+compares every stair edge and the 30 previously rejected transport rows with content
+movement destinations, including open-loc variants and queued teleports. The Shantay Pass is
+branch-sensitive: the south-side `coord+3` action and north-side queued teleport/`coord-3`
+action keep distinct approach and landing tiles.
 
 So is *same-level* routing, wherever the link is an Agility shortcut. `derive-doors`
 only sees doors, so a balance log or a climbable outcrop leaves two regions looking
