@@ -1,6 +1,7 @@
 import { afterEach, expect, mock, test } from 'bun:test';
 
 import IfType from '#/client/config/IfType.js';
+import ObjType from '#/client/config/ObjType.js';
 import JString from '#/client/datastruct/JString.js';
 import { ClientProt } from '#/client/io/ClientProt.js';
 import Packet from '#/client/io/Packet.js';
@@ -395,4 +396,45 @@ test('chat effect 4 uses Java integer division for its scroll offset (Client.jav
         [110, 201, Colour.BLACK],
         [110, 200, Colour.YELLOW]
     ]);
+});
+
+test('CS1 opcode 4 accepts the highest valid raw object ID (Client.java:11200-11209)', () => {
+    const original = {
+        numDefinitions: ObjType.numDefinitions,
+        idx: ObjType.idx,
+        dat: ObjType.dat,
+        recent: ObjType.recent,
+        recentPos: ObjType.recentPos,
+        datEnd: ObjType.datEnd,
+        memServer: ObjType.memServer
+    };
+
+    try {
+        ObjType.numDefinitions = 2;
+        ObjType.idx = new Int32Array(2);
+        ObjType.dat = new Packet(new Uint8Array(0));
+        ObjType.recent = Array.from({ length: 10 }, () => new ObjType());
+        ObjType.recent[0]!.id = 1;
+        ObjType.recentPos = 0;
+        ObjType.memServer = true;
+
+        const inventory = new IfType();
+        inventory.id = 0;
+        inventory.linkObjType = Int32Array.from([2]);
+        inventory.linkObjNumber = Int32Array.from([17]);
+        const scriptOwner = new IfType();
+        scriptOwner.scripts = [Uint16Array.from([4, 0, 1, 0])];
+        IfType.list = [inventory, scriptOwner];
+
+        const client = clientFixture();
+        expect(client['getIfVar'](scriptOwner, 0)).toBe(17);
+    } finally {
+        ObjType.numDefinitions = original.numDefinitions;
+        ObjType.idx = original.idx;
+        ObjType.dat = original.dat;
+        ObjType.recent = original.recent;
+        ObjType.recentPos = original.recentPos;
+        ObjType.datEnd = original.datEnd;
+        ObjType.memServer = original.memServer;
+    }
 });

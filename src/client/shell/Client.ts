@@ -10319,7 +10319,7 @@ export class Client extends GameShell {
                     const objId: number = script[pc++];
                     const obj: number = objId + 1;
 
-                    if (com.linkObjType && com.linkObjNumber && obj >= 0 && obj < ObjType.numDefinitions && (!ObjType.list(objId).members || Client.memServer)) {
+                    if (com.linkObjType && com.linkObjNumber && objId >= 0 && objId < ObjType.numDefinitions && (!ObjType.list(objId).members || Client.memServer)) {
                         for (let i: number = 0; i < com.linkObjType.length; i++) {
                             if (com.linkObjType[i] === obj) {
                                 register += com.linkObjNumber[i];
