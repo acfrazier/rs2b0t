@@ -351,3 +351,48 @@ test('HP bars follow the Java combat-cycle gate (Client.java:6408-6416)', () => 
         Pix2D.fillRect = originalFillRect;
     }
 });
+
+test('chat effect 4 uses Java integer division for its scroll offset (Client.java:6520-6525)', () => {
+    const draws: [number, number, number][] = [];
+    const font = {
+        stringWid: () => 21,
+        height: 12,
+        drawString: (_message: string | null, x: number, y: number, colour: number): void => {
+            draws.push([x, y, colour]);
+        }
+    };
+    const npc = {
+        isReady: () => true,
+        height: 40,
+        chatMessage: 'abc',
+        chatColour: 0,
+        chatEffect: 4,
+        chatTimer: 100,
+        combatCycle: 0,
+        damageCycles: new Int32Array(4),
+        type: null
+    };
+    const client = overlayClient({
+        localPlayer: null,
+        npcCount: 1,
+        npcIds: Int32Array.from([5]),
+        npc: Object.assign([], { 5: npc }),
+        chatEffects: 0,
+        chatWidth: new Int32Array(50),
+        chatHeight: new Int32Array(50),
+        chatX: new Int32Array(50),
+        chatY: new Int32Array(50),
+        chatColour: new Int32Array(50),
+        chatEffect: new Int32Array(50),
+        chatTimer: new Int32Array(50),
+        chats: new Array<string>(50),
+        b12: font
+    });
+
+    client['entityOverlays']();
+
+    expect(draws).toEqual([
+        [110, 201, Colour.BLACK],
+        [110, 200, Colour.YELLOW]
+    ]);
+});

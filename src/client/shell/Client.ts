@@ -5134,7 +5134,7 @@ export class Client extends GameShell {
                     this.b12?.centreStringShake(message, this.projectX, this.projectY, colour, 150 - this.chatTimer[i], this.sceneCycle);
                 } else if (this.chatEffect[i] === 4) {
                     const w: number = this.b12?.stringWid(message) ?? 0;
-                    const offsetX: number = ((150 - this.chatTimer[i]) * (w + 100)) / 150;
+                    const offsetX: number = (((150 - this.chatTimer[i]) * (w + 100)) / 150) | 0;
                     Pix2D.setClipping(this.projectX - 50, 0, this.projectX + 50, 334);
                     this.b12?.drawString(message, this.projectX + 50 - offsetX, this.projectY + 1, Colour.BLACK);
                     this.b12?.drawString(message, this.projectX + 50 - offsetX, this.projectY, colour);
