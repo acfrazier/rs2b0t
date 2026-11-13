@@ -44,11 +44,12 @@ const variants: Record<number, [number, number]> = {
 };
 const world = hasContentSource ? sourceWorld() : null;
 const hasNav = existsSync('out/collision.lcnav.gz');
-const skipUnqualifiedCampTests = CLIENT_VERSION === 377
-    ? skip377('test/scripts/accountLevelerAdvancedCamps.test.ts', 'S10b keeps AccountLeveler at revision 289; these camp source and route assertions pin 289 placements, not 377-qualified data.')
-    : null;
-const skipCampSource = skipUnqualifiedCampTests ?? test.skipIf(!hasContentSource);
-const skipCampRoutes = skipUnqualifiedCampTests ?? test.skipIf(!hasContentSource || !hasNav);
+const skipCampSource = test.skipIf(!hasContentSource);
+const skipCampRoutes = test.skipIf(!hasContentSource || !hasNav);
+const FILE = 'test/scripts/accountLevelerAdvancedCamps.test.ts';
+const brimhavenDungeonCampIds = new Set(['brimhaven-dungeon-moss-giants', 'brimhaven-dungeon-fire-giants']);
+const brimhavenDungeonCamps = ADVANCED_CAMPS.filter(camp => brimhavenDungeonCampIds.has(camp.id));
+const otherCampRoutes = ADVANCED_CAMPS.filter(camp => !brimhavenDungeonCampIds.has(camp.id));
 const finder = hasNav ? new PathFinder(gunzipSync(readFileSync('out/collision.lcnav.gz'))) : null;
 if (finder) loadDefaultNavEdges(finder);
 const banks = [{ x: 3092, z: 3243, level: 0 }, { x: 3013, z: 3355, level: 0 }, { x: 2612, z: 3092, level: 0 }];
@@ -80,6 +81,11 @@ function route(camp: CombatCamp, start: NavPoint, destination: NavPoint) {
         avoidZones: resolveDangerZones(levelerTravelZones(destination, camp.wilderness), { includeAutomatic: true, combatLevel: camp.minCombat ?? 3, start, destination }),
         useTeleportCatalog: false
     });
+}
+function expectCampRoute(camp: CombatCamp, start: NavPoint, destination: NavPoint) {
+    const path = route(camp, start, destination);
+    expect(path.ok, `${camp.id}: ${JSON.stringify(start)} -> ${JSON.stringify(destination)}${path.ok ? '' : `: ${path.reason}`}`).toBe(true);
+    if (path.ok) for (const hop of path.hops) expect([102, 1805, 1541], camp.id).not.toContain(hop.locId);
 }
 
 test('every advanced camp has an independent source audit', () => {
@@ -120,17 +126,32 @@ skipCampSource.each([...ADVANCED_CAMPS])('hunting NPCs around $id stay within it
     }
 });
 
-skipCampRoutes.each([...ADVANCED_CAMPS])('declared travel supplies reach $id from three banks and return', camp => {
+skipCampRoutes.each([...otherCampRoutes])('declared travel supplies reach $id from three banks and return', camp => {
     const anchor = { x: camp.x, z: camp.z, level: camp.level ?? 0 };
     expect(finder!.walkable(anchor.x, anchor.z, anchor.level), camp.id).toBe(true);
     for (const bank of banks) {
-        for (const [start, destination] of [[bank, anchor], [anchor, bank]]) {
-            const path = route(camp, start, destination);
-            expect(path.ok, `${camp.id}: ${JSON.stringify(start)} -> ${JSON.stringify(destination)}${path.ok ? '' : `: ${path.reason}`}`).toBe(true);
-            if (path.ok) for (const hop of path.hops) expect([102, 1805, 1541], camp.id).not.toContain(hop.locId);
-        }
+        expectCampRoute(camp, bank, anchor);
+        expectCampRoute(camp, anchor, bank);
     }
 }, 30_000);
+
+skipCampRoutes.each([...brimhavenDungeonCamps])('declared travel supplies reach $id from three banks', camp => {
+    const anchor = { x: camp.x, z: camp.z, level: camp.level ?? 0 };
+    expect(finder!.walkable(anchor.x, anchor.z, anchor.level), camp.id).toBe(true);
+    for (const bank of banks) expectCampRoute(camp, bank, anchor);
+}, 30_000);
+
+function returnToBanks(camp: CombatCamp) {
+    const anchor = { x: camp.x, z: camp.z, level: camp.level ?? 0 };
+    for (const bank of banks) expectCampRoute(camp, anchor, bank);
+}
+
+if (CLIENT_VERSION === 377) {
+    // Why: "a test whose scenario the 377 data does not contain" (test/lib/skip377.ts:4): karam_dungeon_exit has no 377 OPLOC handler (transports.json:196; CONTENT_DIR/pack/loc.pack:5085; maps/m42_149.jm2:5830). Report: RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.
+    skip377(FILE, '377 data gap: karam_dungeon_exit has no OPLOC leave handler (transports.json:196; content/pack/loc.pack:5085; maps/m42_149.jm2:5830). Report: RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.').each([...brimhavenDungeonCamps])('declared travel supplies return from $id to three banks', returnToBanks, 30_000);
+} else {
+    skipCampRoutes.each([...brimhavenDungeonCamps])('declared travel supplies return from $id to three banks', returnToBanks, 30_000);
+}
 
 skipCampRoutes.each([...ADVANCED_CAMPS])('anchor reaches every target spawn in the wander envelope at $id', camp => {
     const anchor = { x: camp.x, z: camp.z, level: camp.level ?? 0 };
