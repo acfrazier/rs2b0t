@@ -12,10 +12,6 @@ import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import { resolveDangerZones } from '#/bot/event/webwalk/data/dangerZones.js';
-import { skip377 } from '../lib/skip377.js';
-const FILE = 'test/scripts/accountLevelerRangingGuild.test.ts';
-// Why: RangingGuild stays an unqualified revision-289 program; its expected Oak shortbow belongs to that item program, not the 377 data.
-const skipUnqualifiedRangingGuild = skip377(FILE, 'RangingGuild remains revision 289 under S10b; the Oak shortbow expectation is not qualified by the 377 item catalog.');
 
 const snapshot = (ranged = 40, coins = 100000): LevelerSnapshot => ({
     levels: { ...Object.fromEntries(enabledSkills.map(skill => [skill, 60])), ranged },
@@ -23,7 +19,7 @@ const snapshot = (ranged = 40, coins = 100000): LevelerSnapshot => ({
     target: 60, wilderness: false, allowQuests: false, now: 1000
 });
 
-skipUnqualifiedRangingGuild('Ranged switches to the guild at 40 without food or combat ammunition', () => {
+test('Ranged switches to the guild at 40 without food or combat ammunition', () => {
     const s = snapshot(39);
     const before = methodFor(s, 'ranged', emptyMemory(), () => 0)!;
     expect(before.script).toBe('AutoFighter');
@@ -34,7 +30,8 @@ skipUnqualifiedRangingGuild('Ranged switches to the guild at 40 without food or 
     if (decision.kind !== 'activity') return;
     expect(decision.queue.map(plan => plan.script)).toEqual(['RangingGuild']);
     expect(decision.plan.settings).toEqual({ coinsPerTrip: 10000, coinsReserve: 200 });
-    expect(decision.plan.needs.map(need => need.item)).toEqual(['Coins', 'Oak shortbow']);
+    // Why: upstream 27e57fa3 reuses rangedBow; the port's 377 Lowe stock already supplies Maple (accountLevelerEquipment.test.ts).
+    expect(decision.plan.needs.map(need => need.item)).toEqual(['Coins', 'Maple shortbow']);
     expect(decision.plan.food).toBeUndefined();
     expect(decision.plan.combat).not.toBe(true);
 });
