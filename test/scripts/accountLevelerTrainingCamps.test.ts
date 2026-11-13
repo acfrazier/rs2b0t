@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Glob } from 'bun';
 import { expect, test } from 'bun:test';
 import { gunzipSync } from 'fflate';
@@ -8,6 +7,9 @@ import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import { resolveDangerZones } from '#/bot/event/webwalk/data/dangerZones.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
+import { contentRoot } from '../lib/contentWorld.js';
+import { skip377 } from '../lib/skip377.js';
 
 const additions = [
     { id: 'varrock-west-guards', npcIds: [9], maxThreat: 28 },
@@ -29,9 +31,26 @@ const additions = [
     { id: 'ardougne-moss-giants', npcIds: [112], maxThreat: 42 },
     { id: 'wilderness-hobgoblins', npcIds: [122], maxThreat: 28 },
 ];
-const content = resolve('../rs2b2t-content');
+const content = contentRoot;
 const hasSource = existsSync(`${content}/pack/npc.pack`);
 const hasNav = existsSync('out/collision.lcnav.gz');
+const testFile = 'test/scripts/accountLevelerTrainingCamps.test.ts';
+const sourceGapReasons: Record<string, string> = {
+    'falador-south-guards': '"a test whose scenario the 377 data does not contain" (test/lib/skip377.ts:4): no plane-0 Guard with Attack is within 12 tiles of camp (3006,3322); full covering squares maps/m46_51.jm2, maps/m46_52.jm2, maps/m47_51.jm2, maps/m47_52.jm2 span x=2944..3071,z=3264..3391. NPC ID 9 remains defined at pack/npc.pack:10 and scripts/_unpack/377/all.npc:332, but no matching spawn exists in that radius.',
+    'lumbridge-bears': '"a test whose scenario the 377 data does not contain" (test/lib/skip377.ts:4): no plane-0 Bear with Attack is within 12 tiles of camp (3169,3227); the complete covering square maps/m49_50.jm2 spans x=3136..3199,z=3200..3263. Bear IDs 105–106 are defined at pack/npc.pack:106–107 and scripts/_unpack/377/all.npc:2981,3010, but neither is placed in that radius.'
+};
+
+function registerCampCase(name: string, run: () => void, dataGap?: string, requiresNav = false, timeout?: number) {
+    const missingInput = !hasSource || (requiresNav && !hasNav);
+    if (missingInput) {
+        test.skip(name, run, timeout);
+    } else if (CLIENT_VERSION === 377 && dataGap) {
+        // Why: skip377.ts:4 permits "a test whose scenario the 377 data does not contain"; each dataGap cites that case's map evidence.
+        skip377(testFile, `${dataGap} Report: RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.`)(name, run, timeout);
+    } else {
+        test(name, run, timeout);
+    }
+}
 type NpcConfig = Record<string, string>;
 interface Spawn { id: number; x: number; z: number; level: number }
 
@@ -93,43 +112,57 @@ const variants: Record<number, [number, number]> = {
     112: [42, 60], 117: [28, 35], 122: [28, 29], 1076: [37, 40], 1077: [37, 40]
 };
 
-test.skipIf(!hasSource).each(additions)('source verifies ordinary variants and nearby threats at $id', ({ id, npcIds, maxThreat }) => {
-    const camp = COMBAT_CAMPS.find(camp => camp.id === id);
-    expect(camp, id).toBeDefined();
-    if (!camp) return;
-    expect(targets(id).length, id).toBeGreaterThan(0);
-    for (const spawn of targets(id, true)) {
-        const npc = world!.npcs.get(spawn.id)!;
-        expect(npcIds, `${id}:${spawn.id}`).toContain(spawn.id);
-        expect([Number(npc.vislevel), Number(npc.hitpoints)], npc.key).toEqual(variants[spawn.id]);
-        expect(npc.op2, npc.key).toBe('Attack');
-        expect(world!.attackOverrides.has(npc.key), npc.key).toBe(false);
-        if (npc.category) expect(world!.attackOverrides.has(`_${npc.category}`), npc.key).toBe(false);
-    }
-    for (const spawn of world!.spawns) {
-        const npc = world!.npcs.get(spawn.id)!;
-        if (spawn.level !== 0 || !npc.huntmode || Math.max(Math.abs(spawn.x - camp.x), Math.abs(spawn.z - camp.z)) > 12 + Number(npc.wanderrange ?? 5) + Number(npc.huntrange ?? 0)) continue;
-        expect(Number(npc.vislevel), `${id}:${npc.key}`).toBeLessThanOrEqual(maxThreat);
-        expect(npc.params, `${id}:${npc.key}`).not.toMatch(/poison/);
-    }
-});
+for (const { id, npcIds, maxThreat } of additions) {
+    registerCampCase(
+        `source verifies ordinary variants and nearby threats at ${id}`,
+        () => {
+            const camp = COMBAT_CAMPS.find(camp => camp.id === id);
+            expect(camp, id).toBeDefined();
+            if (!camp) return;
+            expect(targets(id).length, id).toBeGreaterThan(0);
+            for (const spawn of targets(id, true)) {
+                const npc = world!.npcs.get(spawn.id)!;
+                expect(npcIds, `${id}:${spawn.id}`).toContain(spawn.id);
+                expect([Number(npc.vislevel), Number(npc.hitpoints)], npc.key).toEqual(variants[spawn.id]);
+                expect(npc.op2, npc.key).toBe('Attack');
+                expect(world!.attackOverrides.has(npc.key), npc.key).toBe(false);
+                if (npc.category) expect(world!.attackOverrides.has(`_${npc.category}`), npc.key).toBe(false);
+            }
+            for (const spawn of world!.spawns) {
+                const npc = world!.npcs.get(spawn.id)!;
+                if (spawn.level !== 0 || !npc?.huntmode || Math.max(Math.abs(spawn.x - camp.x), Math.abs(spawn.z - camp.z)) > 12 + Number(npc.wanderrange ?? 5) + Number(npc.huntrange ?? 0)) continue;
+                expect(Number(npc.vislevel), `${id}:${npc.key}`).toBeLessThanOrEqual(maxThreat);
+                expect(npc.params, `${id}:${npc.key}`).not.toMatch(/poison/);
+            }
+        },
+        sourceGapReasons[id]
+    );
+}
 
-test.skipIf(!hasSource || !hasNav).each(additions)('real routes reach $id and target spawns without restricted doors', ({ id }) => {
-    const camp = COMBAT_CAMPS.find(camp => camp.id === id);
-    expect(camp, id).toBeDefined();
-    if (!camp) return;
-    const anchor = { x: camp.x, z: camp.z, level: 0 };
-    for (const bank of banks) {
-        const path = route(bank, anchor);
-        expect(path.ok, `${id} from ${bank.x},${bank.z}`).toBe(true);
-        if (path.ok) for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
-    }
-    for (const spawn of targets(id, true)) {
-        const path = route(anchor, spawn);
-        expect(path.ok, `${id} target ${spawn.x},${spawn.z}`).toBe(true);
-        if (path.ok) {
-            expect(path.cost, `${id} target ${spawn.x},${spawn.z}`).toBeLessThanOrEqual(64);
-            for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
-        }
-    }
-}, 20000);
+for (const { id } of additions) {
+    registerCampCase(
+        `real routes reach ${id} and target spawns without restricted doors`,
+        () => {
+            const camp = COMBAT_CAMPS.find(camp => camp.id === id);
+            expect(camp, id).toBeDefined();
+            if (!camp) return;
+            const anchor = { x: camp.x, z: camp.z, level: 0 };
+            for (const bank of banks) {
+                const path = route(bank, anchor);
+                expect(path.ok, `${id} from ${bank.x},${bank.z}`).toBe(true);
+                if (path.ok) for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
+            }
+            for (const spawn of targets(id, true)) {
+                const path = route(anchor, spawn);
+                expect(path.ok, `${id} target ${spawn.x},${spawn.z}`).toBe(true);
+                if (path.ok) {
+                    expect(path.cost, `${id} target ${spawn.x},${spawn.z}`).toBeLessThanOrEqual(64);
+                    for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
+                }
+            }
+        },
+        undefined,
+        true,
+        20000
+    );
+}

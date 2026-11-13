@@ -50,7 +50,7 @@
   "artifacts": [
     {
       "path": "docs/SCRIPTS.md",
-      "sha256": "b35466f002115047371deb2ea1062c80ced3067a2b390f3477b9d0e779881ff6",
+      "sha256": "1facf99f53471aa6f48c03669608b0209f762adaa13c816daf3b1cca71bff56f",
       "kind": "generated",
       "qualification": "offline"
     },
@@ -627,7 +627,7 @@
     },
     {
       "path": "src/bot/event/webwalk/travelCatalog.ts",
-      "sha256": "3e2884de207b0db5f488fb2b6160321e703959c964b9ee2a37fb81c036c8ab8f",
+      "sha256": "00c76cb60108ed8c9bc546753d8312de30512fe789d794d8005227f0f286f184",
       "kind": "edition",
       "qualification": "offline"
     },

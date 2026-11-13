@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Glob } from 'bun';
 import { expect, test } from 'bun:test';
 import { gunzipSync } from 'fflate';
@@ -10,6 +9,9 @@ import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import { resolveDangerZones } from '#/bot/event/webwalk/data/dangerZones.js';
 import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
+import { contentRoot } from '../lib/contentWorld.js';
+import { skip377 } from '../lib/skip377.js';
 
 const additions = [
     { id: 'lumbridge-swamp-giant-rats', npcIds: [86, 87] },
@@ -46,9 +48,28 @@ const snapshot = (level = 40): LevelerSnapshot => ({
     stock: { coins: 100000, trout: 100, 'bronze arrow': 87 }, bankReady: true, quests: {}, target: 40, wilderness: true, now: 1000
 });
 const isolate = (id: string) => ({ ...emptyMemory(), cooldowns: Object.fromEntries(COMBAT_CAMPS.filter(camp => camp.id !== id).map(camp => [camp.id, 2000])) });
-const content = resolve('../rs2b2t-content');
+const content = contentRoot;
 const hasSource = existsSync(`${content}/pack/npc.pack`);
 const hasNav = existsSync('out/collision.lcnav.gz');
+const testFile = 'test/scripts/accountLevelerLowLevelCamps.test.ts';
+const sourceGapReasons: Record<string, string> = {
+    'falador-women': '"a test whose scenario the 377 data does not contain" (test/lib/skip377.ts:4): no plane-0 Woman with Attack is within 12 tiles of camp (2970,3389); full covering squares maps/m46_52.jm2 and maps/m46_53.jm2 span x=2944..3007,z=3328..3455. NPC IDs 4–6 are defined in pack/npc.pack:5–7 and scripts/_unpack/377/all.npc:148,182,222, but none is placed in that radius.'
+};
+const routeGapReasons: Record<string, string> = {
+    'varrock-east-giant-rats': '"a test whose scenario the 377 data does not contain" (test/lib/skip377.ts:4): the route to camp anchor (3265,3382) is blocked by loc 1631 oldwall at world x=3263,z=3380..3385 (maps/m50_52.jm2:7326,7328–7336; pack/loc.pack:1632). The 377 target NPC 87 is on the far side at (3264,3383) (maps/m51_52.jm2:6634).'
+};
+
+function registerCampCase(name: string, run: () => void, dataGap?: string, requiresNav = false, timeout?: number) {
+    const missingInput = !hasSource || (requiresNav && !hasNav);
+    if (missingInput) {
+        test.skip(name, run, timeout);
+    } else if (CLIENT_VERSION === 377 && dataGap) {
+        // Why: skip377.ts:4 permits "a test whose scenario the 377 data does not contain"; each dataGap cites that case's map evidence.
+        skip377(testFile, `${dataGap} Report: RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.`)(name, run, timeout);
+    } else {
+        test(name, run, timeout);
+    }
+}
 type NpcConfig = Record<string, string>;
 interface Spawn { id: number; x: number; z: number; level: number }
 
@@ -143,49 +164,63 @@ test('teleporting imps and the three inaccessible starter sites remain excluded'
     for (const id of ['port-sarim-rats', 'varrock-chickens', 'varrock-rats']) expect(COMBAT_CAMPS.some(camp => camp.id === id)).toBe(false);
 });
 
-test.skipIf(!hasSource).each(additions)('source verifies attackable ordinary NPCs and safe nearby spawns at $id', ({ id, npcIds }) => {
-    const camp = COMBAT_CAMPS.find(camp => camp.id === id);
-    expect(camp, id).toBeDefined();
-    if (!camp) return;
-    const nearby = targets(id);
-    expect(nearby.length, id).toBeGreaterThan(0);
-    for (const spawn of nearby) {
-        const npc = world!.npcs.get(spawn.id)!;
-        expect(npcIds, `${id}:${spawn.id}`).toContain(spawn.id);
-        expect(npc.op2, npc.key).toBe('Attack');
-        expect(Number(npc.vislevel)).toBeLessThanOrEqual(25);
-        expect(world!.attackOverrides.has(npc.key), npc.key).toBe(false);
-        if (npc.category) expect(world!.attackOverrides.has(`_${npc.category}`), npc.key).toBe(false);
-    }
-    if (camp.offence <= 15) {
-        const dangerous = world!.spawns.filter(spawn => {
-            const npc = world!.npcs.get(spawn.id);
-            if (spawn.level !== 0 || !npc?.huntmode || Number(npc.vislevel) < 10) return false;
-            return Math.max(Math.abs(spawn.x - camp.x), Math.abs(spawn.z - camp.z)) <= 12 + Number(npc.wanderrange ?? 5) + Number(npc.huntrange ?? 0);
-        });
-        expect(dangerous.map(spawn => `${world!.npcs.get(spawn.id)?.name}:${spawn.x},${spawn.z}`), id).toEqual([]);
-    }
-});
+for (const { id, npcIds } of additions) {
+    registerCampCase(
+        `source verifies attackable ordinary NPCs and safe nearby spawns at ${id}`,
+        () => {
+            const camp = COMBAT_CAMPS.find(camp => camp.id === id);
+            expect(camp, id).toBeDefined();
+            if (!camp) return;
+            const nearby = targets(id);
+            expect(nearby.length, id).toBeGreaterThan(0);
+            for (const spawn of nearby) {
+                const npc = world!.npcs.get(spawn.id)!;
+                expect(npcIds, `${id}:${spawn.id}`).toContain(spawn.id);
+                expect(npc.op2, npc.key).toBe('Attack');
+                expect(Number(npc.vislevel)).toBeLessThanOrEqual(25);
+                expect(world!.attackOverrides.has(npc.key), npc.key).toBe(false);
+                if (npc.category) expect(world!.attackOverrides.has(`_${npc.category}`), npc.key).toBe(false);
+            }
+            if (camp.offence <= 15) {
+                const dangerous = world!.spawns.filter(spawn => {
+                    const npc = world!.npcs.get(spawn.id);
+                    if (spawn.level !== 0 || !npc?.huntmode || Number(npc.vislevel) < 10) return false;
+                    return Math.max(Math.abs(spawn.x - camp.x), Math.abs(spawn.z - camp.z)) <= 12 + Number(npc.wanderrange ?? 5) + Number(npc.huntrange ?? 0);
+                });
+                expect(dangerous.map(spawn => `${world!.npcs.get(spawn.id)?.name}:${spawn.x},${spawn.z}`), id).toEqual([]);
+            }
+        },
+        sourceGapReasons[id]
+    );
+}
 
-test.skipIf(!hasSource || !hasNav).each(additions)('real routes reach $id and its target spawns without restricted doors', ({ id }) => {
-    const camp = COMBAT_CAMPS.find(camp => camp.id === id);
-    expect(camp, id).toBeDefined();
-    if (!camp) return;
-    const anchor = { x: camp.x, z: camp.z, level: 0 };
-    for (const bank of banks) {
-        const path = route(bank, anchor);
-        expect(path.ok, `${id} from ${bank.x},${bank.z}`).toBe(true);
-        if (path.ok) {
-            for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
-            if (camp.offence <= 15) expect(path.waypoints.some(point => point.z > 6400), id).toBe(false);
-        }
-    }
-    for (const spawn of targets(id)) {
-        const path = route(anchor, spawn);
-        expect(path.ok, `${id} target ${spawn.x},${spawn.z}`).toBe(true);
-        if (path.ok) {
-            expect(path.cost, `${id} target ${spawn.x},${spawn.z}`).toBeLessThanOrEqual(64);
-            for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
-        }
-    }
-}, 20000);
+for (const { id } of additions) {
+    registerCampCase(
+        `real routes reach ${id} and its target spawns without restricted doors`,
+        () => {
+            const camp = COMBAT_CAMPS.find(camp => camp.id === id);
+            expect(camp, id).toBeDefined();
+            if (!camp) return;
+            const anchor = { x: camp.x, z: camp.z, level: 0 };
+            for (const bank of banks) {
+                const path = route(bank, anchor);
+                expect(path.ok, `${id} from ${bank.x},${bank.z}`).toBe(true);
+                if (path.ok) {
+                    for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
+                    if (camp.offence <= 15) expect(path.waypoints.some(point => point.z > 6400), id).toBe(false);
+                }
+            }
+            for (const spawn of targets(id)) {
+                const path = route(anchor, spawn);
+                expect(path.ok, `${id} target ${spawn.x},${spawn.z}`).toBe(true);
+                if (path.ok) {
+                    expect(path.cost, `${id} target ${spawn.x},${spawn.z}`).toBeLessThanOrEqual(64);
+                    for (const hop of path.hops) expect([102, 1805, 1541], id).not.toContain(hop.locId);
+                }
+            }
+        },
+        routeGapReasons[id],
+        true,
+        20000
+    );
+}

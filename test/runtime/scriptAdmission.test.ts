@@ -108,7 +108,7 @@ const L2_QUALIFIED = ['BoneBurier'];
 
 test('bundled scripts target revision 289 except the L2-qualified set', () => {
     const scripts = ScriptRegistry.list();
-    expect(scripts).toHaveLength(76);
+    expect(scripts).toHaveLength(77);
     for (const meta of scripts) {
         expect({ name: meta.name, revision: meta.revision }).toEqual({ name: meta.name, revision: L2_QUALIFIED.includes(meta.name) ? CLIENT_VERSION : OLD_REVISION });
     }

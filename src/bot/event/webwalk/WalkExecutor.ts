@@ -57,6 +57,7 @@ import {
     tryNearbyDoor
 } from './exec/doorCrossing.js';
 import { handleSpecialCrossing } from './exec/specialCrossing.js';
+import { handleDungeonEntry } from './exec/dungeonEntry.js';
 import {
     awaitTransportLoc,
     findTransportLoc,
@@ -632,10 +633,10 @@ class WalkExecutorImpl {
 
     private checkRouteItems(waypoints: Waypoint[], log: (msg: string) => void): boolean {
         const missing = missingItemsForPath(waypoints, snapshotWorldStateData());
+        this.lastMissingGateItems = missing;
         if (missing.length === 0) {
             return true;
         }
-        this.lastMissingGateItems = missing;
         this.lastOutcome = 'unreachable';
         log(`route needs ${missing.map(m => `${m.count}×${m.name}`).join(', ')} before departure`);
         return false;
@@ -1239,6 +1240,12 @@ class WalkExecutorImpl {
                 log(`suppress teleport ${transport.teleportId} for this walk`);
             }
             return ok;
+        }
+
+        const dungeon = await handleDungeonEntry(transport, approach, step, log);
+        if (dungeon !== null) {
+            if (dungeon) RouteState.noteTransport(approach, step);
+            return dungeon;
         }
 
         const special = specialCrossingForTransport(transport, approach, step);

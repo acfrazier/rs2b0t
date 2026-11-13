@@ -2,6 +2,7 @@
 // Constant landings cite their content sources; stand tiles are pack-checked approaches.
 
 import type { TransportEdgeData } from './PathFinder.js';
+import { lighthouseTravelEdges } from './lighthouseTravel.js';
 import { iceQueenRockslideEdges } from './iceQueenRockslide.js';
 import { essenceExitEdges } from './essenceExit.js';
 import { parseLcCoord } from './geometry/lcCoord.js';
@@ -585,6 +586,7 @@ export function desertMiningCampEdges(): TransportEdgeData[] {
 /** All curated travel rows to merge with transports.json at graph load. */
 export function curatedTravelEdges(): TransportEdgeData[] {
     return [
+        ...lighthouseTravelEdges(),
         ...spiritTreeEdges(),
         ...gliderEdges(),
         ...entranaFerryEdges(),

@@ -57,6 +57,22 @@ the 377 content names every member distinctly, so those groups no longer exist.
 - Amulets: the 377 collision groups keep every strung and unstrung pair: Gold [1673,1692], Sapphire [1675,1694], Emerald [1677,1696,+6041 magic strung], Ruby [1679,1698], Diamond [1681,1700], Dragonstone ammy [1683,1702] (`all.obj` `name=Dragonstone ammy` :22547). The Emerald group has three members, which defeats the two-way worn and unworn split, so 1696 keeps the generated "Strung emerald amulet" label.
 - Shorthand keys must be names the 377 content repeats. The dragonhide shorthand is gone with its groups, and Dragonstone retargets to "Dragonstone ammy".
 
+## AccountLeveler merge expectations
+
+Upstream `27e57fa3` adds Ranging Guild selection at Ranged 40 and uses the existing `rangedBow`
+equipment planner. The port already selects Maple shortbow at level 30 (`accountLevelerEquipment.test.ts`).
+The cutover's shop catalog supplies it through Lowe: `scripts/_unpack/727/all.inv:121-141`,
+especially `stock11=maple_shortbow,1,100` at line 140. Oak shortbow also exists.
+The guild test therefore expects Maple, not the upstream 289 catalog's Oak. Neither the equipment
+planner nor the 289 shop data changes for this merge.
+
+The dragon Prayer plans retain the distinct hide names from Item aliases above while keeping
+upstream special attacks and secondary loot. The names are `all.obj:23454,23475`.
+Secondary rune loot comes from `DROP_DB`, not from every rune object that exists.
+Soul rune is declared (`pack/obj.pack:567`, `all.obj:5651-5652`), but no canonical
+`scripts/drop_tables` drop or NPC `death_drop` yields it. The separate Soul rune assertion uses
+the existing missing-scenario skip rule. The other twelve rune assertions run.
+
 ## Mining locations and rocks
 
 Rocks per camp are the 377 placements of the ids in `miningRocks.ts`: the classic 2090-2111 rocks plus the `rocks_97xx/111xxx/119xxx/148xx` series (`pack/loc.pack`, `scripts/skill_mining/configs/mine.dbrow:12-198`); decode in `RS2B0T-377-S9-1106/placements-rocks.txt`.
