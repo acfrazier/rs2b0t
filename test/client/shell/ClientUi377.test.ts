@@ -485,16 +485,16 @@ test('type-8 tooltips use Java hover gates, tagged text widths and clipping (Cli
 
         const client = clientFixture({
             p12: font,
-            overMainComId: 1,
-            overSideComId: 0,
-            overChatComId: 0,
+            tooltipMainComId: 1,
+            tooltipSideComId: 0,
+            tooltipChatComId: 0,
             tooltipTimer: 100
         });
         const tooltipPainted = (main: number, side: number, chat: number, timer: number): boolean => {
             pixels.fill(0);
-            client['overMainComId'] = main;
-            client['overSideComId'] = side;
-            client['overChatComId'] = chat;
+            client['tooltipMainComId'] = main;
+            client['tooltipSideComId'] = side;
+            client['tooltipChatComId'] = chat;
             client['tooltipTimer'] = timer;
             client['drawInterface'](root, 20, 30, 0);
             return pixels[62 * Pix2D.width + 130] === 0xffffa0;
@@ -509,9 +509,9 @@ test('type-8 tooltips use Java hover gates, tagged text widths and clipping (Cli
 
         pixels.fill(0);
         textDraws.length = 0;
-        client['overMainComId'] = 1;
-        client['overSideComId'] = 0;
-        client['overChatComId'] = 0;
+        client['tooltipMainComId'] = 1;
+        client['tooltipSideComId'] = 0;
+        client['tooltipChatComId'] = 0;
         client['tooltipTimer'] = 100;
         client['drawInterface'](root, 20, 30, 0);
         expect(textDraws).toEqual([
@@ -553,9 +553,9 @@ test('type-8 tooltips use Java hover gates, tagged text widths and clipping (Cli
 
 test('type-8 tooltip timer holds 100 hovered cycles and decays without hover (Client.java:3306-3322)', () => {
     const client = clientFixture({
-        overMainComId: 0,
-        overSideComId: 7,
-        overChatComId: 8,
+        tooltipMainComId: 0,
+        tooltipSideComId: 7,
+        tooltipChatComId: 8,
         tooltipTimer: 99,
         redrawChat: false,
         redrawSide: false
@@ -566,8 +566,8 @@ test('type-8 tooltip timer holds 100 hovered cycles and decays without hover (Cl
     expect(client['redrawChat']).toBe(true);
     expect(client['redrawSide']).toBe(true);
 
-    client['overSideComId'] = 0;
-    client['overChatComId'] = 0;
+    client['tooltipSideComId'] = 0;
+    client['tooltipChatComId'] = 0;
     client['tooltipTimer'] = 1;
     client['updateTooltipTimer']();
     expect(client['tooltipTimer']).toBe(0);

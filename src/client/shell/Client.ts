@@ -556,6 +556,11 @@ export class Client extends GameShell {
     private overChatComId: number = 0;
     private overMainComId: number = 0;
     private overSideComId: number = 0;
+    // Java 377 field611/580/425/340: type-8 hover is separate from overcolour/overlayer highlighting.
+    private lastTooltipComId: number = 0;
+    private tooltipChatComId: number = 0;
+    private tooltipMainComId: number = 0;
+    private tooltipSideComId: number = 0;
     private tooltipTimer: number = 0;
     private activeIcon: number = 3;
     private sideIcon: number[] = [
@@ -2579,7 +2584,6 @@ export class Client extends GameShell {
         this.timeoutChat();
 
         this.worldUpdateNum++;
-        this.updateTooltipTimer();
 
         if (this.crossMode !== 0) {
             this.crossCycle += 20;
@@ -2711,6 +2715,8 @@ export class Client extends GameShell {
         if (this.mouseButton === 1 || this.mouseClickButton === 1) {
             this.scrollCycle++;
         }
+
+        this.updateTooltipTimer();
 
         if (this.sceneState === 2) {
             this.followCamera();
@@ -2895,15 +2901,20 @@ export class Client extends GameShell {
         const fullscreenId: number = getClient377State(this).fullscreenInterfaceId0;
         if (fullscreenId !== -1) {
             this.lastOverComId = 0;
+            this.lastTooltipComId = 0;
             this.addComponentOptions(IfType.list[fullscreenId], this.mouseX, this.mouseY, 0, 0, 0);
             if (this.lastOverComId !== this.overMainComId) {
                 this.overMainComId = this.lastOverComId;
+            }
+            if (this.lastTooltipComId !== this.tooltipMainComId) {
+                this.tooltipMainComId = this.lastTooltipComId;
             }
             return;
         }
 
         this.addPrivateChatOptions();
         this.lastOverComId = 0;
+        this.lastTooltipComId = 0;
 
         if (this.mouseX > 4 && this.mouseY > 4 && this.mouseX < 516 && this.mouseY < 338) {
             if (this.mainModalId === -1) {
@@ -2916,8 +2927,12 @@ export class Client extends GameShell {
         if (this.lastOverComId !== this.overMainComId) {
             this.overMainComId = this.lastOverComId;
         }
+        if (this.lastTooltipComId !== this.tooltipMainComId) {
+            this.tooltipMainComId = this.lastTooltipComId;
+        }
 
         this.lastOverComId = 0;
+        this.lastTooltipComId = 0;
 
         if (this.mouseX > 553 && this.mouseY > 205 && this.mouseX < 743 && this.mouseY < 466) {
             if (this.sideModalId !== -1) {
@@ -2931,8 +2946,13 @@ export class Client extends GameShell {
             this.redrawSide = true;
             this.overSideComId = this.lastOverComId;
         }
+        if (this.lastTooltipComId !== this.tooltipSideComId) {
+            this.redrawSide = true;
+            this.tooltipSideComId = this.lastTooltipComId;
+        }
 
         this.lastOverComId = 0;
+        this.lastTooltipComId = 0;
 
         if (this.mouseX > 17 && this.mouseY > 357 && this.mouseX < 496 && this.mouseY < 453) {
             if (this.chatModalId !== -1) {
@@ -2948,6 +2968,10 @@ export class Client extends GameShell {
         if ((this.chatModalId !== -1 || this.tutComId !== -1) && this.lastOverComId !== this.overChatComId) {
             this.redrawChat = true;
             this.overChatComId = this.lastOverComId;
+        }
+        if ((this.chatModalId !== -1 || this.tutComId !== -1) && this.lastTooltipComId !== this.tooltipChatComId) {
+            this.redrawChat = true;
+            this.tooltipChatComId = this.lastTooltipComId;
         }
 
         let sorted: boolean = false;
@@ -9545,6 +9569,10 @@ export class Client extends GameShell {
                 }
             }
 
+            if (child.type === ComponentType.TYPE_TEXT_STATIC && mouseX >= childX && mouseY >= childY && mouseX < childX + child.width && mouseY < childY + child.height) {
+                this.lastTooltipComId = child.id;
+            }
+
             if (child.type === 0) {
                 this.addComponentOptions(child, mouseX, mouseY, childX, childY, child.scrollPos);
 
@@ -9794,7 +9822,7 @@ export class Client extends GameShell {
     }
 
     private updateTooltipTimer(): void {
-        if (this.overMainComId === 0 && this.overSideComId === 0 && this.overChatComId === 0) {
+        if (this.tooltipMainComId === 0 && this.tooltipSideComId === 0 && this.tooltipChatComId === 0) {
             if (this.tooltipTimer > 0) {
                 this.tooltipTimer--;
             }
@@ -9802,10 +9830,10 @@ export class Client extends GameShell {
             this.tooltipTimer++;
 
             if (this.tooltipTimer === 100) {
-                if (this.overChatComId !== 0) {
+                if (this.tooltipChatComId !== 0) {
                     this.redrawChat = true;
                 }
-                if (this.overSideComId !== 0) {
+                if (this.tooltipSideComId !== 0) {
                     this.redrawSide = true;
                 }
             }
@@ -10175,7 +10203,7 @@ export class Client extends GameShell {
                 }
             } else if (
                 child.type === ComponentType.TYPE_TEXT_STATIC &&
-                (this.overChatComId === child.id || this.overSideComId === child.id || this.overMainComId === child.id) &&
+                (this.tooltipChatComId === child.id || this.tooltipSideComId === child.id || this.tooltipMainComId === child.id) &&
                 this.tooltipTimer === 100
             ) {
                 const font: PixFont | null = this.p12;
