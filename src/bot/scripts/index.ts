@@ -89,6 +89,7 @@ import GnomeMagicChopper, { GNOME_MAGIC_CHOPPER_SETTINGS } from './GnomeMagicCho
 import ArravSupplier, { ARRAV_SUPPLIER_SETTINGS } from './ArravSupplier/ArravSupplier.js';
 import Barcrawl from './Barcrawl/Barcrawl.js';
 import DuelArena, { DUEL_ARENA_SETTINGS } from './DuelArena/DuelArena.js';
+import DragonfireShield, { SETTINGS as DRAGONFIRESHIELD_SETTINGS } from './DragonfireShield/DragonfireShield.js';
 import WanderLooter, { SETTINGS as WANDER_LOOTER_SETTINGS } from './WanderLooter/WanderLooter.js';
 
 // First register = panel default when no script is remembered (BotPanel → list()[0]).
@@ -149,6 +150,16 @@ ScriptRegistry.register({
     tags: ['duel arena', 'pvp', 'attack', 'strength', 'defence', 'multibox'],
     settingsSchema: DUEL_ARENA_SETTINGS,
     create: () => new DuelArena()
+});
+
+ScriptRegistry.register({
+    revision: 289,
+    name: 'DragonfireShield',
+    description: 'Farms free anti-dragonbreath shields from Duke Horacio in Lumbridge Castle (requires the %dragon_shield var, unlocked by Oziach in the Dark Slayer quest) — drop-mode: un-noted shields are dropped at the Duke, looted and banked; noted shields are carried to seed the pile and freely drop-safe to the floor',
+    category: 'Quest',
+    tags: ['dark slayer', 'dragonfire shield', 'antidragonbreath shield', 'duke horacio', 'certificates', 'faucet'],
+    settingsSchema: DRAGONFIRESHIELD_SETTINGS,
+    create: () => new DragonfireShield()
 });
 
 ScriptRegistry.register({
@@ -654,7 +665,7 @@ ScriptRegistry.register({
     revision: 289,
     name: 'HerbloreSecondaries',
     description:
-        "Collects one herblore secondary — red spiders' eggs, snape grass, eye of newt, chocolate dust (buy+grind), white berries (dragonfire shield), toad's legs, or unicorn horn dust (grinds banked horns at the nearest bank) — with food on dangerous routes and a 5k coin cap for shops",
+        "Collects red spiders' eggs, snape grass, eye of newt, chocolate dust, white berries, toad's legs, blue dragon scales, or unicorn horn dust. Blue dragon scales use the Taverley Dungeon, a Dusty key, and a dragonfire shield. Carries food on dangerous routes and caps shop coins at 5k.",
     category: 'Herblore',
     tags: ['herblore', 'secondaries', 'banking', 'shopping', 'loot'],
     settingsSchema: HERBLORE_SECONDARIES_SETTINGS,

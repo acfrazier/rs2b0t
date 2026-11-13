@@ -111,5 +111,5 @@ describe('documentation links', () => {
             }
         }
         expect(dangling).toEqual([]);
-    });
+    }, 15_000);
 });

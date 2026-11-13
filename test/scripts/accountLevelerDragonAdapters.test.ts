@@ -17,13 +17,17 @@ import { emptyMemory, enabledSkills } from '#/bot/scripts/AccountLeveler/planner
 import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
 import { restoreSafety, safetyScenario } from './JiveDragons/safety.fixture.js';
 
+import { skip377 } from '../lib/skip377.js';
 const snapshot = (): LevelerSnapshot => ({ levels: Object.fromEntries(enabledSkills.map(skill => [skill, 50])),
     stock: { coins: 100000, lobster: 100, 'dragonfire shield': 1 }, quests: { 'Dragon Slayer': true }, target: 60,
     wilderness: true, bankReady: true, now: 1000 });
 
 afterEach(restoreSafety);
+const FILE = 'test/scripts/accountLevelerDragonAdapters.test.ts';
+// Why: AccountLeveler is unqualified on 377 and its generic Dragonhide option is absent from the 377 adapter schema.
+const skipUnqualifiedDragonAdapter = skip377(FILE, 'S10b keeps AccountLeveler at revision 289; the 289 Dragonhide setting is not supported by the 377 adapter schema.');
 
-for (const roll of [0, 0.999]) test(`dragon adapter ${roll} uses supported settings, keeps prepared food and carries its return fare`, async () => {
+for (const roll of [0, 0.999]) skipUnqualifiedDragonAdapter(`dragon adapter ${roll} uses supported settings, keeps prepared food and carries its return fare`, async () => {
     const s = snapshot();
     const plan = methodFor(s, 'prayer', emptyMemory(), () => roll)!;
     const meta = ScriptRegistry.get(plan.script)!;

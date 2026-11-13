@@ -10,6 +10,8 @@ import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import { resolveDangerZones } from '#/bot/event/webwalk/data/dangerZones.js';
 import type { LevelerSnapshot } from '#/bot/scripts/AccountLeveler/types.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
+import { skip377 } from '../lib/skip377.js';
 
 const additions = [
     { id: 'lumbridge-swamp-giant-rats', npcIds: [86, 87] },
@@ -49,6 +51,11 @@ const isolate = (id: string) => ({ ...emptyMemory(), cooldowns: Object.fromEntri
 const content = resolve('../rs2b2t-content');
 const hasSource = existsSync(`${content}/pack/npc.pack`);
 const hasNav = existsSync('out/collision.lcnav.gz');
+const skipUnqualifiedCampTests = CLIENT_VERSION === 377
+    ? skip377('test/scripts/accountLevelerLowLevelCamps.test.ts', 'S10b keeps AccountLeveler at revision 289; these camp source and route assertions pin 289 placements, not 377-qualified data.')
+    : null;
+const skipCampSource = skipUnqualifiedCampTests ?? test.skipIf(!hasSource);
+const skipCampRoutes = skipUnqualifiedCampTests ?? test.skipIf(!hasSource || !hasNav);
 type NpcConfig = Record<string, string>;
 interface Spawn { id: number; x: number; z: number; level: number }
 
@@ -143,7 +150,7 @@ test('teleporting imps and the three inaccessible starter sites remain excluded'
     for (const id of ['port-sarim-rats', 'varrock-chickens', 'varrock-rats']) expect(COMBAT_CAMPS.some(camp => camp.id === id)).toBe(false);
 });
 
-test.skipIf(!hasSource).each(additions)('source verifies attackable ordinary NPCs and safe nearby spawns at $id', ({ id, npcIds }) => {
+skipCampSource.each(additions)('source verifies attackable ordinary NPCs and safe nearby spawns at $id', ({ id, npcIds }) => {
     const camp = COMBAT_CAMPS.find(camp => camp.id === id);
     expect(camp, id).toBeDefined();
     if (!camp) return;
@@ -167,7 +174,7 @@ test.skipIf(!hasSource).each(additions)('source verifies attackable ordinary NPC
     }
 });
 
-test.skipIf(!hasSource || !hasNav).each(additions)('real routes reach $id and its target spawns without restricted doors', ({ id }) => {
+skipCampRoutes.each(additions)('real routes reach $id and its target spawns without restricted doors', ({ id }) => {
     const camp = COMBAT_CAMPS.find(camp => camp.id === id);
     expect(camp, id).toBeDefined();
     if (!camp) return;

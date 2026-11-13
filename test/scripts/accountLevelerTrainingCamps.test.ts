@@ -8,6 +8,8 @@ import { PathFinder } from '#/bot/event/webwalk/PathFinder.js';
 import { loadDefaultNavEdges } from '#/bot/event/webwalk/loadTransportGraph.js';
 import { emptyWorldStateData } from '#/bot/event/webwalk/worldStateData.js';
 import { resolveDangerZones } from '#/bot/event/webwalk/data/dangerZones.js';
+import { CLIENT_VERSION } from '#/client/io/ClientProt.js';
+import { skip377 } from '../lib/skip377.js';
 
 const additions = [
     { id: 'varrock-west-guards', npcIds: [9], maxThreat: 28 },
@@ -32,6 +34,11 @@ const additions = [
 const content = resolve('../rs2b2t-content');
 const hasSource = existsSync(`${content}/pack/npc.pack`);
 const hasNav = existsSync('out/collision.lcnav.gz');
+const skipUnqualifiedCampTests = CLIENT_VERSION === 377
+    ? skip377('test/scripts/accountLevelerTrainingCamps.test.ts', 'S10b keeps AccountLeveler at revision 289; these camp source and route assertions pin 289 placements, not 377-qualified data.')
+    : null;
+const skipCampSource = skipUnqualifiedCampTests ?? test.skipIf(!hasSource);
+const skipCampRoutes = skipUnqualifiedCampTests ?? test.skipIf(!hasSource || !hasNav);
 type NpcConfig = Record<string, string>;
 interface Spawn { id: number; x: number; z: number; level: number }
 
@@ -93,7 +100,7 @@ const variants: Record<number, [number, number]> = {
     112: [42, 60], 117: [28, 35], 122: [28, 29], 1076: [37, 40], 1077: [37, 40]
 };
 
-test.skipIf(!hasSource).each(additions)('source verifies ordinary variants and nearby threats at $id', ({ id, npcIds, maxThreat }) => {
+skipCampSource.each(additions)('source verifies ordinary variants and nearby threats at $id', ({ id, npcIds, maxThreat }) => {
     const camp = COMBAT_CAMPS.find(camp => camp.id === id);
     expect(camp, id).toBeDefined();
     if (!camp) return;
@@ -114,7 +121,7 @@ test.skipIf(!hasSource).each(additions)('source verifies ordinary variants and n
     }
 });
 
-test.skipIf(!hasSource || !hasNav).each(additions)('real routes reach $id and target spawns without restricted doors', ({ id }) => {
+skipCampRoutes.each(additions)('real routes reach $id and target spawns without restricted doors', ({ id }) => {
     const camp = COMBAT_CAMPS.find(camp => camp.id === id);
     expect(camp, id).toBeDefined();
     if (!camp) return;
