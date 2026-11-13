@@ -1,6 +1,6 @@
 import { afterEach, expect, mock, test } from 'bun:test';
 
-import IfType from '#/client/config/IfType.js';
+import IfType, { ComponentType } from '#/client/config/IfType.js';
 import ObjType from '#/client/config/ObjType.js';
 import JString from '#/client/datastruct/JString.js';
 import { ClientProt } from '#/client/io/ClientProt.js';
@@ -9,6 +9,7 @@ import { getClient377State } from '#/client/shell/Client377State.js';
 import { MiniMenuAction } from '#/client/shell/MiniMenuAction.js';
 import { Colour } from '#/client/graphics/Colour.js';
 import Pix2D from '#/client/graphics/Pix2D.js';
+import PixFont from '#/client/graphics/PixFont.js';
 
 mock.module('#/client/3rdparty/audio.js', () => ({
     playWave: async (): Promise<void> => {},
@@ -437,4 +438,137 @@ test('CS1 opcode 4 accepts the highest valid raw object ID (Client.java:11200-11
         ObjType.datEnd = original.datEnd;
         ObjType.memServer = original.memServer;
     }
+});
+
+test('type-8 tooltips use Java hover gates, tagged text widths and clipping (Client.java:10996-11046)', () => {
+    const original = {
+        pixels: Pix2D.pixels,
+        width: Pix2D.width,
+        height: Pix2D.height,
+        clipMinX: Pix2D.clipMinX,
+        clipMaxX: Pix2D.clipMaxX,
+        clipMinY: Pix2D.clipMinY,
+        clipMaxY: Pix2D.clipMaxY,
+        sizeX: Pix2D.sizeX,
+        maxX: Pix2D.maxX,
+        maxY: Pix2D.maxY
+    };
+    const pixels = new Int32Array(765 * 503);
+    const textDraws: [string, number, number, number, boolean][] = [];
+    const font = Object.assign(Object.create(PixFont.prototype), {
+        height: 10,
+        charAdvance: new Int32Array(128).fill(5),
+        drawStringTag: (text: string, x: number, y: number, colour: number, shadowed: boolean): void => {
+            textDraws.push([text, x, y, colour, shadowed]);
+        }
+    }) as PixFont;
+
+    try {
+        Pix2D.setPixels(pixels, 765, 503);
+
+        const root = new IfType();
+        root.id = 0;
+        root.type = ComponentType.TYPE_LAYER;
+        root.width = 140;
+        root.height = 60;
+        root.children = [1];
+        root.childX = [50];
+        root.childY = [20];
+
+        const tooltip = new IfType();
+        tooltip.id = 1;
+        tooltip.type = ComponentType.TYPE_TEXT_STATIC;
+        tooltip.width = 100;
+        tooltip.height = 10;
+        tooltip.text = '@red@Wide\\nshort';
+        IfType.list = [root, tooltip];
+
+        const client = clientFixture({
+            p12: font,
+            overMainComId: 1,
+            overSideComId: 0,
+            overChatComId: 0,
+            tooltipTimer: 100
+        });
+        const tooltipPainted = (main: number, side: number, chat: number, timer: number): boolean => {
+            pixels.fill(0);
+            client['overMainComId'] = main;
+            client['overSideComId'] = side;
+            client['overChatComId'] = chat;
+            client['tooltipTimer'] = timer;
+            client['drawInterface'](root, 20, 30, 0);
+            return pixels[62 * Pix2D.width + 130] === 0xffffa0;
+        };
+
+        expect(tooltipPainted(1, 0, 0, 100)).toBe(true);
+        expect(tooltipPainted(0, 1, 0, 100)).toBe(true);
+        expect(tooltipPainted(0, 0, 1, 100)).toBe(true);
+        expect(tooltipPainted(0, 0, 0, 100)).toBe(false);
+        expect(tooltipPainted(2, 0, 0, 100)).toBe(false);
+        expect(tooltipPainted(1, 0, 0, 99)).toBe(false);
+
+        pixels.fill(0);
+        textDraws.length = 0;
+        client['overMainComId'] = 1;
+        client['overSideComId'] = 0;
+        client['overChatComId'] = 0;
+        client['tooltipTimer'] = 100;
+        client['drawInterface'](root, 20, 30, 0);
+        expect(textDraws).toEqual([
+            ['@red@Wide', 132, 73, Colour.BLACK, false],
+            ['short', 132, 84, Colour.BLACK, false]
+        ]);
+        expect(pixels[62 * Pix2D.width + 130]).toBe(0xffffa0);
+        expect(pixels[61 * Pix2D.width + 129]).toBe(Colour.BLACK);
+        expect(pixels[89 * Pix2D.width + 159]).toBe(Colour.BLACK);
+        expect(Pix2D.clipMinX).toBe(0);
+        expect(Pix2D.clipMinY).toBe(0);
+        expect(Pix2D.clipMaxX).toBe(765);
+        expect(Pix2D.clipMaxY).toBe(503);
+
+        tooltip.text = '';
+        pixels.fill(0);
+        textDraws.length = 0;
+        client['drawInterface'](root, 20, 30, 0);
+        expect(textDraws).toEqual([]);
+        expect(pixels[66 * Pix2D.width + 155]).toBe(0xffffa0);
+
+        root.width = 20;
+        root.height = 50;
+        root.childX = [0];
+        root.childY = [0];
+        tooltip.width = 10;
+        tooltip.height = 10;
+        tooltip.text = 'abcde';
+        pixels.fill(0);
+        client['drawInterface'](root, 20, 30, 0);
+        expect(pixels[46 * Pix2D.width + 19]).toBe(0);
+        expect(pixels[46 * Pix2D.width + 20]).toBe(0xffffa0);
+        expect(pixels[46 * Pix2D.width + 39]).toBe(Colour.BLACK);
+        expect(pixels[46 * Pix2D.width + 40]).toBe(0);
+    } finally {
+        Object.assign(Pix2D, original);
+    }
+});
+
+test('type-8 tooltip timer holds 100 hovered cycles and decays without hover (Client.java:3306-3322)', () => {
+    const client = clientFixture({
+        overMainComId: 0,
+        overSideComId: 7,
+        overChatComId: 8,
+        tooltipTimer: 99,
+        redrawChat: false,
+        redrawSide: false
+    });
+
+    client['updateTooltipTimer']();
+    expect(client['tooltipTimer']).toBe(100);
+    expect(client['redrawChat']).toBe(true);
+    expect(client['redrawSide']).toBe(true);
+
+    client['overSideComId'] = 0;
+    client['overChatComId'] = 0;
+    client['tooltipTimer'] = 1;
+    client['updateTooltipTimer']();
+    expect(client['tooltipTimer']).toBe(0);
 });

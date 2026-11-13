@@ -556,6 +556,7 @@ export class Client extends GameShell {
     private overChatComId: number = 0;
     private overMainComId: number = 0;
     private overSideComId: number = 0;
+    private tooltipTimer: number = 0;
     private activeIcon: number = 3;
     private sideIcon: number[] = [
         -1, -1, -1,
@@ -2578,6 +2579,7 @@ export class Client extends GameShell {
         this.timeoutChat();
 
         this.worldUpdateNum++;
+        this.updateTooltipTimer();
 
         if (this.crossMode !== 0) {
             this.crossCycle += 20;
@@ -9791,6 +9793,25 @@ export class Client extends GameShell {
         }
     }
 
+    private updateTooltipTimer(): void {
+        if (this.overMainComId === 0 && this.overSideComId === 0 && this.overChatComId === 0) {
+            if (this.tooltipTimer > 0) {
+                this.tooltipTimer--;
+            }
+        } else if (this.tooltipTimer < 100) {
+            this.tooltipTimer++;
+
+            if (this.tooltipTimer === 100) {
+                if (this.overChatComId !== 0) {
+                    this.redrawChat = true;
+                }
+                if (this.overSideComId !== 0) {
+                    this.redrawSide = true;
+                }
+            }
+        }
+    }
+
     private drawInterface(com: IfType, x: number, y: number, scrollY: number): void {
         if (com.type !== 0 || !com.children || (com.hide && this.overMainComId !== com.id && this.overSideComId !== com.id && this.overChatComId !== com.id)) {
             return;
@@ -10151,6 +10172,71 @@ export class Client extends GameShell {
 
                         slot++;
                     }
+                }
+            } else if (
+                child.type === ComponentType.TYPE_TEXT_STATIC &&
+                (this.overChatComId === child.id || this.overSideComId === child.id || this.overMainComId === child.id) &&
+                this.tooltipTimer === 100
+            ) {
+                const font: PixFont | null = this.p12;
+                if (!font) {
+                    continue;
+                }
+
+                const tooltip: string = child.text!;
+                let width: number = 0;
+                let height: number = 0;
+                let measure: string = tooltip;
+                while (measure.length > 0) {
+                    const newline: number = measure.indexOf('\\n');
+                    let line: string;
+                    if (newline === -1) {
+                        line = measure;
+                        measure = '';
+                    } else {
+                        line = measure.substring(0, newline);
+                        measure = measure.substring(newline + 2);
+                    }
+
+                    const lineWidth: number = font.stringWid(line);
+                    if (lineWidth > width) {
+                        width = lineWidth;
+                    }
+                    height += font.height + 1;
+                }
+                width += 6;
+                height += 7;
+
+                let boxX: number = childX + child.width - 5 - width;
+                let boxY: number = childY + child.height + 5;
+                if (boxX < childX + 5) {
+                    boxX = childX + 5;
+                }
+                if (boxX + width > x + com.width) {
+                    boxX = x + com.width - width;
+                }
+                if (boxY + height > y + com.height) {
+                    boxY = y + com.height - height;
+                }
+
+                Pix2D.fillRect(boxX, boxY, width, height, 0xffffa0);
+                Pix2D.drawRect(boxX, boxY, width, height, Colour.BLACK);
+
+                let lineY: number = boxY + font.height + 2;
+                let draw: string = tooltip;
+                while (draw.length > 0) {
+                    const newline: number = draw.indexOf('\\n');
+                    let line: string;
+                    if (newline === -1) {
+                        line = draw;
+                        draw = '';
+                    } else {
+                        line = draw.substring(0, newline);
+                        draw = draw.substring(newline + 2);
+                    }
+
+                    font.drawStringTag(line, boxX + 3, lineY, Colour.BLACK, false);
+                    lineY += font.height + 1;
                 }
             }
         }
