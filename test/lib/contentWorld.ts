@@ -4,7 +4,7 @@ import { Glob } from 'bun';
 
 export type NpcConfig = Record<string, string>;
 export interface NpcSpawn { id: number; x: number; z: number; level: number }
-export const contentRoot = resolve('../rs2b2t-content');
+export const contentRoot = resolve(process.env.CONTENT_DIR ?? '../rs2b2t-content');
 export const hasContentSource = existsSync(`${contentRoot}/pack/npc.pack`);
 
 export function sourceWorld() {

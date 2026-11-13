@@ -14,8 +14,8 @@ const bank = { x: 3092, z: 3243, level: 0 };
 const camp = { x: 2522, z: 10023, level: 0 };
 const packPath = 'out/collision.lcnav.gz';
 const FILE = 'test/event/webwalk/lighthouseTransports.test.ts';
-// Why: 377's collision pack reaches the ladder landing but not the postquest floor exit, so the upstream route assertion does not describe a 377 path.
-const skipUnqualifiedLighthouseRoute = skip377(FILE, 'The canonical 377 collision pack cannot route from (2518,9994,1) to the postquest floor exit (2515,10008,0); retain this upstream 289 scenario for a qualified map.');
+// Why: skip377.ts:4 permits "a test whose scenario the 377 data does not contain". The 377 pack has no route between the ladder landing and postquest floor exit. See RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.
+const skipUnqualifiedLighthouseRoute = skip377(FILE, '377 data gap: the collision pack cannot route (2518,9994,1) to (2515,10008,0). Report: RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.');
 const postquest = [
     { debugName: 'horror_ladder_down', from: { x: 2507, z: 3644, level: 0 }, to: { x: 2518, z: 9994, level: 1 } },
     { debugName: 'horror_ladder_top', from: { x: 2510, z: 3644, level: 0 }, to: { x: 2518, z: 9994, level: 1 } },

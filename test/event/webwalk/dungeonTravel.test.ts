@@ -27,8 +27,8 @@ const fire = { x: 2659, z: 9483, level: 0 };
 const worker = { x: 3503, z: 9524, level: 2 };
 const packPath = 'out/collision.lcnav.gz';
 const FILE = 'test/event/webwalk/dungeonTravel.test.ts';
-// Why: Revision 377's generated `karam_dungeon_exit` transport has no matching OPLOC handler, so the upstream 289 return path is unavailable here.
-const skipUnqualifiedBrimhavenReturn = skip377(FILE, 'The 377 transport row karam_dungeon_exit is disabled: no matching revision-377 OPLOC handler for its `leave` action.');
+// Why: skip377.ts:4 permits "a test whose scenario the 377 data does not contain". transports.json disables karam_dungeon_exit without a 377 OPLOC leave handler. See RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.
+const skipUnqualifiedBrimhavenReturn = skip377(FILE, '377 data gap: karam_dungeon_exit has no OPLOC leave handler (transports.json:196). Report: RS2B0T-377-UPSTREAM-MERGE-1112/fix-r2.md.');
 const supplies = () => ({ ...emptyWorldStateData(), skills: { agility: 12, woodcutting: 27 }, items: { Coins: 1000, 'Bronze axe': 1, Rope: 1, 'Shantay pass': 1 } });
 
 describe.skipIf(!existsSync(packPath))('dungeon collision routes', () => {
