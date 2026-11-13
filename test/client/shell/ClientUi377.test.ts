@@ -6,6 +6,8 @@ import { ClientProt } from '#/client/io/ClientProt.js';
 import Packet from '#/client/io/Packet.js';
 import { getClient377State } from '#/client/shell/Client377State.js';
 import { MiniMenuAction } from '#/client/shell/MiniMenuAction.js';
+import { Colour } from '#/client/graphics/Colour.js';
+import Pix2D from '#/client/graphics/Pix2D.js';
 
 mock.module('#/client/3rdparty/audio.js', () => ({
     playWave: async (): Promise<void> => {},
@@ -312,4 +314,40 @@ test('an npc whose multinpc form resolves to nothing draws no overlay at all (Cl
     Client.loopCycle = 0;
     client['entityOverlays']();
     expect(log).toEqual([]);
+});
+test('HP bars follow the Java combat-cycle gate (Client.java:6408-6416)', () => {
+    const originalLoopCycle = Client.loopCycle;
+    const originalFillRect = Pix2D.fillRect;
+    const fills: [number, number, number, number, number][] = [];
+    const localPlayer = {
+        isReady: () => true,
+        height: 50,
+        headiconPk: -1,
+        headiconPrayer: -1,
+        chatMessage: null,
+        combatCycle: 100,
+        health: 5,
+        totalHealth: 10,
+        damageCycles: new Int32Array(4)
+    };
+    const client = overlayClient({ localPlayer });
+    Pix2D.fillRect = (x, y, width, height, colour): void => {
+        fills.push([x, y, width, height, colour]);
+    };
+
+    try {
+        Client.loopCycle = 100;
+        client['entityOverlays']();
+        expect(fills).toEqual([]);
+
+        localPlayer.combatCycle = 101;
+        client['entityOverlays']();
+        expect(fills).toEqual([
+            [85, 197, 15, 5, Colour.GREEN],
+            [100, 197, 15, 5, Colour.RED]
+        ]);
+    } finally {
+        Client.loopCycle = originalLoopCycle;
+        Pix2D.fillRect = originalFillRect;
+    }
 });

@@ -5016,7 +5016,7 @@ export class Client extends GameShell {
                 }
             }
 
-            if (entity.combatCycle > Client.loopCycle + 100) {
+            if (entity.combatCycle > Client.loopCycle) {
                 this.getOverlayPosEntity(entity, entity.height + 15);
 
                 if (this.projectX > -1) {
